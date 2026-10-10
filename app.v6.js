@@ -50,6 +50,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const arraysContainer = document.getElementById('arrays-container');
   const sectionConstants = document.getElementById('section-constants');
   const constantsGrid = document.getElementById('constants-grid');
+  const varViewToggle = document.getElementById('var-view-toggle');
+  const varCardsBtn = document.getElementById('var-cards-btn');
+  const varTableBtn = document.getElementById('var-table-btn');
+  const varStatusBar = document.getElementById('var-status-bar');
+  const varStatusText = document.getElementById('var-status-text');
+  const varLastChangeBadge = document.getElementById('var-last-change-badge');
+  const varSearchInput = document.getElementById('var-search-input');
+  const variablesCardsView = document.getElementById('variables-cards-view');
+  const variablesTableView = document.getElementById('variables-table-view');
+  const variablesTableBody = document.getElementById('variables-table-body');
 
   // DOM Elements - Trace Table
   const traceEmpty = document.getElementById('trace-empty');
@@ -372,13 +382,65 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabId === 'tab-trace') {
       copyTraceBtn.style.display = 'inline-flex';
       clearTerminalBtn.style.display = 'none';
+      if (varViewToggle) varViewToggle.style.display = 'none';
     } else if (tabId === 'tab-terminal') {
       copyTraceBtn.style.display = 'none';
       clearTerminalBtn.style.display = 'inline-flex';
+      if (varViewToggle) varViewToggle.style.display = 'none';
+    } else if (tabId === 'tab-variables') {
+      copyTraceBtn.style.display = 'none';
+      clearTerminalBtn.style.display = 'none';
+      if (varViewToggle) varViewToggle.style.display = 'inline-flex';
     } else {
       copyTraceBtn.style.display = 'none';
       clearTerminalBtn.style.display = 'none';
+      if (varViewToggle) varViewToggle.style.display = 'none';
     }
+  }
+
+  // Variable View Toggle (Cards vs Table)
+  if (varCardsBtn && varTableBtn) {
+    varCardsBtn.addEventListener('click', () => {
+      varCardsBtn.classList.add('active');
+      varTableBtn.classList.remove('active');
+      if (variablesCardsView) variablesCardsView.style.display = 'block';
+      if (variablesTableView) variablesTableView.style.display = 'none';
+    });
+
+    varTableBtn.addEventListener('click', () => {
+      varTableBtn.classList.add('active');
+      varCardsBtn.classList.remove('active');
+      if (variablesCardsView) variablesCardsView.style.display = 'none';
+      if (variablesTableView) variablesTableView.style.display = 'block';
+    });
+  }
+
+  // Variable Filter / Search Input
+  if (varSearchInput) {
+    varSearchInput.addEventListener('input', (e) => {
+      const q = e.target.value.trim().toUpperCase();
+      filterVariablesDisplay(q);
+    });
+  }
+
+  function filterVariablesDisplay(query) {
+    const cards = document.querySelectorAll('.memory-box-card');
+    cards.forEach(card => {
+      const name = (card.getAttribute('data-var-name') || '').toUpperCase();
+      card.style.display = (!query || name.includes(query)) ? '' : 'none';
+    });
+
+    const arrayBoxes = document.querySelectorAll('.array-box');
+    arrayBoxes.forEach(box => {
+      const name = (box.getAttribute('data-var-name') || '').toUpperCase();
+      box.style.display = (!query || name.includes(query)) ? '' : 'none';
+    });
+
+    const tableRows = document.querySelectorAll('#variables-table-body tr');
+    tableRows.forEach(row => {
+      const name = (row.getAttribute('data-var-name') || '').toUpperCase();
+      row.style.display = (!query || name.includes(query)) ? '' : 'none';
+    });
   }
 
   clearTerminalBtn.addEventListener('click', () => {
@@ -505,13 +567,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function resetInspector() {
     previousVariableValues = {};
-    varCountBadge.textContent = '0';
-    variablesEmpty.style.display = 'flex';
-    variablesContent.style.display = 'none';
-    primitivesGrid.innerHTML = '';
-    arraysContainer.innerHTML = '';
-    constantsGrid.innerHTML = '';
-    sectionConstants.style.display = 'none';
+    if (varCountBadge) varCountBadge.textContent = '0';
+    if (variablesEmpty) variablesEmpty.style.display = 'flex';
+    if (variablesContent) variablesContent.style.display = 'none';
+    if (primitivesGrid) primitivesGrid.innerHTML = '';
+    if (arraysContainer) arraysContainer.innerHTML = '';
+    if (constantsGrid) constantsGrid.innerHTML = '';
+    if (sectionConstants) sectionConstants.style.display = 'none';
+    if (variablesTableBody) variablesTableBody.innerHTML = '';
+    if (varLastChangeBadge) varLastChangeBadge.style.display = 'none';
   }
 
   function updateVariableInspector(variables) {
@@ -520,8 +584,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    variablesEmpty.style.display = 'none';
-    variablesContent.style.display = 'block';
+    if (variablesEmpty) variablesEmpty.style.display = 'none';
+    if (variablesContent) variablesContent.style.display = 'block';
 
     let totalVarCount = 0;
     const currentPrimitives = {};
@@ -532,81 +596,136 @@ document.addEventListener('DOMContentLoaded', () => {
       if (name === 'EOLN') continue; // Skip internal marker
       totalVarCount++;
 
+      const isConst = rawInfo && typeof rawInfo === 'object' && rawInfo.isConstant;
+
       if (rawInfo instanceof ArrayObject || (rawInfo && rawInfo.type === 'array')) {
         currentArrays[name] = rawInfo;
+      } else if (isConst) {
+        const val = (rawInfo && typeof rawInfo === 'object' && 'value' in rawInfo) ? rawInfo.value : rawInfo;
+        currentConstants[name] = val;
       } else {
         const val = (rawInfo && typeof rawInfo === 'object' && 'value' in rawInfo) ? rawInfo.value : rawInfo;
         currentPrimitives[name] = val;
       }
     }
 
-    varCountBadge.textContent = totalVarCount;
+    if (varCountBadge) varCountBadge.textContent = totalVarCount;
 
-    // 1. Render Primitives
+    let latestChangeText = '';
+
+    // 1. Render Primitives (Visual Memory Boxes)
     primitivesGrid.innerHTML = '';
     for (const [name, val] of Object.entries(currentPrimitives)) {
       const card = document.createElement('div');
-      card.className = 'var-card';
+      card.className = 'memory-box-card';
+      card.setAttribute('data-var-name', name);
 
       const prev = previousVariableValues[name];
-      if (prev !== undefined && prev !== val) {
+      const hasChanged = prev !== undefined && prev !== val;
+      if (hasChanged) {
         card.classList.add('just-changed');
+        latestChangeText = `${name} = ${val} (από ${prev})`;
       }
 
-      let typeStr = 'ΑΚΕΡΑΙΟΣ';
+      let typeName = 'ΑΚΕΡΑΙΟΣ';
+      let typeClass = 'type-integer';
       if (typeof val === 'number') {
-        typeStr = Number.isInteger(val) ? 'INTEGER' : 'REAL';
+        if (Number.isInteger(val)) {
+          typeName = 'ΑΚΕΡΑΙΟΣ';
+          typeClass = 'type-integer';
+        } else {
+          typeName = 'ΠΡΑΓΜΑΤΙΚΟΣ';
+          typeClass = 'type-real';
+        }
       } else if (typeof val === 'boolean') {
-        typeStr = 'BOOLEAN';
+        typeName = 'ΛΟΓΙΚΟΣ';
+        typeClass = 'type-boolean';
       } else if (typeof val === 'string') {
-        typeStr = val.length === 1 ? 'CHAR' : 'STRING';
+        typeName = val.length === 1 ? 'ΧΑΡΑΚΤΗΡΑΣ' : 'ΣΥΜΒΟΛΟΣΕΙΡΑ';
+        typeClass = 'type-string';
       }
 
-      const displayVal = typeof val === 'boolean' ? (val ? 'TRUE (ΑΛΗΘΗΣ)' : 'FALSE (ΨΕΥΔΗΣ)') :
-                         typeof val === 'string' ? `"${val}"` : val;
+      let heroValueHtml = '';
+      if (typeof val === 'boolean') {
+        heroValueHtml = val
+          ? `<div class="val-boolean-chip is-true">🟢 TRUE / ΑΛΗΘΗΣ</div>`
+          : `<div class="val-boolean-chip is-false">🔴 FALSE / ΨΕΥΔΗΣ</div>`;
+      } else if (typeof val === 'string') {
+        heroValueHtml = `
+          <div class="mem-value-hero val-string-chip">"${escapeHTML(val)}"</div>
+          <div class="mem-label">${val.length === 1 ? 'Χαρακτήρας' : 'Μήκος: ' + val.length + ' χαρ.'}</div>
+        `;
+      } else {
+        heroValueHtml = `<div class="mem-value-hero">${val}</div>`;
+      }
+
+      let footerHtml = '';
+      if (hasChanged) {
+        footerHtml = `<span class="mem-diff-text">⚡ Άλλαξε: ${prev} ➔ ${val}</span>`;
+      } else if (prev === undefined) {
+        footerHtml = `<span>✨ Αρχική τιμή: ${val}</span>`;
+      } else {
+        footerHtml = `<span>✓ Αμετάβλητη</span>`;
+      }
 
       card.innerHTML = `
-        <div class="var-name-row">
-          <span class="var-name">${escapeHTML(name)}</span>
-          <span class="var-type">${typeStr}</span>
+        <div class="mem-header">
+          <div class="mem-title-group">
+            <span class="mem-icon">📦</span>
+            <span class="mem-name">${escapeHTML(name)}</span>
+          </div>
+          <span class="mem-type-badge ${typeClass}">${typeName}</span>
         </div>
-        <div class="var-val">${escapeHTML(String(displayVal))}</div>
+        <div class="mem-value-section">
+          <span class="mem-label">ΤΙΜΗ ΣΤΗ ΜΝΗΜΗ</span>
+          ${heroValueHtml}
+        </div>
+        <div class="mem-footer">
+          ${footerHtml}
+        </div>
       `;
       primitivesGrid.appendChild(card);
     }
 
-    // 2. Render Arrays
+    // 2. Render Arrays (Memory Tapes & Matrices)
     arraysContainer.innerHTML = '';
     for (const [name, arrObj] of Object.entries(currentArrays)) {
       const box = document.createElement('div');
       box.className = 'array-box';
+      box.setAttribute('data-var-name', name);
 
-      const bounds = arrObj.bounds;
+      const bounds = arrObj.bounds || [];
       const data = arrObj.data || {};
       const dimStr = bounds.map(b => `${b.from}..${b.to}`).join(', ');
 
       if (bounds.length === 1) {
-        // 1D Array
+        // 1D Array Tape
         const b = bounds[0];
         let cellsHtml = '';
+        let changedInThisArray = 0;
         for (let idx = b.from; idx <= b.to; idx++) {
           const key = String(idx);
           const cellVal = data.hasOwnProperty(key) ? data[key] : 0;
           const prevKey = `${name}[${key}]`;
           const isChanged = previousVariableValues[prevKey] !== undefined && previousVariableValues[prevKey] !== cellVal;
+          if (isChanged) {
+            changedInThisArray++;
+            latestChangeText = `${name}[${idx}] = ${cellVal}`;
+          }
 
           cellsHtml += `
             <div class="array-cell ${isChanged ? 'just-changed' : ''}">
-              <div class="array-cell-idx">[${idx}]</div>
+              <div class="array-cell-idx">${escapeHTML(name)}[${idx}]</div>
               <div class="array-cell-val">${escapeHTML(String(cellVal))}</div>
             </div>
           `;
         }
 
+        const countTotal = (b.to - b.from + 1);
         box.innerHTML = `
           <div class="array-title">
-            <span>${escapeHTML(name)}</span>
-            <span class="array-dim-badge">ARRAY[${dimStr}]</span>
+            <span>📊 ${escapeHTML(name)}</span>
+            <span class="array-dim-badge">ARRAY[${dimStr}] &bull; ${countTotal} Θέσεις</span>
           </div>
           <div class="array-cells">${cellsHtml}</div>
         `;
@@ -617,17 +736,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let tableHtml = '<table class="matrix-2d-table"><thead><tr><th>[i\\j]</th>';
         for (let j = colB.from; j <= colB.to; j++) {
-          tableHtml += `<th>[${j}]</th>`;
+          tableHtml += `<th>j=${j}</th>`;
         }
         tableHtml += '</tr></thead><tbody>';
 
         for (let i = rowB.from; i <= rowB.to; i++) {
-          tableHtml += `<tr><th>[${i}]</th>`;
+          tableHtml += `<tr><th>i=${i}</th>`;
           for (let j = colB.from; j <= colB.to; j++) {
             const key = `${i},${j}`;
             const cellVal = data.hasOwnProperty(key) ? data[key] : 0;
             const prevKey = `${name}[${key}]`;
             const isChanged = previousVariableValues[prevKey] !== undefined && previousVariableValues[prevKey] !== cellVal;
+            if (isChanged) {
+              latestChangeText = `${name}[${i},${j}] = ${cellVal}`;
+            }
 
             tableHtml += `<td class="${isChanged ? 'just-changed' : ''}">${escapeHTML(String(cellVal))}</td>`;
           }
@@ -635,10 +757,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         tableHtml += '</tbody></table>';
 
+        const rowsCount = (rowB.to - rowB.from + 1);
+        const colsCount = (colB.to - colB.from + 1);
         box.innerHTML = `
           <div class="array-title">
-            <span>${escapeHTML(name)}</span>
-            <span class="array-dim-badge">ARRAY[${dimStr}] (2D Matrix)</span>
+            <span>📊 ${escapeHTML(name)}</span>
+            <span class="array-dim-badge">ARRAY[${dimStr}] (2D Matrix: ${rowsCount}x${colsCount})</span>
           </div>
           ${tableHtml}
         `;
@@ -647,7 +771,116 @@ document.addEventListener('DOMContentLoaded', () => {
       arraysContainer.appendChild(box);
     }
 
-    // Save previous values for next step diff
+    // 3. Render Constants
+    if (Object.keys(currentConstants).length > 0) {
+      sectionConstants.style.display = 'block';
+      constantsGrid.innerHTML = '';
+      for (const [name, val] of Object.entries(currentConstants)) {
+        const card = document.createElement('div');
+        card.className = 'memory-box-card';
+        card.setAttribute('data-var-name', name);
+        card.innerHTML = `
+          <div class="mem-header">
+            <div class="mem-title-group">
+              <span class="mem-icon">🔒</span>
+              <span class="mem-name">${escapeHTML(name)}</span>
+            </div>
+            <span class="mem-type-badge type-constant">ΣΤΑΘΕΡΑ</span>
+          </div>
+          <div class="mem-value-section">
+            <span class="mem-label">ΚΛΕΙΔΩΜΕΝΗ ΤΙΜΗ</span>
+            <div class="mem-value-hero">${escapeHTML(String(val))}</div>
+          </div>
+          <div class="mem-footer">
+            <span>🔒 Δεν τροποποιείται</span>
+          </div>
+        `;
+        constantsGrid.appendChild(card);
+      }
+    } else {
+      sectionConstants.style.display = 'none';
+    }
+
+    // 4. Render Table View
+    if (variablesTableBody) {
+      variablesTableBody.innerHTML = '';
+      
+      // Add Primitives to Table
+      for (const [name, val] of Object.entries(currentPrimitives)) {
+        const prev = previousVariableValues[name];
+        const isChanged = prev !== undefined && prev !== val;
+        let typeStr = typeof val === 'number' ? (Number.isInteger(val) ? 'INTEGER' : 'REAL') :
+                       typeof val === 'boolean' ? 'BOOLEAN' : 'STRING';
+        
+        const displayVal = typeof val === 'boolean' ? (val ? 'TRUE' : 'FALSE') :
+                           typeof val === 'string' ? `"${val}"` : val;
+
+        const row = document.createElement('tr');
+        row.setAttribute('data-var-name', name);
+        if (isChanged) row.className = 'row-changed';
+        row.innerHTML = `
+          <td><strong>${escapeHTML(name)}</strong></td>
+          <td><span class="mem-type-badge type-${typeStr.toLowerCase()}">${typeStr}</span></td>
+          <td><strong style="color:var(--button-bg); font-size:1.1rem;">${escapeHTML(String(displayVal))}</strong></td>
+          <td>${prev !== undefined ? escapeHTML(String(prev)) : '-'}</td>
+          <td><span class="status-pill ${isChanged ? 'updated' : 'initial'}">${isChanged ? '⚡ Ενημερώθηκε' : 'Αμετάβλητη'}</span></td>
+        `;
+        variablesTableBody.appendChild(row);
+      }
+
+      // Add Constants to Table
+      for (const [name, val] of Object.entries(currentConstants)) {
+        const row = document.createElement('tr');
+        row.setAttribute('data-var-name', name);
+        row.innerHTML = `
+          <td><strong>${escapeHTML(name)}</strong></td>
+          <td><span class="mem-type-badge type-constant">ΣΤΑΘΕΡΑ</span></td>
+          <td><strong style="color:var(--button-bg); font-size:1.1rem;">${escapeHTML(String(val))}</strong></td>
+          <td>-</td>
+          <td><span class="status-pill initial">🔒 Σταθερά</span></td>
+        `;
+        variablesTableBody.appendChild(row);
+      }
+
+      // Add Arrays Summary to Table
+      for (const [name, arrObj] of Object.entries(currentArrays)) {
+        const bounds = arrObj.bounds || [];
+        const dimStr = bounds.map(b => `${b.from}..${b.to}`).join(', ');
+        const row = document.createElement('tr');
+        row.setAttribute('data-var-name', name);
+        row.innerHTML = `
+          <td><strong>${escapeHTML(name)}</strong></td>
+          <td><span class="mem-type-badge type-integer">ARRAY[${dimStr}]</span></td>
+          <td colspan="2"><small>Δείτε αναλυτικά τα κελιά στην προβολή "Κάρτες"</small></td>
+          <td><span class="status-pill initial">📊 Πίνακας</span></td>
+        `;
+        variablesTableBody.appendChild(row);
+      }
+    }
+
+    // 5. Update Status Bar Summary & Last Change Badge
+    if (varStatusText) {
+      const pCount = Object.keys(currentPrimitives).length;
+      const aCount = Object.keys(currentArrays).length;
+      const cCount = Object.keys(currentConstants).length;
+      varStatusText.textContent = `📦 ${totalVarCount} Ενεργές (${pCount} Απλές, ${aCount} Πίνακες, ${cCount} Σταθερές)`;
+    }
+
+    if (varLastChangeBadge) {
+      if (latestChangeText) {
+        varLastChangeBadge.style.display = 'inline-block';
+        varLastChangeBadge.textContent = `⚡ Τελευταία αλλαγή: ${latestChangeText}`;
+      } else {
+        varLastChangeBadge.style.display = 'none';
+      }
+    }
+
+    // 6. Re-apply search filter if user already typed in search box
+    if (varSearchInput && varSearchInput.value.trim()) {
+      filterVariablesDisplay(varSearchInput.value.trim().toUpperCase());
+    }
+
+    // 7. Save previous values for next step diff
     for (const [name, val] of Object.entries(currentPrimitives)) {
       previousVariableValues[name] = val;
     }

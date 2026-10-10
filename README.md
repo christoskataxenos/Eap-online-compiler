@@ -1,107 +1,113 @@
-# 🟣 EAP Online Compiler (Pseudo-Language Interpreter)
+# EAP Online Compiler
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
-[![Stack: Vanilla JS](https://img.shields.io/badge/Tech-Vanilla%20JS-F7DF1E.svg?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![AI Assisted](https://img.shields.io/badge/Built%20With-GenAI%20%7C%20Gemini-8E75B2.svg)](https://deepmind.google/technologies/gemini/)
-[![Context](https://img.shields.io/badge/University-Hellenic%20Open%20University-blue.svg)](https://www.eap.gr/)
+Browser-based interpreter και debugger για την Ψευδογλώσσα του Ελληνικού Ανοικτού Πανεπιστημίου.
+
+> **Γιατί το να γράψεις μια άσκηση ΠΛΗ10 δεν θα έπρεπε να απαιτεί να παλέψεις με το `plh10.exe`.**
+
+[![Άδεια: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
+[![Vanilla JS](https://img.shields.io/badge/Tech-Vanilla%20JS-F7DF1E.svg?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+[![Tests](https://img.shields.io/badge/tests-66%20αρχεία%20ΕΑΠ-brightgreen.svg)](#έλεγχοι)
 
 <p align="center">
-  <a href="#-english-version"><strong>[ 🇬🇧 English Version ]</strong></a> | 
-  <a href="#-ελληνική-έκδοση"><strong>[ 🇬🇷 Ελληνική Έκδοση ]</strong></a>
+  <a href="https://eap-online-compiler.vercel.app/"><strong>Δοκίμασέ το live</strong></a>
 </p>
 
 ---
 
-<div id="english"></div>
+## Τι είναι;
 
-## 🇬🇧 English Version
+Το EAP Online Compiler είναι ένας interpreter και debugger για την ελληνική Ψευδογλώσσα της ΠΛΗ10. Τρέχει εξ ολοκλήρου στον browser, χωρίς εγκατάσταση, backend ή εξάρτηση από λειτουργικό σύστημα.
 
-> **Human vs Machine:** This project was born out of frustration. The official university compiler was a legacy Windows-only executable that often failed on modern systems. I built this to give every student—regardless of OS—a working tool. To ship it fast, I used **AI-Orchestrated Engineering**.
+Με απλά λόγια: ανοίγεις τη σελίδα, γράφεις κώδικα, πατάς εκτέλεση και βλέπεις τι πραγματικά κάνει αυτό το έκτρωμα ψευδοκώδικα.
 
-### 🎯 The Motivation: Fixing the "Windows-Only" Bottleneck
-Students at the Hellenic Open University (EAP) struggled with the official pseudo-code interpreter (`plh10.exe`).
-* ❌ It was **Windows-only**, excluding macOS and Linux users.
-* ❌ It required local installation and configuration.
-* ❌ It was prone to crashes and lacked modern debugging features.
+## Γιατί δημιουργήθηκε;
 
-**The Solution:** I reverse-engineered the language specifications and built a **Web-Based Interpreter** that runs on any device, right in the browser.
+Το επίσημο εργαλείο του ΕΑΠ είναι ένα legacy Windows executable. Αυτό σημαίνει:
 
-### ⚙️ The "AI-First" Workflow
-To solve this urgent problem quickly without mastering the nuances of JS parsers first, I leveraged AI:
+- περιορισμός σε Windows,
+- εγκατάσταση και ρυθμίσεις PATH,
+- προβλήματα σε σύγχρονα περιβάλλοντα ανάπτυξης,
+- φτωχό error reporting,
+- απουσία visual debugging,
+- και πιθανότητα να χαλάσει το περιβάλλον GCC/MinGW ενώ προσπαθείς απλώς να κάνεις την εργασία σου.
 
-#### 1. Data Ingestion (The "Dirty" Work) 🤖
-* **Input:** Unstructured University PDF textbooks containing syntax rules.
-* **Tool:** **Gemini CLI**.
-* **Process:** I fed the PDFs to the LLM and prompted it to extract the formal grammar (BNF-style) and generate the core **Tokenizer** and **Parser** logic.
+Η λύση είναι ένας ελαφρύς, cross-platform interpreter που ανοίγει ακόμη και απευθείας από το filesystem.
 
-#### 2. The Human Touch (Architecture & UI) 👨‍💻
-* **Role:** Product Engineer.
-* **Task:** AI handled the parsing logic, but I designed the **Cyberpunk/Dark Mode** UI to make coding pleasant. I ensured the architecture supported specific memory features (Global vs Local scope) that the official tool often mishandled.
+## Χαρακτηριστικά
 
-#### 3. Integration (The App Layer) 🚀
-* **Tool:** **Google Jules / AI Assistants**.
-* **Task:** Wiring the logic into a reactive Web App, ensuring 100% client-side execution for privacy and speed.
+- **Editor CodeMirror:** syntax highlighting, αντιστοίχιση παρενθέσεων, αυτόματο κλείσιμο και autocomplete για την ελληνική Ψευδογλώσσα.
+- **Βήμα-βήμα εκτέλεση:** εκτέλεση εντολή-προς-εντολή με επισήμανση της ενεργής γραμμής και ρύθμιση ταχύτητας.
+- **Επιθεωρητής μεταβλητών και μνήμης (Visual Memory Inspector):** ζωντανή προβολή πραγματικών τιμών σε στυλ "Κουτιών Μνήμης" (Memory Boxes), οπτική αναπαράσταση μονοδιάστατων πινάκων (RAM tape με δείκτες) και 2D πινάκων, badges λογικών τιμών (ΑΛΗΘΗΣ / ΨΕΥΔΗΣ), δυναμική επισήμανση πρόσφατων αλλαγών (live diff glow) και εναλλαγή μεταξύ Καρτών (Cards) και αναλυτικού Πίνακα (Table).
+- **Πίνακας τιμών:** καταγραφή των τιμών κατά την εκτέλεση και αντιγραφή σε Markdown.
+- **Υποστήριξη `.eap`:** άνοιγμα και αποθήκευση αρχείων Windows-1253 και UTF-8.
+- **Κοινοποίηση κώδικα:** δημιουργία shareable URL με συμπίεση LZ-String.
+- **Παραδείγματα ύλης:** ταξινομήσεις, αναζητήσεις, πίνακες, αναδρομή και κλήση με αναφορά.
+- **Client-side λειτουργία:** χωρίς backend και με δυνατότητα offline χρήσης.
 
-### ⚡ Features (v2.0)
-* **CodeMirror Editor:** Syntax highlighting, matching brackets, auto-closing brackets, and context-aware autocomplete for Greek pseudocode.
-* **Step-by-Step Visual Debugger:** Step through code line-by-line (⏭ ΒΗΜΑ) with active line highlighting and speed control (⏱️ Normal, 200ms, 500ms, 1s).
-* **Live Memory & Variables Inspector:** Real-time scope inspection displaying primitive variables, 1D arrays, and 2D matrices with animated diff highlighting (`.just-changed`).
-* **Trace Table (Πίνακας Τιμών):** Automatic generation of the execution trace table required in EAP exams and homework, with one-click export to Markdown (`📋 Copy Markdown`).
-* **Cross-Platform & Offline:** 100% client-side, zero backend dependencies. Works in any browser even when opened directly from file system (`file://`).
-* **Legacy Windows-1253 File Decoding:** Open and save official university `.eap` files in both Windows-1253 and UTF-8 formats.
-* **Code Sharing via URL:** Share code snippets instantly using LZ-String permalinks.
-* **Curated Curriculum Examples:** 17 official university examples across 8 categories (Sorts, Searches, 2D Matrices, Recursion, References).
-* **Comprehensive Automated Test Suite:** 100% pass rate across all 66 official university curriculum `.eap` files (`npm test`).
+## Live Demo
 
-### 🚀 Quick Start
-1.  **Clone** this repository.
-2.  Open `index.html` or `editor.html` in **any** browser.
-3.  Or run tests with `npm test`.
+**[Άνοιξε τον EAP Online Compiler](https://eap-online-compiler.vercel.app/)**
+
+## Εγκατάσταση και χρήση
+
+Δεν χρειάζεται εγκατάσταση dependencies για να χρησιμοποιήσεις την εφαρμογή.
+
+```bash
+git clone https://github.com/christoskataxenos/Eap-online-compiler.git
+cd Eap-online-compiler
+```
+
+Άνοιξε το `index.html` ή το `editor.html` σε οποιονδήποτε σύγχρονο browser.
+
+## Έλεγχοι
+
+Χρειάζεσαι Node.js για να τρέξεις το test suite:
+
+```bash
+npm test
+```
+
+Οι έλεγχοι επαληθεύουν τη λειτουργία του interpreter και κάνουν parse και στα 66 αρχεία `.eap` του φακέλου `tests/`.
+
+## Δομή του project
+
+```text
+.
+├── index.html       # Landing page
+├── editor.html      # Κύριος editor και debugger
+├── app.v6.js        # UI και application logic
+├── core.v6.js       # Πυρήνας του interpreter
+├── eap-mode.js      # CodeMirror grammar mode
+├── examples.js      # Παραδείγματα ύλης
+├── style.css        # Themes και layout
+└── tests/            # Tests και αρχεία .eap
+```
+
+## Τεχνολογίες
+
+- **JavaScript:** Vanilla JS / ES6+
+- **Editor:** CodeMirror 5
+- **Frontend:** HTML5 και CSS3
+- **Tests:** Node.js test runner
+- **Libraries:** LZ-String και CodeMirror vendor builds
+
+## Συνεισφορά
+
+Αν είσαι φοιτητής του ΕΑΠ και θέλεις να βελτιώσεις το εργαλείο:
+
+1. Κάνε fork το repository.
+2. Δημιούργησε ένα feature branch.
+3. Τρέξε `npm test`.
+4. Άνοιξε Pull Request με σύντομη περιγραφή της αλλαγής.
+
+## English Summary
+
+EAP Online Compiler is a browser-based interpreter and debugger for the Hellenic Open University pseudocode language. It is a cross-platform alternative to the legacy `plh10.exe` workflow and includes step execution, variable inspection, trace tables, `.eap` file support, code sharing and curriculum examples.
+
+## Άδεια χρήσης
+
+Το project διατίθεται με την [MIT License](LICENSE).
 
 ---
 
-<div id="greek"></div>
-
-## 🇬🇷 Ελληνική Έκδοση
-
-> **Human vs Machine:** Αυτό το project γεννήθηκε από ανάγκη. Ο επίσημος compiler του ΕΑΠ ήταν ένα παλιό εκτελέσιμο αρχείο (.exe) που απέκλειε χρήστες macOS/Linux και συχνά δυσλειτουργούσε. Έφτιαξα αυτό το εργαλείο για να δώσω λύση σε όλους τους φοιτητές, χρησιμοποιώντας **AI-Orchestrated Engineering** για ταχύτητα.
-
-### 🎯 Το Κίνητρο: Πέρα από το plh10.exe
-Πολλοί φοιτητές στην ενότητα ΠΛΗ10 αντιμετώπιζαν προβλήματα με το επίσημο λογισμικό:
-* ❌ Λειτουργούσε **μόνο σε Windows**.
-* ❌ Απαιτούσε εγκατάσταση.
-* ❌ Είχε φτωχό error reporting και καθόλου δυνατότητες visual debugging.
-
-**Η Λύση:** Ένας σύγχρονος **Web-Based Interpreter & Debugger** που τρέχει παντού (κινητά, tablet, Mac, PC, Linux) χωρίς καμία εγκατάσταση.
-
-### ⚡ Χαρακτηριστικά (v2.0)
-* **Σύγχρονος Συντάκτης CodeMirror:** Πλήρης υποστήριξη της ελληνικής ψευδογλώσσας, αυτόματη συμπλήρωση (autocomplete), ταίριασμα παρενθέσεων και αυτόματη στοίχιση (Format - Ctrl+Shift+F).
-* **Βήμα-προς-Βήμα Αποσφαλμάτωση (Visual Stepper):** Εκτέλεση εντολή-προς-εντολή (⏭ ΒΗΜΑ) με οπτική επισήμανση της ενεργής γραμμής και ρύθμιση ταχύτητας (⏱️).
-* **Επιθεωρητής Μνήμης & Μεταβλητών (Inspector):** Ζωντανή παρακολούθηση τιμών, οπτική αναπαράσταση μονοδιάστατων πινάκων και 2D πινάκων, με χρωματική επισήμανση των μεταβλητών που άλλαξαν τιμή.
-* **Πίνακας Τιμών (Trace Table):** Αυτόματη καταγραφή του πίνακα τιμών (απαραίτητο στις εργασίες και εξετάσεις ΠΛΗ10) και αντιγραφή σε Markdown με 1 κλικ.
-* **Υποστήριξη Αρχείων .eap (Windows-1253):** Άνοιγμα και αποκωδικοποίηση των επίσημων αρχείων του πανεπιστημίου χωρίς προβλήματα γραμματοσειράς.
-* **Κοινοποίηση μέσω Συνδέσμου (Share):** Δημιουργία μοναδικού συνδέσμου (URL permalink) με ενσωματωμένο τον κώδικα (LZ-String).
-* **17 Έτοιμα Παραδείγματα Ύλης:** Ταξινομήσεις (Bubble, Selection, Insertion, Quick, Merge Sort), Αναζητήσεις, 2D Πίνακες, Αναδρομή, Κλήση με Αναφορά (`%`).
-* **Πλήρης Αυτοματοποιημένη Σουίτα Ελέγχων:** 100% επιτυχία και στα 66 επίσημα `.eap` αρχεία του πανεπιστημίου (`npm test`).
-
-### 🚀 Οδηγίες Χρήσης
-1.  Κατεβάστε τα αρχεία ή κάντε clone το repository.
-2.  Ανοίξτε το αρχείο `index.html` ή `editor.html` με οποιονδήποτε browser (ακόμα και offline).
-3.  Για εκτέλεση των tests: τρέξτε `npm test`.
-
----
-
-### 🛠️ Tech Stack
-* **Language:** Vanilla JavaScript (ES6+), Node.js (Test runner).
-* **Editor:** CodeMirror 5 με custom EAP grammar mode.
-* **Frontend:** HTML5, CSS3 (Light Solarized & Dark Cyberpunk Themes).
-* **Tools:** Google Gemini CLI, Google Jules.
-
-### 🤝 Contributing
-Αν είσαι φοιτητής του ΕΑΠ και θέλεις να βελτιώσουμε κι άλλο το εργαλείο:
-1.  Κάνε **Fork** το repo.
-2.  Δημιούργησε Pull Request.
-
----
-*Developed by **Christos Kataxenos** | [LinkedIn](https://www.linkedin.com/in/christoskataxenos/)*
-
+Developed by **[Christos Kataxenos](https://www.linkedin.com/in/christoskataxenos/)**.

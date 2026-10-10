@@ -115,6 +115,10 @@
                     <div class="tab-actions">
                         <button id="clear-terminal-btn" class="tab-action-btn" title="Καθαρισμός εξόδου τερματικού">🗑️ Καθαρισμός</button>
                         <button id="copy-trace-btn" class="tab-action-btn" style="display:none;" title="Αντιγραφή Πίνακα Τιμών σε μορφή Markdown">📋 Αντιγραφή Markdown</button>
+                        <div id="var-view-toggle" class="var-toggle-group" style="display:none;">
+                            <button id="var-cards-btn" class="tab-action-btn active" title="Προβολή σε Κάρτες Μνήμης">🗂️ Κάρτες</button>
+                            <button id="var-table-btn" class="tab-action-btn" title="Προβολή σε Αναλυτικό Πίνακα">📋 Πίνακας</button>
+                        </div>
                     </div>
                 </div>
 
@@ -137,18 +141,49 @@
                             <div class="placeholder-text">Δεν υπάρχουν ακόμη ενεργές μεταβλητές.</div>
                             <div class="placeholder-sub">Ξεκινήστε την εκτέλεση ή πατήστε <strong>⏭ ΒΗΜΑ</strong> για παρακολούθηση της μνήμης.</div>
                         </div>
+                        
                         <div id="variables-content" style="display:none;">
-                            <div class="vars-section" id="section-primitives">
-                                <div class="vars-section-title">Απλές Μεταβλητές (Primitives)</div>
-                                <div id="primitives-grid" class="vars-grid"></div>
+                            <!-- Variables Status Bar -->
+                            <div class="var-status-bar" id="var-status-bar">
+                                <div class="var-status-summary" id="var-status-summary">
+                                    <span id="var-status-text">📦 Ενεργές Μεταβλητές</span>
+                                    <span id="var-last-change-badge" class="var-last-change-badge" style="display:none;"></span>
+                                </div>
+                                <div class="var-search-wrapper">
+                                    <input type="text" id="var-search-input" placeholder="🔍 Αναζήτηση μεταβλητής..." autocomplete="off">
+                                </div>
                             </div>
-                            <div class="vars-section" id="section-arrays">
-                                <div class="vars-section-title">Πίνακες (Arrays)</div>
-                                <div id="arrays-container" class="arrays-list"></div>
+
+                            <!-- Cards View -->
+                            <div id="variables-cards-view">
+                                <div class="vars-section" id="section-primitives">
+                                    <div class="vars-section-title">📦 Απλές Μεταβλητές (Scalars &amp; Primitives)</div>
+                                    <div id="primitives-grid" class="vars-grid"></div>
+                                </div>
+                                <div class="vars-section" id="section-arrays">
+                                    <div class="vars-section-title">📊 Πίνακες στη Μνήμη (Array Memory Tapes)</div>
+                                    <div id="arrays-container" class="arrays-list"></div>
+                                </div>
+                                <div class="vars-section" id="section-constants" style="display:none;">
+                                    <div class="vars-section-title">🔒 Σταθερές (Constants)</div>
+                                    <div id="constants-grid" class="vars-grid"></div>
+                                </div>
                             </div>
-                            <div class="vars-section" id="section-constants" style="display:none;">
-                                <div class="vars-section-title">Σταθερές (Constants)</div>
-                                <div id="constants-grid" class="vars-grid"></div>
+
+                            <!-- Table View -->
+                            <div id="variables-table-view" style="display:none;">
+                                <table class="variables-table" id="variables-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Μεταβλητή</th>
+                                            <th>Τύπος</th>
+                                            <th>Τρέχουσα Τιμή στη Μνήμη</th>
+                                            <th>Προηγούμενη Τιμή</th>
+                                            <th>Κατάσταση</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="variables-table-body"></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

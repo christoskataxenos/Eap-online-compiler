@@ -877,15 +877,27 @@ class Environment {
     constructor(parent = null) {
         this.values = new Map();
         this.subroutines = new Map();
+        this.constants = new Set();
         this.parent = parent;
     }
     
-    define(name, value) {
+    define(name, value, isConstant = false) {
+        const key = name.toUpperCase();
         if (value && typeof value === 'object' && 'value' in value && Object.keys(value).length === 1) {
-            this.values.set(name.toUpperCase(), value);
+            this.values.set(key, value);
         } else {
-            this.values.set(name.toUpperCase(), { value });
+            this.values.set(key, { value });
         }
+        if (isConstant) {
+            this.constants.add(key);
+        }
+    }
+    
+    isConstant(name) {
+        const key = name.toUpperCase();
+        if (this.constants.has(key)) return true;
+        if (this.parent) return this.parent.isConstant(name);
+        return false;
     }
     
     defineBox(name, box) {
@@ -950,16 +962,19 @@ class Environment {
         for (const [key, box] of this.values.entries()) {
             if (key === 'EOLN') continue;
             const val = box.value;
+            const isConst = this.isConstant(key);
             if (val instanceof ArrayObject) {
                 result[key] = {
                     type: 'array',
                     bounds: val.bounds,
-                    data: { ...val.data }
+                    data: { ...val.data },
+                    isConstant: isConst
                 };
             } else {
                 result[key] = {
                     type: typeof val,
-                    value: val
+                    value: val,
+                    isConstant: isConst
                 };
             }
         }
@@ -1127,7 +1142,7 @@ class Interpreter {
         for (const decl of declarations) {
             if (decl.type === 'ConstantDeclaration') {
                 const val = await this.evaluate(decl.value, env);
-                env.define(decl.name, val);
+                env.define(decl.name, val, true);
             } else if (decl.type === 'ProcedureDeclaration' || decl.type === 'FunctionDeclaration') {
                 env.defineSubroutine(decl.name, decl);
             }
