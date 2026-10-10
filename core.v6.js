@@ -941,6 +941,30 @@ class Environment {
         }
         throw new Error(`Undefined function or procedure '${name}'.`);
     }
+    
+    getAllVariables() {
+        const result = {};
+        if (this.parent) {
+            Object.assign(result, this.parent.getAllVariables());
+        }
+        for (const [key, box] of this.values.entries()) {
+            if (key === 'EOLN') continue;
+            const val = box.value;
+            if (val instanceof ArrayObject) {
+                result[key] = {
+                    type: 'array',
+                    bounds: val.bounds,
+                    data: { ...val.data }
+                };
+            } else {
+                result[key] = {
+                    type: typeof val,
+                    value: val
+                };
+            }
+        }
+        return result;
+    }
 }
 
 class ArrayObject {
@@ -1001,10 +1025,50 @@ class Interpreter {
         this.stepCount = 0;
         this.maxSteps = options.maxSteps || 500000;
         this.isCancelled = false;
+        
+        // Debugging & Stepping
+        this.debugMode = options.debugMode || false;
+        this.executionSpeed = options.speed || 0;
+        this.stepCallback = options.onStep || null;
+        this.stepResolver = null;
     }
     
     cancel() {
         this.isCancelled = true;
+        if (this.stepResolver) {
+            const r = this.stepResolver;
+            this.stepResolver = null;
+            r();
+        }
+    }
+    
+    setStepCallback(callback) {
+        this.stepCallback = callback;
+    }
+    
+    setExecutionSpeed(ms) {
+        this.executionSpeed = ms;
+    }
+    
+    setDebugMode(enabled) {
+        this.debugMode = enabled;
+    }
+    
+    step() {
+        if (this.stepResolver) {
+            const r = this.stepResolver;
+            this.stepResolver = null;
+            r();
+        }
+    }
+    
+    continueExecution() {
+        this.debugMode = false;
+        if (this.stepResolver) {
+            const r = this.stepResolver;
+            this.stepResolver = null;
+            r();
+        }
     }
     
     checkExecutionHealth() {
@@ -1030,6 +1094,9 @@ class Interpreter {
         this.globalEnv = new Environment();
         this.stepCount = 0;
         this.isCancelled = false;
+        if (this.stepResolver) {
+            this.stepResolver = null;
+        }
         
         this.globalEnv.define('EOLN', '__EOLN__');
         
@@ -1103,6 +1170,27 @@ class Interpreter {
     async execute(stmt, env) {
         this.checkExecutionHealth();
         this.currentNode = stmt;
+        
+        if (this.stepCallback && stmt.loc && stmt.loc.line) {
+            await this.stepCallback({
+                line: stmt.loc.line,
+                column: stmt.loc.column,
+                stmt,
+                variables: env.getAllVariables()
+            });
+            
+            if (this.executionSpeed > 0) {
+                await new Promise(r => setTimeout(r, this.executionSpeed));
+            }
+            
+            if (this.debugMode) {
+                await new Promise(resolve => {
+                    this.stepResolver = resolve;
+                });
+            }
+            
+            this.checkExecutionHealth();
+        }
         
         switch (stmt.type) {
             case 'AssignmentStatement': {

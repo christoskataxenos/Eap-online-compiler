@@ -1,107 +1,71 @@
 // -----------------------------------------------------------------------------
-// UI AND EXECUTION
+// EAP Online Pseudocode Interpreter & Debugger (ΠΛΗ10)
+// Modern UI & Execution Controller (CodeMirror, Stepper, Memory & Trace Table)
 // -----------------------------------------------------------------------------
-const EXAMPLES = {
-  HELLO: `ΑΛΓΟΡΙΘΜΟΣ Hello
-ΑΡΧΗ
-  ΤΥΠΩΣΕ("Hello World")
-ΤΕΛΟΣ`,
-  FIBONACCI: `ΑΛΓΟΡΙΘΜΟΣ Fibonacci
-ΔΕΔΟΜΕΝΑ N, A, B, TEMP, I : ΑΚΕΡΑΙΟΣ;
-ΑΡΧΗ
-  ΤΥΠΩΣΕ("Δώσε αριθμό όρων:")
-  ΔΙΑΒΑΣΕ(N)
-  A := 0; B := 1;
-  ΤΥΠΩΣΕ(A)
-  ΤΥΠΩΣΕ(B)
-  ΓΙΑ I := 3 ΕΩΣ N ΕΠΑΝΑΛΑΒΕ
-    TEMP := A + B;
-    ΤΥΠΩΣΕ(TEMP);
-    A := B;
-    B := TEMP
-  ΓΙΑ-ΤΕΛΟΣ
-ΤΕΛΟΣ`,
-  BUBBLE_SORT: `ΑΛΓΟΡΙΘΜΟΣ BubbleSort
-ΣΤΑΘΕΡΕΣ
-  N = 5;
-ΔΕΔΟΜΕΝΑ
-  A: ARRAY[1..N] OF INTEGER;
-  I, J, TEMP: INTEGER;
-ΑΡΧΗ
-  /* Είσοδος */
-  ΓΙΑ I:=1 ΕΩΣ N ΕΠΑΝΑΛΑΒΕ
-    A[I] := (N - I + 1) * 10
-  ΓΙΑ-ΤΕΛΟΣ;
-  /* Ταξινόμηση */
-  ΓΙΑ I:=2 ΕΩΣ N ΕΠΑΝΑΛΑΒΕ
-    ΓΙΑ J:=N ΕΩΣ I ΜΕ ΒΗΜΑ -1 ΕΠΑΝΑΛΑΒΕ
-      ΕΑΝ A[J-1] > A[J] ΤΟΤΕ
-        TEMP := A[J-1];
-        A[J-1] := A[J];
-        A[J] := TEMP
-      ΕΑΝ-ΤΕΛΟΣ
-    ΓΙΑ-ΤΕΛΟΣ
-  ΓΙΑ-ΤΕΛΟΣ;
-  /* Εκτύπωση */
-  ΓΙΑ I:=1 ΕΩΣ N ΕΠΑΝΑΛΑΒΕ
-    ΤΥΠΩΣΕ(A[I])
-  ΓΙΑ-ΤΕΛΟΣ
-ΤΕΛΟΣ`,
-  AVERAGE: `ΑΛΓΟΡΙΘΜΟΣ Average
-ΔΕΔΟΜΕΝΑ SUM, COUNT, NUM : ΠΡΑΓΜΑΤΙΚΟΣ;
-ΑΡΧΗ
-  SUM := 0; COUNT := 0;
-  ΤΥΠΩΣΕ("Δώσε αριθμούς (0 για τέλος):")
-  ΕΠΑΝΑΛΑΒΕ
-    ΔΙΑΒΑΣΕ(NUM);
-    ΕΑΝ NUM <> 0 ΤΟΤΕ
-      SUM := SUM + NUM;
-      COUNT := COUNT + 1
-    ΕΑΝ-ΤΕΛΟΣ
-  ΜΕΧΡΙ NUM = 0;
-  ΕΑΝ COUNT > 0 ΤΟΤΕ
-    ΤΥΠΩΣΕ("Μέσος Όρος:", SUM / COUNT)
-  ΑΛΛΙΩΣ
-    ΤΥΠΩΣΕ("Δεν δόθηκαν αριθμοί.")
-  ΕΑΝ-ΤΕΛΟΣ
-ΤΕΛΟΣ`
-};
 
 document.addEventListener('DOMContentLoaded', () => {
-  const codeEditor = document.getElementById('code-editor');
-  const highlighting = document.getElementById('highlighting');
-  const highlightingContent = document.getElementById('highlighting-content');
-  const lineNumbers = document.getElementById('line-numbers');
+  // DOM Elements - Editor & Toolbar
+  const editorMount = document.getElementById('code-editor-mount');
+  const editorTitle = document.getElementById('editor-title');
+  const exampleSelector = document.getElementById('example-selector');
+  const formatButton = document.getElementById('format-button');
+  const shareButton = document.getElementById('share-button');
+  const themeToggle = document.getElementById('theme-toggle');
+
+  // DOM Elements - Primary Controls
   const runButton = document.getElementById('run-button');
+  const stepButton = document.getElementById('step-button');
+  const continueButton = document.getElementById('continue-button');
+  const stopButton = document.getElementById('stop-button');
+  const speedSelect = document.getElementById('speed-select');
+
+  // DOM Elements - Secondary Controls
+  const loadButton = document.getElementById('load-button');
   const saveButton = document.getElementById('save-button');
   const clearButton = document.getElementById('clear-button');
-  const loadButton = document.getElementById('load-button');   // NEW
-  const fileInput = document.getElementById('file-input');     // NEW
-  const exampleSelector = document.getElementById('example-selector');
-  const themeToggle = document.getElementById('theme-toggle');
-  // Syntax help modal
-    const triggerButton = document.getElementById('syntax-help-button');
-    const modalId = 'my-dynamic-modal'; // Unique ID for the modal container
+  const syntaxHelpButton = document.getElementById('syntax-help-button');
+  const fileInput = document.getElementById('file-input');
+  const dragHandle = document.getElementById('drag-handle');
+  const outputContainer = document.querySelector('.output-container');
 
+  // DOM Elements - Tabs & Content
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabPanes = document.querySelectorAll('.tab-pane');
+  const varCountBadge = document.getElementById('var-count-badge');
+  const traceStepBadge = document.getElementById('trace-step-badge');
+  const clearTerminalBtn = document.getElementById('clear-terminal-btn');
+  const copyTraceBtn = document.getElementById('copy-trace-btn');
 
-  // Terminal Elements
+  // DOM Elements - Terminal
+  const terminalWindow = document.getElementById('terminal-window');
   const terminalOutput = document.getElementById('terminal-output');
   const terminalInputLine = document.getElementById('terminal-input-line');
   const terminalInput = document.getElementById('terminal-input');
   const terminalPrompt = document.getElementById('terminal-prompt');
-  const outputContainer = document.querySelector('.output-container');
-  const dragHandle = document.getElementById('drag-handle');
 
-  // -----------------------------------
+  // DOM Elements - Memory & Variables Inspector
+  const variablesEmpty = document.getElementById('variables-empty');
+  const variablesContent = document.getElementById('variables-content');
+  const primitivesGrid = document.getElementById('primitives-grid');
+  const arraysContainer = document.getElementById('arrays-container');
+  const sectionConstants = document.getElementById('section-constants');
+  const constantsGrid = document.getElementById('constants-grid');
+
+  // DOM Elements - Trace Table
+  const traceEmpty = document.getElementById('trace-empty');
+  const traceTableContainer = document.getElementById('trace-table-container');
+  const traceTableBody = document.getElementById('trace-table-body');
+
+  // ---------------------------------------------------------------------------
   // SETTINGS MANAGER
-  // -----------------------------------
+  // ---------------------------------------------------------------------------
   const SettingsManager = {
     get: (key, defaultValue) => {
       try {
         const val = localStorage.getItem(key);
         return val !== null ? val : defaultValue;
       } catch (e) {
-        console.warn('LocalStorage access failed:', e);
+        console.warn('LocalStorage read error:', e);
         return defaultValue;
       }
     },
@@ -109,623 +73,354 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         localStorage.setItem(key, value);
       } catch (e) {
-        console.warn('LocalStorage write failed:', e);
+        console.warn('LocalStorage write error:', e);
       }
     }
   };
 
-  // -----------------------------------
-  // AUTOCOMPLETE CONFIG
-  // -----------------------------------
-  const AUTOCOMPLETE_KEYWORDS = [
-    'ΑΛΓΟΡΙΘΜΟΣ', 'ΣΤΑΘΕΡΕΣ', 'ΔΕΔΟΜΕΝΑ', 'ΑΡΧΗ', 'ΤΕΛΟΣ',
-    'ΕΑΝ', 'ΤΟΤΕ', 'ΑΛΛΙΩΣ', 'ΕΑΝ-ΤΕΛΟΣ',
-    'ΓΙΑ', 'ΕΩΣ', 'ΜΕ', 'ΒΗΜΑ', 'ΓΙΑ-ΤΕΛΟΣ',
-    'ΕΝΟΣΩ', 'ΕΝΟΣΩ-ΤΕΛΟΣ', 'ΜΕΧΡΙ', 'ΕΠΑΝΑΛΑΒΕ', 
-    'ΤΥΠΩΣΕ', 'ΔΙΑΒΑΣΕ',
-    'ΔΙΑΔΙΚΑΣΙΑ', 'ΤΕΛΟΣ-ΔΙΑΔΙΚΑΣΙΑΣ',
-    'ΣΥΝΑΡΤΗΣΗ', 'ΤΕΛΟΣ-ΣΥΝΑΡΤΗΣΗΣ',
-    'ΑΚΕΡΑΙΟΣ', 'ΠΡΑΓΜΑΤΙΚΟΣ', 'ΛΟΓΙΚΟΣ', 'ΧΑΡΑΚΤΗΡΑΣ', 'ΣΥΜΒΟΛΟΣΕΙΡΑ',
-    'ALGORITHM', 'CONSTANTS', 'DATA', 'BEGIN', 'END',
-    'IF', 'THEN', 'ELSE', 'ENDIF',
-    'FOR', 'TO', 'STEP', 'ENDFOR',
-    'WHILE', 'ENDWHILE',
-    'REPEAT', 'UNTIL',
-    'PRINT', 'READ',
-    'PROCEDURE', 'ENDPROCEDURE',
-    'FUNCTION', 'ENDFUNCTION',
-    'INTEGER', 'REAL', 'BOOLEAN', 'CHAR', 'STRING'
-  ];
+  // ---------------------------------------------------------------------------
+  // TOAST NOTIFICATIONS
+  // ---------------------------------------------------------------------------
+  function showToast(message, duration = 2500) {
+    const existing = document.querySelector('.eap-toast');
+    if (existing) existing.remove();
 
-  const autocompleteBox = document.getElementById('autocomplete-box');
-  const syntaxHelpButton = document.getElementById('syntax-help-button');
+    const toast = document.createElement('div');
+    toast.className = 'eap-toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
 
-  function getCurrentWord(text, pos) {
-    const left = text.slice(0, pos);
-    const match = left.match(/([A-Za-zΑ-Ωα-ω]+)$/u);
-    return match ? match[1] : '';
+    setTimeout(() => {
+      if (toast.parentNode) toast.remove();
+    }, duration);
   }
 
-  function showAutocomplete(prefix) {
-    if (!prefix || prefix.length < 2) {
-      autocompleteBox.style.display = 'none';
-      return;
-    }
-    const upper = prefix.toUpperCase();
-    const matches = AUTOCOMPLETE_KEYWORDS.filter(k => k.startsWith(upper));
-    if (!matches.length) {
-      autocompleteBox.style.display = 'none';
-      return;
-    }
+  // ---------------------------------------------------------------------------
+  // INITIALIZE CODEMIRROR
+  // ---------------------------------------------------------------------------
+  let initialCode = EXAMPLES && EXAMPLES.HELLO ? EXAMPLES.HELLO : 'ΑΛΓΟΡΙΘΜΟΣ Hello\nΑΡΧΗ\n  ΤΥΠΩΣΕ("Καλημέρα Κόσμε")\nΤΕΛΟΣ';
 
-    autocompleteBox.innerHTML = matches
-      .map((m, i) =>
-        `<div class="autocomplete-item${i === 0 ? ' selected' : ''}">${m}</div>`
-      )
-      .join('');
-
-    const rect = codeEditor.getBoundingClientRect();
-    const textUpToCursor = codeEditor.value.slice(0, codeEditor.selectionStart);
-    const lineIndex = textUpToCursor.split('\n').length - 1;
-    const lineHeight = 18;
-
-    autocompleteBox.style.left = rect.left + window.scrollX + 60 + 'px';
-    autocompleteBox.style.top =
-      rect.top + window.scrollY + 10 + lineIndex * lineHeight + 'px';
-    autocompleteBox.style.display = 'block';
-  }
-
-  function hideAutocomplete() {
-    autocompleteBox.style.display = 'none';
-  }
-
-  function acceptAutocomplete() {
-    if (autocompleteBox.style.display === 'none') return false;
-    const selected = autocompleteBox.querySelector('.autocomplete-item.selected');
-    if (!selected) return false;
-    const word = getCurrentWord(codeEditor.value, codeEditor.selectionStart);
-    if (!word) return false;
-
-    const start = codeEditor.selectionStart - word.length;
-    const end = codeEditor.selectionEnd;
-    const insert = selected.textContent;
-
-    codeEditor.value =
-      codeEditor.value.slice(0, start) +
-      insert +
-      codeEditor.value.slice(end);
-
-    const newPos = start + insert.length;
-    codeEditor.selectionStart = codeEditor.selectionEnd = newPos;
-    hideAutocomplete();
-    onInput();
-    return true;
-  }
-
-  // -----------------------------------
-  // SYNTAX HIGHLIGHTING
-  // -----------------------------------
-  const escapeHTML = (str) =>
-    str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/\"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
-  const updateHighlighting = () => {
-    const text = codeEditor.value;
-    let html = '';
-    try {
-      // Regex-based highlighter for visual only.
-      let i = 0;
-      while (i < text.length) {
-        let match = null;
-        let matchType = '';
-        let matchLength = 0;
-        let matchText = '';
-
-        const isBoundary = (idx) => {
-          if (idx < 0 || idx >= text.length) return true;
-          const c = text[idx];
-          return /[^a-zA-Z\d\u0370-\u03ff_]/.test(c);
-        };
-
-        const keywords = [
-          'ΑΛΓΟΡΙΘΜΟΣ', 'ΣΤΑΘΕΡΕΣ', 'ΔΕΔΟΜΕΝΑ', 'ΑΡΧΗ', 'ΤΕΛΟΣ',
-          'ΕΑΝ', 'ΤΟΤΕ', 'ΑΛΛΙΩΣ', 'ΕΑΝ-ΤΕΛΟΣ',
-          'ΓΙΑ', 'ΕΩΣ', 'ΜΕ', 'ΒΗΜΑ', 'ΕΠΑΝΑΛΑΒΕ', 'ΓΙΑ-ΤΕΛΟΣ',
-          'ΕΝΟΣΩ', 'ΕΝΟΣΩ-ΤΕΛΟΣ', 'ΜΕΧΡΙ',
-          'ΤΥΠΩΣΕ', 'ΔΙΑΒΑΣΕ', 'ΥΠΟΛΟΓΙΣΕ',
-          'ΔΙΑΔΙΚΑΣΙΑ', 'ΤΕΛΟΣ-ΔΙΑΔΙΚΑΣΙΑΣ',
-          'ΣΥΝΑΡΤΗΣΗ', 'ΤΕΛΟΣ-ΣΥΝΑΡΤΗΣΗΣ',
-          'ΕΠΙΣΤΡΕΨΕ',
-          'ΑΚΕΡΑΙΟΣ', 'ΠΡΑΓΜΑΤΙΚΟΣ', 'ΛΟΓΙΚΟΣ', 'ΧΑΡΑΚΤΗΡΑΣ', 'ΣΥΜΒΟΛΟΣΕΙΡΑ',
-          'ALGORITHM', 'CONSTANTS', 'DATA', 'BEGIN', 'END',
-          'IF', 'THEN', 'ELSE', 'END_IF',
-          'FOR', 'TO', 'STEP', 'REPEAT', 'END_FOR',
-          'WHILE', 'END_WHILE', 'UNTIL',
-          'PRINT', 'READ', 'CALCULATE',
-          'PROCEDURE', 'END_PROCEDURE',
-          'FUNCTION', 'END_FUNCTION',
-          'RETURN', 'INTEGER', 'REAL', 'BOOLEAN', 'CHAR', 'STRING'
-        ];
-
-        // 1. Keywords
-        if (isBoundary(i - 1)) {
-          for (const kw of keywords) {
-            if (
-              text.substr(i, kw.length).toUpperCase() === kw &&
-              isBoundary(i + kw.length)
-            ) {
-              if (!match || kw.length > matchLength) {
-                matchText = text.substr(i, kw.length);
-                matchLength = kw.length;
-                matchType = 'token-keyword';
-                match = true;
-              }
-            }
-          }
-        }
-
-        // 2. Comments
-        const commentRegex = /\/\*[\s\S]*?\*\/|\/\/.*/y;
-        commentRegex.lastIndex = i;
-        let m = commentRegex.exec(text);
-        if (m && (!match || m[0].length > matchLength)) {
-          match = true;
-          matchType = 'token-comment';
-          matchText = m[0];
-          matchLength = m[0].length;
-        }
-
-        // 3. Strings
-        const stringRegex = /\"[^\"]*\"/y;
-        stringRegex.lastIndex = i;
-        m = stringRegex.exec(text);
-        if (m && (!match || m[0].length > matchLength)) {
-          match = true;
-          matchType = 'token-string';
-          matchText = m[0];
-          matchLength = m[0].length;
-        }
-
-        // 4. Numbers
-        const numberRegex = /\b\d+(\.\d+)?\b/y;
-        numberRegex.lastIndex = i;
-        m = numberRegex.exec(text);
-        if (m && (!match || m[0].length > matchLength)) {
-          match = true;
-          matchType = 'token-number';
-          matchText = m[0];
-          matchLength = m[0].length;
-        }
-
-        // 5. Operators
-        const operators = [
-          ':=', '+', '-', '*', '/', '<>', '<=', '>=', '<', '>', '=',
-          ':', ';', ',', '.', '[', ']', '(', ')'
-        ];
-        for (const op of operators) {
-          if (text.startsWith(op, i)) {
-            if (!match || op.length > matchLength) {
-              match = true;
-              matchType = 'token-operator';
-              matchText = op;
-              matchLength = op.length;
-            }
-          }
-        }
-
-        if (match) {
-          html += `<span class="${matchType}">${escapeHTML(matchText)}</span>`;
-          i += matchLength;
-        } else {
-          html += escapeHTML(text[i]);
-          i++;
+  // Check URL hash for shared code permalink
+  try {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#code=')) {
+      const compressed = hash.substring(6);
+      if (window.LZString) {
+        const decompressed = LZString.decompressFromEncodedURIComponent(compressed);
+        if (decompressed && decompressed.trim().length > 0) {
+          initialCode = decompressed;
         }
       }
-      if (text[text.length - 1] === '\n') {
-        html += ' ';
-      }
-    } catch (e) {
-      html = escapeHTML(text);
     }
-    highlightingContent.innerHTML = html;
-  };
-
-  const updateLineNumbers = () => {
-    const lines = codeEditor.value.split('\n').length;
-    lineNumbers.innerHTML = Array(lines)
-      .fill(0)
-      .map((_, i) => i + 1)
-      .map((n) => `<div class="line-num">${n}</div>`)
-      .join('');
-  };
-
-  const updateProgramName = () => {
-  const code = codeEditor.value;
-  const panelHeader = document.querySelector('.editor-container .panel-header span');
-  
-  // Try to extract program name from ΑΛΓΟΡΙΘΜΟΣ declaration
-  const greekMatch = code.match(/ΑΛΓΟΡΙΘΜΟΣ\s+([A-Za-zΑ-Ωα-ω_][A-Za-zΑ-Ωα-ω0-9_]*)/i);
-  const englishMatch = code.match(/ALGORITHM\s+([A-Za-zΑ-Ωα-ω_][A-Za-zΑ-Ωα-ω0-9_]*)/i);
-  
-  const match = greekMatch || englishMatch;
-  
-  if (match && match[1]) {
-    panelHeader.textContent = `Κώδικας Ψευδογλώσσας: ${match[1]}`;
-  } else {
-    panelHeader.textContent = 'Κώδικας Ψευδογλώσσας';
-  }
-};
-
-  const syncScroll = () => {
-    highlighting.scrollTop = codeEditor.scrollTop;
-    highlighting.scrollLeft = codeEditor.scrollLeft;
-    lineNumbers.scrollTop = codeEditor.scrollTop;
-  };
-
-  const onInput = () => {
-    updateHighlighting();
-    updateLineNumbers();
-    updateProgramName();
-  };
-
-  codeEditor.addEventListener('scroll', syncScroll);
-
-  // Initial
-  updateLineNumbers();
-  updateHighlighting();
-
-  // -----------------------------------
-  // KEYBOARD HANDLING: TAB + INDENT + AUTOCOMPLETE
-  // -----------------------------------
- // AUTO-INDENTATION + AUTO-FORMAT HANDLER
-// Replace the entire keydown event listener in app.v6.js
-
-// Auto-format function
-function autoFormatCode() {
-  const code = codeEditor.value;
-  const lines = code.split('\n');
-  const formatted = [];
-  let currentIndent = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-    const trimmedUpper = trimmed.toUpperCase();
-
-    // Skip empty lines
-    if (trimmed === '') {
-      formatted.push('');
-      continue;
-    }
-
-    // Closing keywords: decrease indent BEFORE adding line
-    const isClosing = 
-      trimmedUpper.startsWith('ΤΕΛΟΣ') ||
-      trimmedUpper.startsWith('ΕΑΝ-ΤΕΛΟΣ') ||
-      trimmedUpper.startsWith('ΓΙΑ-ΤΕΛΟΣ') ||
-      trimmedUpper.startsWith('ΕΝΟΣΩ-ΤΕΛΟΣ') ||
-      trimmedUpper.startsWith('ΤΕΛΟΣ-ΔΙΑΔΙΚΑΣΙΑΣ') ||
-      trimmedUpper.startsWith('ΤΕΛΟΣ-ΣΥΝΑΡΤΗΣΗΣ') ||
-      trimmedUpper.startsWith('END') ||
-      trimmedUpper.startsWith('ENDIF') ||
-      trimmedUpper.startsWith('ENDFOR') ||
-      trimmedUpper.startsWith('ENDWHILE') ||
-      trimmedUpper.startsWith('END_IF') ||
-      trimmedUpper.startsWith('END_FOR') ||
-      trimmedUpper.startsWith('END_WHILE') ||
-      trimmedUpper.startsWith('ENDPROCEDURE') ||
-      trimmedUpper.startsWith('ENDFUNCTION') ||
-      trimmedUpper.startsWith('END_PROCEDURE') ||
-      trimmedUpper.startsWith('END_FUNCTION') ||
-      trimmedUpper.startsWith('ΜΕΧΡΙ') ||
-      trimmedUpper.startsWith('UNTIL');
-
-    // ΑΛΛΙΩΣ/ELSE: decrease then add line
-    const isElse = 
-      trimmedUpper.startsWith('ΑΛΛΙΩΣ') ||
-      trimmedUpper.startsWith('ELSE');
-
-    if (isClosing && currentIndent > 0) {
-      currentIndent--;
-    }
-
-    if (isElse && currentIndent > 0) {
-      currentIndent--;
-    }
-
-    // Add line with current indentation
-    const indent = '  '.repeat(currentIndent);
-    formatted.push(indent + trimmed);
-
-    // Opening keywords: increase indent AFTER adding line
-    const shouldIncrease = 
-      trimmedUpper.endsWith('ΑΡΧΗ') ||
-      trimmedUpper.endsWith('ΤΟΤΕ') ||
-      trimmedUpper.endsWith('ΑΛΛΙΩΣ') ||
-      trimmedUpper.endsWith('ΕΠΑΝΑΛΑΒΕ') ||
-      trimmedUpper.endsWith('BEGIN') ||
-      trimmedUpper.endsWith('THEN') ||
-      trimmedUpper.endsWith('ELSE') ||
-      trimmedUpper.endsWith('REPEAT');
-
-    if (shouldIncrease) {
-      currentIndent++;
-    }
+  } catch (e) {
+    console.warn('Failed to parse code from URL hash:', e);
   }
 
-  return formatted.join('\n');
-}
+  const currentTheme = document.documentElement.getAttribute('data-theme') || SettingsManager.get('theme', 'light');
+  const isDarkMode = currentTheme === 'dark';
 
-codeEditor.addEventListener('keydown', (e) => {
-  const start = codeEditor.selectionStart;
-  const end = codeEditor.selectionEnd;
-  const value = codeEditor.value;
-
-  // AUTO-FORMAT: Ctrl+Shift+F (or Cmd+Shift+F on Mac)
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
-    e.preventDefault();
-    
-    // Store cursor position
-    const cursorPos = codeEditor.selectionStart;
-    
-    // Format code
-    const formatted = autoFormatCode();
-    codeEditor.value = formatted;
-    
-    // Restore cursor position (approximately)
-    codeEditor.selectionStart = Math.min(cursorPos, formatted.length);
-    codeEditor.selectionEnd = codeEditor.selectionStart;
-    
-    // Update UI
-    onInput();
-    
-    // Show notification (optional)
-    const notification = document.createElement('div');
-    notification.textContent = '✓ Code formatted!';
-    notification.style.cssText = `
-      position: fixed;
-      top: 70px;
-      right: 20px;
-      background: var(--button-bg);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 4px;
-      font-weight: bold;
-      z-index: 1000;
-      animation: slideIn 0.3s ease-out;
-    `;
-    document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 2000);
-    
-    return;
-  }
-
-  // Accept autocomplete with Enter or Tab if box visible
-  if (
-    (e.key === 'Enter' || e.key === 'Tab') &&
-    autocompleteBox &&
-    autocompleteBox.style.display === 'block'
-  ) {
-    const accepted = acceptAutocomplete();
-    if (accepted) {
-      e.preventDefault();
-      return;
+  const editor = CodeMirror(editorMount, {
+    value: initialCode,
+    mode: 'eap-pseudocode',
+    theme: isDarkMode ? 'dracula' : 'default',
+    lineNumbers: true,
+    matchBrackets: true,
+    autoCloseBrackets: true,
+    styleActiveLine: true,
+    indentUnit: 2,
+    tabSize: 2,
+    lineWrapping: false,
+    extraKeys: {
+      'Ctrl-Space': 'autocomplete',
+      'F5': () => runExecution(false),
+      'F10': () => stepExecution(),
+      'Ctrl-Shift-F': () => formatEditorCode(),
+      'Cmd-Shift-F': () => formatEditorCode()
     }
-  }
-
-  // TAB: insert indentation
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const insert = '  '; // 2 spaces
-    codeEditor.value = value.slice(0, start) + insert + value.slice(end);
-    codeEditor.selectionStart = codeEditor.selectionEnd = start + insert.length;
-    onInput();
-    return;
-  }
-
-  // ENTER: auto indentation
-  if (e.key === 'Enter') {
-    e.preventDefault();
-
-    // Find the start of the current line
-    let lineStart = start;
-    while (lineStart > 0 && value[lineStart - 1] !== '\n') {
-      lineStart--;
-    }
-
-    // Get the current line up to cursor
-    const currentLine = value.substring(lineStart, start);
-    
-    // Extract current indentation
-    const indentMatch = currentLine.match(/^[ \t]*/);
-    let indent = indentMatch ? indentMatch[0] : '';
-
-    // Get the trimmed, uppercase version for keyword matching
-    const trimmedLine = currentLine.trim().toUpperCase();
-
-    // Check if line ends with keywords that increase indent
-    const shouldIncreaseIndent = 
-      trimmedLine.endsWith('ΑΡΧΗ') ||
-      trimmedLine.endsWith('ΤΟΤΕ') ||
-      trimmedLine.endsWith('ΑΛΛΙΩΣ') ||
-      trimmedLine.endsWith('ΕΠΑΝΑΛΑΒΕ') ||
-      trimmedLine.endsWith('BEGIN') ||
-      trimmedLine.endsWith('THEN') ||
-      trimmedLine.endsWith('ELSE') ||
-      trimmedLine.endsWith('REPEAT');
-
-    // Check if line starts with closing keywords
-    const isClosingKeyword = 
-      trimmedLine.startsWith('ΤΕΛΟΣ') ||
-      trimmedLine.startsWith('ΕΑΝ-ΤΕΛΟΣ') ||
-      trimmedLine.startsWith('ΓΙΑ-ΤΕΛΟΣ') ||
-      trimmedLine.startsWith('ΕΝΟΣΩ-ΤΕΛΟΣ') ||
-      trimmedLine.startsWith('ΤΕΛΟΣ-ΔΙΑΔΙΚΑΣΙΑΣ') ||
-      trimmedLine.startsWith('ΤΕΛΟΣ-ΣΥΝΑΡΤΗΣΗΣ') ||
-      trimmedLine.startsWith('END') ||
-      trimmedLine.startsWith('ENDIF') ||
-      trimmedLine.startsWith('ENDFOR') ||
-      trimmedLine.startsWith('ENDWHILE') ||
-      trimmedLine.startsWith('END_IF') ||
-      trimmedLine.startsWith('END_FOR') ||
-      trimmedLine.startsWith('END_WHILE') ||
-      trimmedLine.startsWith('ENDPROCEDURE') ||
-      trimmedLine.startsWith('ENDFUNCTION') ||
-      trimmedLine.startsWith('END_PROCEDURE') ||
-      trimmedLine.startsWith('END_FUNCTION');
-
-    // Adjust indent for next line
-    if (isClosingKeyword && indent.length >= 2) {
-      indent = indent.substring(0, indent.length - 2);
-    }
-
-    if (shouldIncreaseIndent) {
-      indent = indent + '  ';
-    }
-
-    // Insert newline with indentation
-    const insertText = '\n' + indent;
-    codeEditor.value = value.substring(0, start) + insertText + value.substring(end);
-    
-    // Position cursor
-    const newPos = start + insertText.length;
-    codeEditor.selectionStart = newPos;
-    codeEditor.selectionEnd = newPos;
-
-    onInput();
-    return;
-  }
-
-  // Navigate autocomplete with arrows
-  if (
-    autocompleteBox &&
-    autocompleteBox.style.display === 'block' &&
-    (e.key === 'ArrowDown' || e.key === 'ArrowUp')
-  ) {
-    e.preventDefault();
-    const items = Array.from(
-      autocompleteBox.querySelectorAll('.autocomplete-item')
-    );
-    if (!items.length) return;
-    let idx = items.findIndex((it) => it.classList.contains('selected'));
-    if (idx === -1) idx = 0;
-    items[idx].classList.remove('selected');
-    if (e.key === 'ArrowDown') {
-      idx = (idx + 1) % items.length;
-    } else {
-      idx = (idx - 1 + items.length) % items.length;
-    }
-    items[idx].classList.add('selected');
-    return;
-  }
-
-  if (e.key === 'Escape') {
-    hideAutocomplete();
-  }
-});
-
-// Add CSS animation for notification
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes slideIn {
-    from {
-      transform: translateX(100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-`;
-document.head.appendChild(style);
-
-  codeEditor.addEventListener('input', () => {
-    onInput();
-    const word = getCurrentWord(codeEditor.value, codeEditor.selectionStart);
-    showAutocomplete(word);
   });
 
-  codeEditor.addEventListener('blur', hideAutocomplete);
+  // Trigger autocomplete hints when typing identifiers or keywords
+  editor.on('inputRead', (cm, change) => {
+    if (change.text && change.text[0] && /[\u0370-\u03ffa-zA-Z_]/.test(change.text[0])) {
+      if (!cm.state.completionActive) {
+        CodeMirror.commands.autocomplete(cm, null, { completeSingle: false });
+      }
+    }
+  });
 
-  // -----------------------------------
-  // EXAMPLE SELECTOR
-  // -----------------------------------
+  function updateProgramName() {
+    const code = editor.getValue();
+    const greekMatch = code.match(/ΑΛΓΟΡΙΘΜΟΣ\s+([A-Za-zΑ-Ωα-ω_][A-Za-zΑ-Ωα-ω0-9_]*)/i);
+    const englishMatch = code.match(/ALGORITHM\s+([A-Za-zΑ-Ωα-ω_][A-Za-zΑ-Ωα-ω0-9_]*)/i);
+    const match = greekMatch || englishMatch;
+
+    if (match && match[1]) {
+      editorTitle.textContent = `Κώδικας Ψευδογλώσσας: ${match[1]}`;
+    } else {
+      editorTitle.textContent = 'Κώδικας Ψευδογλώσσας';
+    }
+  }
+
+  editor.on('change', () => {
+    updateProgramName();
+  });
+
+  updateProgramName();
+
+  // ---------------------------------------------------------------------------
+  // POPULATE EXAMPLE SELECTOR
+  // ---------------------------------------------------------------------------
+  if (typeof EXAMPLE_CATEGORIES !== 'undefined' && Array.isArray(EXAMPLE_CATEGORIES)) {
+    exampleSelector.innerHTML = '<option value="" disabled selected>📚 Παραδείγματα (ΠΛΗ10)...</option>';
+    EXAMPLE_CATEGORIES.forEach(cat => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = cat.category;
+      cat.items.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.id;
+        option.textContent = item.title;
+        optgroup.appendChild(option);
+      });
+      exampleSelector.appendChild(optgroup);
+    });
+  }
+
   exampleSelector.addEventListener('change', (e) => {
     const key = e.target.value;
-    if (EXAMPLES[key]) {
-      codeEditor.value = EXAMPLES[key];
-      onInput();
+    if (EXAMPLES && EXAMPLES[key]) {
+      if (isExecuting) stopExecution();
+      editor.setValue(EXAMPLES[key]);
+      editor.clearHistory();
       updateProgramName();
+      clearTerminal();
+      resetInspector();
+      resetTraceTable();
+      showToast('✓ Φορτώθηκε το παράδειγμα: ' + (e.target.options[e.target.selectedIndex]?.text || key));
     }
   });
 
-  // -----------------------------------
-  // TERMINAL EXECUTION
-  // -----------------------------------
-  const clearErrorHighlights = () => {
-    const lineNumsEls = document.querySelectorAll('.line-num');
-    lineNumsEls.forEach((el) => el.classList.remove('error-line'));
-  };
+  // ---------------------------------------------------------------------------
+  // AUTO-FORMAT FUNCTION
+  // ---------------------------------------------------------------------------
+  function autoFormatCode(code) {
+    const lines = code.split('\n');
+    const formatted = [];
+    let currentIndent = 0;
 
-  const highlightErrorLine = (errorMsg) => {
-    const match =
-      errorMsg.match(/Line\s+(\d+)/i) || errorMsg.match(/γραμμή\s+(\d+)/i);
-    if (match) {
-      const line = parseInt(match[1], 10);
-      const lineElement = lineNumbers.children[line - 1];
-      if (lineElement) {
-        lineElement.classList.add('error-line');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      const trimmedUpper = trimmed.toUpperCase();
+
+      if (trimmed === '') {
+        formatted.push('');
+        continue;
       }
+
+      // Closing statements: decrease indent BEFORE adding line
+      const isClosing =
+        trimmedUpper.startsWith('ΤΕΛΟΣ') ||
+        trimmedUpper.startsWith('ΕΑΝ-ΤΕΛΟΣ') ||
+        trimmedUpper.startsWith('ΓΙΑ-ΤΕΛΟΣ') ||
+        trimmedUpper.startsWith('ΕΝΟΣΩ-ΤΕΛΟΣ') ||
+        trimmedUpper.startsWith('ΤΕΛΟΣ-ΔΙΑΔΙΚΑΣΙΑΣ') ||
+        trimmedUpper.startsWith('ΤΕΛΟΣ-ΣΥΝΑΡΤΗΣΗΣ') ||
+        trimmedUpper.startsWith('END') ||
+        trimmedUpper.startsWith('ENDIF') ||
+        trimmedUpper.startsWith('ENDFOR') ||
+        trimmedUpper.startsWith('ENDWHILE') ||
+        trimmedUpper.startsWith('END_IF') ||
+        trimmedUpper.startsWith('END_FOR') ||
+        trimmedUpper.startsWith('END_WHILE') ||
+        trimmedUpper.startsWith('ENDPROCEDURE') ||
+        trimmedUpper.startsWith('ENDFUNCTION') ||
+        trimmedUpper.startsWith('END_PROCEDURE') ||
+        trimmedUpper.startsWith('END_FUNCTION') ||
+        trimmedUpper.startsWith('ΜΕΧΡΙ') ||
+        trimmedUpper.startsWith('UNTIL');
+
+      const isElse =
+        trimmedUpper.startsWith('ΑΛΛΙΩΣ') ||
+        trimmedUpper.startsWith('ELSE');
+
+      if ((isClosing || isElse) && currentIndent > 0) {
+        currentIndent--;
+      }
+
+      const indent = '  '.repeat(currentIndent);
+      formatted.push(indent + trimmed);
+
+      // Opening statements: increase indent AFTER adding line
+      const shouldIncrease =
+        trimmedUpper.endsWith('ΑΡΧΗ') ||
+        trimmedUpper.endsWith('ΤΟΤΕ') ||
+        trimmedUpper.endsWith('ΑΛΛΙΩΣ') ||
+        trimmedUpper.endsWith('ΕΠΑΝΑΛΑΒΕ') ||
+        trimmedUpper.endsWith('BEGIN') ||
+        trimmedUpper.endsWith('THEN') ||
+        trimmedUpper.endsWith('ELSE') ||
+        trimmedUpper.endsWith('REPEAT');
+
+      if (shouldIncrease) {
+        currentIndent++;
+      }
+    }
+
+    return formatted.join('\n');
+  }
+
+  function formatEditorCode() {
+    const cursor = editor.getCursor();
+    const formatted = autoFormatCode(editor.getValue());
+    editor.setValue(formatted);
+    editor.setCursor(cursor);
+    showToast('✓ Ο κώδικας μορφοποιήθηκε επιτυχώς!');
+  }
+
+  formatButton.addEventListener('click', formatEditorCode);
+
+  // ---------------------------------------------------------------------------
+  // SHARE / PERMALINK (LZ-STRING)
+  // ---------------------------------------------------------------------------
+  shareButton.addEventListener('click', () => {
+    try {
+      const code = editor.getValue();
+      if (!window.LZString) {
+        alert('Η βιβλιοθήκη συμπίεσης δεν είναι διαθέσιμη.');
+        return;
+      }
+      const compressed = LZString.compressToEncodedURIComponent(code);
+      const url = new URL(window.location.href);
+      url.hash = `code=${compressed}`;
+      window.history.replaceState(null, '', url.toString());
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url.toString()).then(() => {
+          showToast('🔗 Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!');
+        }).catch(() => {
+          prompt('Αντιγράψτε τον σύνδεσμο:', url.toString());
+        });
+      } else {
+        prompt('Αντιγράψτε τον σύνδεσμο:', url.toString());
+      }
+    } catch (e) {
+      console.error('Error sharing code:', e);
+      alert('Σφάλμα δημιουργίας συνδέσμου.');
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // THEME MANAGEMENT
+  // ---------------------------------------------------------------------------
+  const applyTheme = (isDark) => {
+    const themeName = isDark ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', themeName);
+    document.body.setAttribute('data-theme', themeName);
+    themeToggle.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    SettingsManager.set('theme', themeName);
+
+    // Update CodeMirror theme
+    if (editor) {
+      editor.setOption('theme', isDark ? 'dracula' : 'default');
+    }
+
+    const url = new URL(window.location);
+    url.searchParams.set('theme', themeName);
+    window.history.replaceState({}, '', url);
+
+    const homeLink = document.querySelector('.home-link');
+    if (homeLink) {
+      homeLink.href = `index.html?theme=${themeName}`;
     }
   };
 
-  const printToTerminal = (text, type = 'output') => {
-  // Handle text with newlines
-  const lines = text.split('\n');
-  
-  for (let i = 0; i < lines.length; i++) {
-    const lineText = lines[i];
-    
-    if (i > 0) {
-      // This is a continuation after a newline, create new div
-      const line = document.createElement('div');
-      line.textContent = lineText;
-      line.className = `term-${type}`;
-      terminalOutput.appendChild(line);
-    } else {
-      // First line - check if we should append or create new
-      const lastChild = terminalOutput.lastElementChild;
-      if (lastChild && lastChild.className === `term-${type}` && !lastChild.dataset.complete) {
-        // Append to existing line
-        lastChild.textContent += lineText;
+  applyTheme(isDarkMode);
+
+  themeToggle.addEventListener('click', () => {
+    const isNowDark = document.documentElement.getAttribute('data-theme') !== 'dark';
+    applyTheme(isNowDark);
+  });
+
+  // ---------------------------------------------------------------------------
+  // TABS LOGIC
+  // ---------------------------------------------------------------------------
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-tab');
+      switchTab(targetId);
+    });
+  });
+
+  function switchTab(tabId) {
+    tabButtons.forEach(b => {
+      if (b.getAttribute('data-tab') === tabId) {
+        b.classList.add('active');
       } else {
-        // Create new line
+        b.classList.remove('active');
+      }
+    });
+
+    tabPanes.forEach(pane => {
+      if (pane.id === tabId) {
+        pane.classList.add('active');
+      } else {
+        pane.classList.remove('active');
+      }
+    });
+
+    // Toggle contextual buttons
+    if (tabId === 'tab-trace') {
+      copyTraceBtn.style.display = 'inline-flex';
+      clearTerminalBtn.style.display = 'none';
+    } else if (tabId === 'tab-terminal') {
+      copyTraceBtn.style.display = 'none';
+      clearTerminalBtn.style.display = 'inline-flex';
+    } else {
+      copyTraceBtn.style.display = 'none';
+      clearTerminalBtn.style.display = 'none';
+    }
+  }
+
+  clearTerminalBtn.addEventListener('click', () => {
+    clearTerminal();
+  });
+
+  // ---------------------------------------------------------------------------
+  // TERMINAL ENGINE
+  // ---------------------------------------------------------------------------
+  const printToTerminal = (text, type = 'output', isComplete = false) => {
+    const lines = text.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const lineText = lines[i];
+
+      if (i > 0) {
         const line = document.createElement('div');
         line.textContent = lineText;
         line.className = `term-${type}`;
         terminalOutput.appendChild(line);
+      } else {
+        const lastChild = terminalOutput.lastElementChild;
+        if (lastChild && lastChild.className === `term-${type}` && !lastChild.dataset.complete) {
+          lastChild.textContent += lineText;
+        } else {
+          const line = document.createElement('div');
+          line.textContent = lineText;
+          line.className = `term-${type}`;
+          terminalOutput.appendChild(line);
+        }
+      }
+
+      if (i === lines.length - 1 && (isComplete || text.endsWith('\n'))) {
+        const lastChild = terminalOutput.lastElementChild;
+        if (lastChild) lastChild.dataset.complete = 'true';
       }
     }
-    
-    // Mark the last line as complete if text ends with newline
-    if (i === lines.length - 1 && text.endsWith('\n')) {
-      const lastChild = terminalOutput.lastElementChild;
-      if (lastChild) {
-        lastChild.dataset.complete = 'true';
-      }
-    }
-  }
-  
-  scrollToBottom();
-};
+
+    scrollToBottom();
+  };
 
   const scrollToBottom = () => {
-    const terminalWindow = document.getElementById('terminal-window');
     if (terminalWindow) {
       setTimeout(() => {
         terminalWindow.scrollTop = terminalWindow.scrollHeight;
@@ -739,425 +434,647 @@ document.head.appendChild(style);
   };
 
   const inputProvider = () =>
-  new Promise((resolve) => {
-    terminalInputLine.style.display = 'flex';
-    scrollToBottom();
-    terminalInput.value = '';
-    terminalInput.focus();
+    new Promise((resolve) => {
+      // Ensure Terminal tab is visible
+      switchTab('tab-terminal');
+      terminalInputLine.style.display = 'flex';
+      scrollToBottom();
+      terminalInput.value = '';
+      terminalInput.focus();
 
-    const handleEnter = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        const val = terminalInput.value;
-        terminalInputLine.style.display = 'none';
-        terminalInput.removeEventListener('keydown', handleEnter);
-        
-        // Echo the input on its own line
-        printToTerminal(val + '\n', 'input-echo');
-        
-        resolve(val);
+      const handleEnter = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = terminalInput.value;
+          terminalInputLine.style.display = 'none';
+          terminalInput.removeEventListener('keydown', handleEnter);
+
+          printToTerminal(val + '\n', 'input-echo', true);
+          resolve(val);
+        }
+      };
+      terminalInput.addEventListener('keydown', handleEnter);
+    });
+
+  // ---------------------------------------------------------------------------
+  // HIGHLIGHT ACTIVE & ERROR LINES
+  // ---------------------------------------------------------------------------
+  let activeDebugLineHandle = null;
+  let activeErrorLineHandle = null;
+
+  function clearDebugLineHighlight() {
+    if (activeDebugLineHandle !== null) {
+      editor.removeLineClass(activeDebugLineHandle, 'background', 'cm-debug-active-line');
+      activeDebugLineHandle = null;
+    }
+  }
+
+  function highlightDebugLine(line1Based) {
+    clearDebugLineHighlight();
+    const lineIndex = line1Based - 1;
+    if (lineIndex >= 0 && lineIndex < editor.lineCount()) {
+      activeDebugLineHandle = editor.addLineClass(lineIndex, 'background', 'cm-debug-active-line');
+      editor.scrollIntoView({ line: lineIndex, ch: 0 }, 60);
+    }
+  }
+
+  function clearErrorHighlight() {
+    if (activeErrorLineHandle !== null) {
+      editor.removeLineClass(activeErrorLineHandle, 'background', 'cm-error-line');
+      activeErrorLineHandle = null;
+    }
+  }
+
+  function highlightErrorLine(errorMsg) {
+    clearErrorHighlight();
+    const match = errorMsg.match(/Line[:\s]+(\d+)/i) || errorMsg.match(/γραμμή[:\s]+(\d+)/i);
+    if (match) {
+      const line1Based = parseInt(match[1], 10);
+      const lineIndex = line1Based - 1;
+      if (lineIndex >= 0 && lineIndex < editor.lineCount()) {
+        activeErrorLineHandle = editor.addLineClass(lineIndex, 'background', 'cm-error-line');
+        editor.scrollIntoView({ line: lineIndex, ch: 0 }, 60);
       }
-    };
-    terminalInput.addEventListener('keydown', handleEnter);
-  });
+    }
+  }
 
-  let currentInterpreter = null;
-  let isRunning = false;
+  // ---------------------------------------------------------------------------
+  // MEMORY & VARIABLES INSPECTOR
+  // ---------------------------------------------------------------------------
+  let previousVariableValues = {};
 
-  runButton.addEventListener('click', async () => {
-    if (isRunning && currentInterpreter) {
-      currentInterpreter.cancel();
-      printToTerminal('Διακοπή εκτέλεσης από τον χρήστη...', 'info');
+  function resetInspector() {
+    previousVariableValues = {};
+    varCountBadge.textContent = '0';
+    variablesEmpty.style.display = 'flex';
+    variablesContent.style.display = 'none';
+    primitivesGrid.innerHTML = '';
+    arraysContainer.innerHTML = '';
+    constantsGrid.innerHTML = '';
+    sectionConstants.style.display = 'none';
+  }
+
+  function updateVariableInspector(variables) {
+    if (!variables || Object.keys(variables).length === 0) {
+      resetInspector();
       return;
     }
 
-    const pseudocode = codeEditor.value;
-    clearTerminal();
-    clearErrorHighlights();
-    printToTerminal('Compiling...', 'info');
+    variablesEmpty.style.display = 'none';
+    variablesContent.style.display = 'block';
 
-    isRunning = true;
-    runButton.textContent = '⏹ ΔΙΑΚΟΠΗ';
-    runButton.classList.add('running-stop');
+    let totalVarCount = 0;
+    const currentPrimitives = {};
+    const currentArrays = {};
+    const currentConstants = {};
 
-    try {
-      const tokens = tokenize(pseudocode);
-      const parser = new Parser(tokens);
-      const ast = parser.parse();
-      printToTerminal('Running...', 'info');
-      currentInterpreter = new Interpreter();
-      currentInterpreter.setInputProvider(inputProvider);
-      currentInterpreter.setOutputCallback((text) => {
-        const hasNewline = text.endsWith('\n');
-        const cleanText = hasNewline ? text.slice(0, -1) : text;
-        printToTerminal(cleanText, 'output', hasNewline);
-      });
-      const result = await currentInterpreter.interpret(ast);
-      if (result.error) {
-        printToTerminal(`Error: ${result.error}`, 'error');
-        highlightErrorLine(result.error);
+    for (const [name, rawInfo] of Object.entries(variables)) {
+      if (name === 'EOLN') continue; // Skip internal marker
+      totalVarCount++;
+
+      if (rawInfo instanceof ArrayObject || (rawInfo && rawInfo.type === 'array')) {
+        currentArrays[name] = rawInfo;
       } else {
-        printToTerminal('finished.', 'success');
+        const val = (rawInfo && typeof rawInfo === 'object' && 'value' in rawInfo) ? rawInfo.value : rawInfo;
+        currentPrimitives[name] = val;
       }
-    } catch (error) {
-      printToTerminal(`Error: ${error.message}`, 'error');
-      highlightErrorLine(error.message);
-      console.error(error);
-    } finally {
-      isRunning = false;
-      currentInterpreter = null;
-      runButton.textContent = '▶ ΕΚΤΕΛΕΣΗ';
-      runButton.classList.remove('running-stop');
+    }
+
+    varCountBadge.textContent = totalVarCount;
+
+    // 1. Render Primitives
+    primitivesGrid.innerHTML = '';
+    for (const [name, val] of Object.entries(currentPrimitives)) {
+      const card = document.createElement('div');
+      card.className = 'var-card';
+
+      const prev = previousVariableValues[name];
+      if (prev !== undefined && prev !== val) {
+        card.classList.add('just-changed');
+      }
+
+      let typeStr = 'ΑΚΕΡΑΙΟΣ';
+      if (typeof val === 'number') {
+        typeStr = Number.isInteger(val) ? 'INTEGER' : 'REAL';
+      } else if (typeof val === 'boolean') {
+        typeStr = 'BOOLEAN';
+      } else if (typeof val === 'string') {
+        typeStr = val.length === 1 ? 'CHAR' : 'STRING';
+      }
+
+      const displayVal = typeof val === 'boolean' ? (val ? 'TRUE (ΑΛΗΘΗΣ)' : 'FALSE (ΨΕΥΔΗΣ)') :
+                         typeof val === 'string' ? `"${val}"` : val;
+
+      card.innerHTML = `
+        <div class="var-name-row">
+          <span class="var-name">${escapeHTML(name)}</span>
+          <span class="var-type">${typeStr}</span>
+        </div>
+        <div class="var-val">${escapeHTML(String(displayVal))}</div>
+      `;
+      primitivesGrid.appendChild(card);
+    }
+
+    // 2. Render Arrays
+    arraysContainer.innerHTML = '';
+    for (const [name, arrObj] of Object.entries(currentArrays)) {
+      const box = document.createElement('div');
+      box.className = 'array-box';
+
+      const bounds = arrObj.bounds;
+      const data = arrObj.data || {};
+      const dimStr = bounds.map(b => `${b.from}..${b.to}`).join(', ');
+
+      if (bounds.length === 1) {
+        // 1D Array
+        const b = bounds[0];
+        let cellsHtml = '';
+        for (let idx = b.from; idx <= b.to; idx++) {
+          const key = String(idx);
+          const cellVal = data.hasOwnProperty(key) ? data[key] : 0;
+          const prevKey = `${name}[${key}]`;
+          const isChanged = previousVariableValues[prevKey] !== undefined && previousVariableValues[prevKey] !== cellVal;
+
+          cellsHtml += `
+            <div class="array-cell ${isChanged ? 'just-changed' : ''}">
+              <div class="array-cell-idx">[${idx}]</div>
+              <div class="array-cell-val">${escapeHTML(String(cellVal))}</div>
+            </div>
+          `;
+        }
+
+        box.innerHTML = `
+          <div class="array-title">
+            <span>${escapeHTML(name)}</span>
+            <span class="array-dim-badge">ARRAY[${dimStr}]</span>
+          </div>
+          <div class="array-cells">${cellsHtml}</div>
+        `;
+      } else if (bounds.length === 2) {
+        // 2D Matrix Array
+        const rowB = bounds[0];
+        const colB = bounds[1];
+
+        let tableHtml = '<table class="matrix-2d-table"><thead><tr><th>[i\\j]</th>';
+        for (let j = colB.from; j <= colB.to; j++) {
+          tableHtml += `<th>[${j}]</th>`;
+        }
+        tableHtml += '</tr></thead><tbody>';
+
+        for (let i = rowB.from; i <= rowB.to; i++) {
+          tableHtml += `<tr><th>[${i}]</th>`;
+          for (let j = colB.from; j <= colB.to; j++) {
+            const key = `${i},${j}`;
+            const cellVal = data.hasOwnProperty(key) ? data[key] : 0;
+            const prevKey = `${name}[${key}]`;
+            const isChanged = previousVariableValues[prevKey] !== undefined && previousVariableValues[prevKey] !== cellVal;
+
+            tableHtml += `<td class="${isChanged ? 'just-changed' : ''}">${escapeHTML(String(cellVal))}</td>`;
+          }
+          tableHtml += '</tr>';
+        }
+        tableHtml += '</tbody></table>';
+
+        box.innerHTML = `
+          <div class="array-title">
+            <span>${escapeHTML(name)}</span>
+            <span class="array-dim-badge">ARRAY[${dimStr}] (2D Matrix)</span>
+          </div>
+          ${tableHtml}
+        `;
+      }
+
+      arraysContainer.appendChild(box);
+    }
+
+    // Save previous values for next step diff
+    for (const [name, val] of Object.entries(currentPrimitives)) {
+      previousVariableValues[name] = val;
+    }
+    for (const [name, arrObj] of Object.entries(currentArrays)) {
+      for (const [k, v] of Object.entries(arrObj.data || {})) {
+        previousVariableValues[`${name}[${k}]`] = v;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // TRACE TABLE (ΠΙΝΑΚΑΣ ΤΙΜΩΝ)
+  // ---------------------------------------------------------------------------
+  let traceHistory = [];
+
+  function resetTraceTable() {
+    traceHistory = [];
+    traceStepBadge.textContent = '0';
+    traceEmpty.style.display = 'flex';
+    traceTableContainer.style.display = 'none';
+    traceTableBody.innerHTML = '';
+  }
+
+  function addTraceTableRow(stepNum, lineNum, stmtText, varChanges, outputText) {
+    traceEmpty.style.display = 'none';
+    traceTableContainer.style.display = 'block';
+    traceStepBadge.textContent = stepNum;
+
+    const row = document.createElement('tr');
+
+    let varChangesHtml = '-';
+    if (varChanges && varChanges.length > 0) {
+      varChangesHtml = varChanges.map(vc =>
+        `<span class="trace-var-item">${escapeHTML(vc.name)} = <strong>${escapeHTML(String(vc.val))}</strong></span>`
+      ).join(' ');
+    }
+
+    row.innerHTML = `
+      <td class="trace-step-num">${stepNum}</td>
+      <td class="trace-line-num">Γρ. ${lineNum}</td>
+      <td class="trace-stmt"><code>${escapeHTML(stmtText)}</code></td>
+      <td>${varChangesHtml}</td>
+      <td class="trace-output-text">${outputText ? escapeHTML(outputText) : '-'}</td>
+    `;
+
+    traceTableBody.appendChild(row);
+
+    // Record data for Markdown export
+    traceHistory.push({
+      step: stepNum,
+      line: lineNum,
+      stmt: stmtText,
+      vars: varChanges && varChanges.length > 0 ? varChanges.map(vc => `${vc.name}=${vc.val}`).join(', ') : '-',
+      output: outputText || '-'
+    });
+
+    // Auto-scroll table to bottom
+    const traceWin = document.getElementById('trace-window');
+    if (traceWin) {
+      traceWin.scrollTop = traceWin.scrollHeight;
+    }
+  }
+
+  copyTraceBtn.addEventListener('click', () => {
+    if (!traceHistory.length) {
+      alert('Δεν υπάρχουν ακόμη δεδομένα στον Πίνακα Τιμών.');
+      return;
+    }
+
+    let md = '| Βήμα | Γραμμή | Εντολή | Μεταβολή Μεταβλητών | Έξοδος |\n';
+    md += '| :---: | :---: | :--- | :--- | :--- |\n';
+
+    traceHistory.forEach(r => {
+      md += `| ${r.step} | ${r.line} | \`${r.stmt.replace(/\|/g, '\\|')}\` | ${r.vars.replace(/\|/g, '\\|')} | ${r.output.replace(/\|/g, '\\|')} |\n`;
+    });
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(md).then(() => {
+        showToast('📋 Ο Πίνακας Τιμών αντιγράφηκε σε Markdown!');
+      }).catch(() => {
+        prompt('Αντιγράψτε τον Πίνακα Τιμών (Markdown):', md);
+      });
+    } else {
+      prompt('Αντιγράψτε τον Πίνακα Τιμών (Markdown):', md);
     }
   });
 
-  // -----------------------------------
-  // CONTROLS Save / Clear
-  // -----------------------------------
+  // ---------------------------------------------------------------------------
+  // INTERPRETER EXECUTION & DEBUGGING ENGINE
+  // ---------------------------------------------------------------------------
+  let currentInterpreter = null;
+  let isExecuting = false;
+  let isPausedInDebug = false;
+  let stepCounter = 0;
+  let lastOutputSnapshotLength = 0;
+  let fullOutputBuffer = '';
+
+  function setControlStates(executing, pausedInDebug) {
+    isExecuting = executing;
+    isPausedInDebug = pausedInDebug;
+
+    if (!executing) {
+      runButton.textContent = '▶ ΕΚΤΕΛΕΣΗ';
+      runButton.disabled = false;
+      stepButton.disabled = false;
+      continueButton.disabled = true;
+      stopButton.disabled = true;
+      speedSelect.disabled = false;
+    } else if (pausedInDebug) {
+      runButton.disabled = true;
+      stepButton.disabled = false;
+      continueButton.disabled = false;
+      stopButton.disabled = false;
+      speedSelect.disabled = false;
+    } else {
+      // Running continuously
+      runButton.textContent = '⏳ ΕΚΤΕΛΕΣΗ...';
+      runButton.disabled = true;
+      stepButton.disabled = true;
+      continueButton.disabled = true;
+      stopButton.disabled = false;
+      speedSelect.disabled = false;
+    }
+  }
+
+  function stopExecution() {
+    if (currentInterpreter) {
+      currentInterpreter.cancel();
+      printToTerminal('Διακοπή εκτέλεσης από τον χρήστη.', 'info', true);
+    }
+    clearDebugLineHighlight();
+    setControlStates(false, false);
+    currentInterpreter = null;
+  }
+
+  stopButton.addEventListener('click', stopExecution);
+
+  continueButton.addEventListener('click', () => {
+    if (isExecuting && isPausedInDebug && currentInterpreter) {
+      isPausedInDebug = false;
+      const speed = parseInt(speedSelect.value, 10);
+      currentInterpreter.setExecutionSpeed(speed);
+      setControlStates(true, false);
+      currentInterpreter.continueExecution();
+    }
+  });
+
+  speedSelect.addEventListener('change', () => {
+    const speed = parseInt(speedSelect.value, 10);
+    if (currentInterpreter) {
+      currentInterpreter.setExecutionSpeed(speed);
+    }
+  });
+
+  async function stepExecution() {
+    if (!isExecuting) {
+      // Start in step debugging mode
+      await runExecution(true);
+    } else if (isPausedInDebug && currentInterpreter) {
+      // Step to next instruction
+      currentInterpreter.step();
+    }
+  }
+
+  stepButton.addEventListener('click', stepExecution);
+  runButton.addEventListener('click', () => runExecution(false));
+
+  async function runExecution(startInDebugMode = false) {
+    if (isExecuting) return;
+
+    clearErrorHighlight();
+    clearDebugLineHighlight();
+    resetInspector();
+    resetTraceTable();
+    clearTerminal();
+
+    const pseudocode = editor.getValue();
+    printToTerminal('Μεταγλώττιση (Compiling)...', 'info', true);
+
+    let ast;
+    try {
+      const tokens = tokenize(pseudocode);
+      const parser = new Parser(tokens);
+      ast = parser.parse();
+    } catch (err) {
+      printToTerminal(`Σφάλμα Σύνταξης: ${err.message}`, 'error', true);
+      highlightErrorLine(err.message);
+      return;
+    }
+
+    printToTerminal('Εκκίνηση εκτέλεσης (Running)...', 'info', true);
+    setControlStates(true, startInDebugMode);
+
+    const speed = parseInt(speedSelect.value, 10);
+    stepCounter = 0;
+    lastOutputSnapshotLength = 0;
+    fullOutputBuffer = '';
+
+    currentInterpreter = new Interpreter({
+      debugMode: startInDebugMode,
+      speed: speed
+    });
+
+    currentInterpreter.setInputProvider(inputProvider);
+
+    currentInterpreter.setOutputCallback((text) => {
+      fullOutputBuffer += text;
+      printToTerminal(text, 'output');
+    });
+
+    currentInterpreter.setStepCallback(async ({ line, stmt, variables }) => {
+      stepCounter++;
+
+      // Highlight active line in CodeMirror
+      highlightDebugLine(line);
+
+      // Extract statement text
+      const rawLine = editor.getLine(line - 1) || '';
+      const stmtPreview = rawLine.trim();
+
+      // Find changed variables for trace table
+      const changedList = [];
+      for (const [name, rawInfo] of Object.entries(variables)) {
+        if (name === 'EOLN') continue;
+        if (rawInfo instanceof ArrayObject || (rawInfo && rawInfo.type === 'array')) {
+          const arrData = rawInfo.data || {};
+          for (const [idxKey, cellVal] of Object.entries(arrData)) {
+            const compoundKey = `${name}[${idxKey}]`;
+            if (previousVariableValues[compoundKey] === undefined || previousVariableValues[compoundKey] !== cellVal) {
+              changedList.push({ name: compoundKey, val: cellVal });
+            }
+          }
+        } else {
+          const val = (rawInfo && typeof rawInfo === 'object' && 'value' in rawInfo) ? rawInfo.value : rawInfo;
+          if (previousVariableValues[name] === undefined || previousVariableValues[name] !== val) {
+            changedList.push({ name, val });
+          }
+        }
+      }
+
+      // Check newly printed output since last step
+      let stepOutput = '';
+      if (fullOutputBuffer.length > lastOutputSnapshotLength) {
+        stepOutput = fullOutputBuffer.substring(lastOutputSnapshotLength).trim();
+        lastOutputSnapshotLength = fullOutputBuffer.length;
+      }
+
+      // Update Inspector & Trace Table
+      updateVariableInspector(variables);
+      addTraceTableRow(stepCounter, line, stmtPreview, changedList, stepOutput);
+
+      if (currentInterpreter.debugMode) {
+        setControlStates(true, true);
+      }
+    });
+
+    try {
+      const result = await currentInterpreter.interpret(ast);
+
+      if (result.error) {
+        printToTerminal(`Σφάλμα: ${result.error}`, 'error', true);
+        highlightErrorLine(result.error);
+      } else {
+        printToTerminal('\nΗ εκτέλεση ολοκληρώθηκε επιτυχώς.', 'success', true);
+      }
+
+      // Final update of variables
+      if (currentInterpreter && currentInterpreter.globalEnv) {
+        updateVariableInspector(currentInterpreter.globalEnv.getAllVariables());
+      }
+    } catch (e) {
+      printToTerminal(`Σφάλμα Εκτέλεσης: ${e.message}`, 'error', true);
+      highlightErrorLine(e.message);
+    } finally {
+      clearDebugLineHighlight();
+      setControlStates(false, false);
+      currentInterpreter = null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FILE SAVE & LOAD (WINDOWS-1253 & UTF-8)
+  // ---------------------------------------------------------------------------
   saveButton.addEventListener('click', () => {
-    const code = codeEditor.value;
-    const blob = new Blob([code], { type: 'text/plain' });
+    const code = editor.getValue();
+    const greekMatch = code.match(/ΑΛΓΟΡΙΘΜΟΣ\s+([A-Za-zΑ-Ωα-ω0-9_]+)/i);
+    const engMatch = code.match(/ALGORITHM\s+([A-Za-zΑ-Ωα-ω0-9_]+)/i);
+    const progName = (greekMatch && greekMatch[1]) || (engMatch && engMatch[1]) || 'program';
+
+    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'pseudocode.txt';
+    a.download = `${progName}.eap`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    showToast(`💾 Το αρχείο αποθηκεύτηκε ως ${progName}.eap`);
   });
 
   clearButton.addEventListener('click', () => {
-    if (confirm('Καθαρισμός κώδικα;')) {
-      codeEditor.value = '';
-      onInput();
+    if (confirm('Καθαρισμός όλου του κώδικα στον συντάκτη;')) {
+      if (isExecuting) stopExecution();
+      editor.setValue('');
       exampleSelector.value = '';
+      clearTerminal();
+      resetInspector();
+      resetTraceTable();
+      updateProgramName();
     }
   });
 
-  // --- FORMAT BUTTON: same behavior as Ctrl+Shift+F ---
-const formatButton = document.getElementById('format-button');
-if (formatButton) {
-  formatButton.addEventListener('click', () => {
+  // Windows-1253 Map
+  const WINDOWS_1253_MAP = {
+    0x80: '\u20AC', 0x82: '\u201A', 0x83: '\u0192', 0x84: '\u201E', 0x85: '\u2026',
+    0x86: '\u2020', 0x87: '\u2021', 0x89: '\u2030', 0x8B: '\u2039', 0x8C: '\u0152',
+    0x91: '\u2018', 0x92: '\u2019', 0x93: '\u201C', 0x94: '\u201D', 0x95: '\u2022',
+    0x96: '\u2013', 0x97: '\u2014', 0x99: '\u2122', 0x9B: '\u203A', 0x9C: '\u0153',
+    0xA0: '\u00A0', 0xA1: '\u0385', 0xA2: '\u0386', 0xA3: '\u00A3', 0xA4: '\u00A4',
+    0xA5: '\u00A5', 0xA6: '\u00A6', 0xA7: '\u00A7', 0xA8: '\u00A8', 0xA9: '\u00A9',
+    0xAA: '\u037A', 0xAB: '\u00AB', 0xAC: '\u00AC', 0xAD: '\u00AD', 0xAE: '\u00AE',
+    0xAF: '\u2015', 0xB0: '\u00B0', 0xB1: '\u00B1', 0xB2: '\u00B2', 0xB3: '\u00B3',
+    0xB4: '\u0384', 0xB5: '\u00B5', 0xB6: '\u00B6', 0xB7: '\u00B7', 0xB8: '\u0388',
+    0xB9: '\u0389', 0xBA: '\u038A', 0xBB: '\u00BB', 0xBC: '\u038C', 0xBD: '\u00BD',
+    0xBE: '\u038E', 0xBF: '\u038F', 0xC0: '\u0390', 0xC1: '\u0391', 0xC2: '\u0392',
+    0xC3: '\u0393', 0xC4: '\u0394', 0xC5: '\u0395', 0xC6: '\u0396', 0xC7: '\u0397',
+    0xC8: '\u0398', 0xC9: '\u0399', 0xCA: '\u039A', 0xCB: '\u039B', 0xCC: '\u039C',
+    0xCD: '\u039D', 0xCE: '\u039E', 0xCF: '\u039F', 0xD0: '\u03A0', 0xD1: '\u03A1',
+    0xD3: '\u03A3', 0xD4: '\u03A4', 0xD5: '\u03A5', 0xD6: '\u03A6', 0xD7: '\u03A7',
+    0xD8: '\u03A8', 0xD9: '\u03A9', 0xDA: '\u03AA', 0xDB: '\u03AB', 0xDC: '\u03AC',
+    0xDD: '\u03AD', 0xDE: '\u03AE', 0xDF: '\u03AF', 0xE0: '\u03B0', 0xE1: '\u03B1',
+    0xE2: '\u03B2', 0xE3: '\u03B3', 0xE4: '\u03B4', 0xE5: '\u03B5', 0xE6: '\u03B6',
+    0xE7: '\u03B7', 0xE8: '\u03B8', 0xE9: '\u03B9', 0xEA: '\u03BA', 0xEB: '\u03BB',
+    0xEC: '\u03BC', 0xED: '\u03BD', 0xEE: '\u03BE', 0xEF: '\u03BF', 0xF0: '\u03C0',
+    0xF1: '\u03C1', 0xF2: '\u03C2', 0xF3: '\u03C3', 0xF4: '\u03C4', 0xF5: '\u03C5',
+    0xF6: '\u03C6', 0xF7: '\u03C7', 0xF8: '\u03C8', 0xF9: '\u03C9', 0xFA: '\u03CA',
+    0xFB: '\u03CB', 0xFC: '\u03CC', 0xFD: '\u03CD', 0xFE: '\u03CE'
+  };
+
+  function decodeWindows1253(bytes) {
+    let result = '';
+    for (let i = 0; i < bytes.length; i++) {
+      const byte = bytes[i];
+      if (byte < 0x80) {
+        result += String.fromCharCode(byte);
+      } else if (WINDOWS_1253_MAP[byte]) {
+        result += WINDOWS_1253_MAP[byte];
+      } else {
+        result += String.fromCharCode(byte);
+      }
+    }
+    return result;
+  }
+
+  function tryDecodeUTF8(buffer) {
     try {
-      // Save approximate cursor position
-      const cursorPos = codeEditor.selectionStart;
-
-      // Format code using the same function used by keyboard handler
-      const formatted = autoFormatCode();
-      codeEditor.value = formatted;
-
-      // Restore cursor (approximate)
-      const newPos = Math.min(cursorPos, formatted.length);
-      codeEditor.selectionStart = codeEditor.selectionEnd = newPos;
-
-      // Refresh highlighting / lines
-      onInput();
-
-      // Optional: show same notification used by keyboard handler
-      const notification = document.createElement('div');
-      notification.textContent = '✓ Code formatted!';
-      notification.style.cssText = `
-        position: fixed;
-        top: 70px;
-        right: 20px;
-        background: var(--button-bg);
-        color: white;
-        padding: 10px 20px;
-        border-radius: 4px;
-        font-weight: bold;
-        z-index: 1000;
-        animation: slideIn 0.25s ease-out;
-      `;
-      document.body.appendChild(notification);
-      setTimeout(() => notification.remove(), 1600);
-    } catch (err) {
-      // Defensive: if something unexpectedly missing, log it
-      console.error('Format button failed:', err);
-      alert('Formatting failed — open console for details.');
-    }
-  });
-}
-
-    // -----------------------------------
-    // LOAD (.eap) FILE
-    // -----------------------------------
-  // Complete Windows-1253 to Unicode mapping table
-const WINDOWS_1253_MAP = {
-  // Control characters 0x00-0x7F are standard ASCII (handled by default)
-  
-  // 0x80-0x9F: Windows-1253 special characters
-  0x80: '\u20AC', // €
-  0x82: '\u201A', // ‚
-  0x83: '\u0192', // ƒ
-  0x84: '\u201E', // „
-  0x85: '\u2026', // …
-  0x86: '\u2020', // †
-  0x87: '\u2021', // ‡
-  0x89: '\u2030', // ‰
-  0x8B: '\u2039', // ‹
-  0x8C: '\u0152', // Œ
-  0x91: '\u2018', // '
-  0x92: '\u2019', // '
-  0x93: '\u201C', // "
-  0x94: '\u201D', // "
-  0x95: '\u2022', // •
-  0x96: '\u2013', // –
-  0x97: '\u2014', // —
-  0x99: '\u2122', // ™
-  0x9B: '\u203A', // ›
-  0x9C: '\u0153', // œ
-  
-  // 0xA0-0xBF: Extended Latin and Greek diacritics
-  0xA0: '\u00A0', // Non-breaking space
-  0xA1: '\u0385', // ΅ (Greek Dialytika Tonos)
-  0xA2: '\u0386', // Ά (Greek Capital Letter Alpha with Tonos)
-  0xA3: '\u00A3', // £
-  0xA4: '\u00A4', // ¤
-  0xA5: '\u00A5', // ¥
-  0xA6: '\u00A6', // ¦
-  0xA7: '\u00A7', // §
-  0xA8: '\u00A8', // ¨
-  0xA9: '\u00A9', // ©
-  0xAA: '\u037A', // ͺ
-  0xAB: '\u00AB', // «
-  0xAC: '\u00AC', // ¬
-  0xAD: '\u00AD', // Soft hyphen
-  0xAE: '\u00AE', // ®
-  0xAF: '\u2015', // ― (Horizontal bar)
-  
-  0xB0: '\u00B0', // °
-  0xB1: '\u00B1', // ±
-  0xB2: '\u00B2', // ²
-  0xB3: '\u00B3', // ³
-  0xB4: '\u0384', // ΄ (Greek Tonos)
-  0xB5: '\u00B5', // µ
-  0xB6: '\u00B6', // ¶
-  0xB7: '\u00B7', // ·
-  0xB8: '\u0388', // Έ (Greek Capital Letter Epsilon with Tonos)
-  0xB9: '\u0389', // Ή (Greek Capital Letter Eta with Tonos)
-  0xBA: '\u038A', // Ί (Greek Capital Letter Iota with Tonos)
-  0xBB: '\u00BB', // »
-  0xBC: '\u038C', // Ό (Greek Capital Letter Omicron with Tonos)
-  0xBD: '\u00BD', // ½
-  0xBE: '\u038E', // Ύ (Greek Capital Letter Upsilon with Tonos)
-  0xBF: '\u038F', // Ώ (Greek Capital Letter Omega with Tonos)
-  
-  // 0xC0-0xDF: Greek uppercase letters
-  0xC0: '\u0390', // ΐ (Greek Small Letter Iota with Dialytika and Tonos)
-  0xC1: '\u0391', // Α (Alpha)
-  0xC2: '\u0392', // Β (Beta)
-  0xC3: '\u0393', // Γ (Gamma)
-  0xC4: '\u0394', // Δ (Delta)
-  0xC5: '\u0395', // Ε (Epsilon)
-  0xC6: '\u0396', // Ζ (Zeta)
-  0xC7: '\u0397', // Η (Eta)
-  0xC8: '\u0398', // Θ (Theta)
-  0xC9: '\u0399', // Ι (Iota)
-  0xCA: '\u039A', // Κ (Kappa)
-  0xCB: '\u039B', // Λ (Lambda)
-  0xCC: '\u039C', // Μ (Mu)
-  0xCD: '\u039D', // Ν (Nu)
-  0xCE: '\u039E', // Ξ (Xi)
-  0xCF: '\u039F', // Ο (Omicron)
-  
-  0xD0: '\u03A0', // Π (Pi)
-  0xD1: '\u03A1', // Ρ (Rho)
-  0xD3: '\u03A3', // Σ (Sigma)
-  0xD4: '\u03A4', // Τ (Tau)
-  0xD5: '\u03A5', // Υ (Upsilon)
-  0xD6: '\u03A6', // Φ (Phi)
-  0xD7: '\u03A7', // Χ (Chi)
-  0xD8: '\u03A8', // Ψ (Psi)
-  0xD9: '\u03A9', // Ω (Omega)
-  0xDA: '\u03AA', // Ϊ (Greek Capital Letter Iota with Dialytika)
-  0xDB: '\u03AB', // Ϋ (Greek Capital Letter Upsilon with Dialytika)
-  0xDC: '\u03AC', // ά (Greek Small Letter Alpha with Tonos)
-  0xDD: '\u03AD', // έ (Greek Small Letter Epsilon with Tonos)
-  0xDE: '\u03AE', // ή (Greek Small Letter Eta with Tonos)
-  0xDF: '\u03AF', // ί (Greek Small Letter Iota with Tonos)
-  
-  // 0xE0-0xFF: Greek lowercase letters
-  0xE0: '\u03B0', // ΰ (Greek Small Letter Upsilon with Dialytika and Tonos)
-  0xE1: '\u03B1', // α (alpha)
-  0xE2: '\u03B2', // β (beta)
-  0xE3: '\u03B3', // γ (gamma)
-  0xE4: '\u03B4', // δ (delta)
-  0xE5: '\u03B5', // ε (epsilon)
-  0xE6: '\u03B6', // ζ (zeta)
-  0xE7: '\u03B7', // η (eta)
-  0xE8: '\u03B8', // θ (theta)
-  0xE9: '\u03B9', // ι (iota)
-  0xEA: '\u03BA', // κ (kappa)
-  0xEB: '\u03BB', // λ (lambda)
-  0xEC: '\u03BC', // μ (mu)
-  0xED: '\u03BD', // ν (nu)
-  0xEE: '\u03BE', // ξ (xi)
-  0xEF: '\u03BF', // ο (omicron)
-  
-  0xF0: '\u03C0', // π (pi)
-  0xF1: '\u03C1', // ρ (rho)
-  0xF2: '\u03C2', // ς (final sigma)
-  0xF3: '\u03C3', // σ (sigma)
-  0xF4: '\u03C4', // τ (tau)
-  0xF5: '\u03C5', // υ (upsilon)
-  0xF6: '\u03C6', // φ (phi)
-  0xF7: '\u03C7', // χ (chi)
-  0xF8: '\u03C8', // ψ (psi)
-  0xF9: '\u03C9', // ω (omega)
-  0xFA: '\u03CA', // ϊ (Greek Small Letter Iota with Dialytika)
-  0xFB: '\u03CB', // ϋ (Greek Small Letter Upsilon with Dialytika)
-  0xFC: '\u03CC', // ό (Greek Small Letter Omicron with Tonos)
-  0xFD: '\u03CD', // ύ (Greek Small Letter Upsilon with Tonos)
-  0xFE: '\u03CE', // ώ (Greek Small Letter Omega with Tonos)
-};
-
-
-function decodeWindows1253(bytes) {
- let result = '';
-  
-  for (let i = 0; i < bytes.length; i++) {
-    const byte = bytes[i];
-    
-    // ASCII range (0x00-0x7F) - direct mapping
-    if (byte < 0x80) {
-      result += String.fromCharCode(byte);
-    }
-    // Windows-1253 extended range (0x80-0xFF)
-    else if (WINDOWS_1253_MAP[byte]) {
-      result += WINDOWS_1253_MAP[byte];
-    }
-    // Undefined bytes - use replacement character or original
-    else {
-      result += String.fromCharCode(byte);
+      const decoder = new TextDecoder('utf-8', { fatal: true });
+      return decoder.decode(buffer);
+    } catch (e) {
+      return null;
     }
   }
-  
-  return result;
-}
 
-
-function tryDecodeUTF8(buffer) {
-   try {
-    const decoder = new TextDecoder('utf-8', { fatal: true });
-    return decoder.decode(buffer);
-  } catch (e) {
-    return null;
+  function containsGreekKeywords(text) {
+    const upper = text.toUpperCase();
+    return (upper.includes('ΑΛΓΟΡΙΘΜΟΣ') || upper.includes('ALGORITHM')) &&
+           (upper.includes('ΑΡΧΗ') || upper.includes('BEGIN'));
   }
-}
 
-function containsGreekKeywords(text) {
-  const upper = text.toUpperCase();
-  return (upper.includes('ΑΛΓΟΡΙΘΜΟΣ') || upper.includes('ALGORITHM')) &&
-         (upper.includes('ΑΡΧΗ') || upper.includes('BEGIN'));
-}
-
-loadButton.addEventListener('click', () => {
-  fileInput.value = '';
-  fileInput.click();
-});
-
-fileInput.addEventListener('change', () => {
-  const file = fileInput.files?.[0];
-  if (!file) return;
-  
-  const reader = new FileReader();
-  
-  reader.onload = (e) => {
-    const buffer = e.target.result;
-    const bytes = new Uint8Array(buffer);
-    
-    // 1. Try UTF-8 first
-    let decoded = tryDecodeUTF8(buffer);
-    if (decoded && containsGreekKeywords(decoded)) {
-      console.log('✓ Loaded as UTF-8');
-      codeEditor.value = decoded;
-      onInput();
-      exampleSelector.value = '';
-      return;
-    }
-    
-    // 2. Try Windows-1253
-    decoded = decodeWindows1253(bytes);
-    if (decoded && containsGreekKeywords(decoded)) {
-      console.log('✓ Loaded as Windows-1253');
-      codeEditor.value = decoded;
-      onInput();
-      exampleSelector.value = '';
-      return;
-    }
-    
-    // 3. Failed
-    alert('Το αρχείο δεν περιέχει έγκυρο πρόγραμμα.\nΔεν βρέθηκαν ΑΛΓΟΡΙΘΜΟΣ και ΑΡΧΗ.');
-  };
-  
-  reader.onerror = () => alert('Αποτυχία ανάγνωσης αρχείου.');
-  
-  reader.readAsArrayBuffer(file);
-});
-
-  // -----------------------------------
-  // DARK MODE
-  // -----------------------------------
-  const applyTheme = (isDark) => {
-    const theme = isDark ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', theme);
-    document.body.setAttribute('data-theme', theme);
-    themeToggle.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
-    SettingsManager.set('theme', theme);
-
-    const url = new URL(window.location);
-    url.searchParams.set('theme', theme);
-    window.history.replaceState({}, '', url);
-
-    const homeLink = document.querySelector('.home-link');
-    if (homeLink) {
-      homeLink.href = `index.html?theme=${theme}`;
-    }
-  };
-
-  const currentTheme =
-    document.documentElement.getAttribute('data-theme') ||
-    SettingsManager.get('theme', 'light');
-  const isDarkMode = currentTheme === 'dark';
-  applyTheme(isDarkMode);
-
-  themeToggle.addEventListener('click', () => {
-    const nowDark =
-      document.documentElement.getAttribute('data-theme') !== 'dark';
-    applyTheme(nowDark);
+  loadButton.addEventListener('click', () => {
+    fileInput.value = '';
+    fileInput.click();
   });
 
-  // -----------------------------------
-  // TERMINAL RESIZING & FOCUS
-  // -----------------------------------
-  const MIN_TERMINAL_HEIGHT = 150; // px
-  const DEFAULT_EXPANDED_HEIGHT = '40vh';
-  let preferredHeight = SettingsManager.get(
-    'terminalExpandedHeight',
-    DEFAULT_EXPANDED_HEIGHT
-  );
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
 
-  const expandTerminal = () => {
-    outputContainer.style.height = preferredHeight;
-  };
-  const collapseTerminal = () => {
-    outputContainer.style.height = MIN_TERMINAL_HEIGHT + 'px';
-  };
+    const reader = new FileReader();
 
+    reader.onload = (e) => {
+      const buffer = e.target.result;
+      const bytes = new Uint8Array(buffer);
+
+      // Try UTF-8 first
+      let decoded = tryDecodeUTF8(buffer);
+      if (decoded && containsGreekKeywords(decoded)) {
+        editor.setValue(decoded);
+        exampleSelector.value = '';
+        showToast(`✓ Φορτώθηκε (UTF-8): ${file.name}`);
+        return;
+      }
+
+      // Try Windows-1253
+      decoded = decodeWindows1253(bytes);
+      if (decoded && containsGreekKeywords(decoded)) {
+        editor.setValue(decoded);
+        exampleSelector.value = '';
+        showToast(`✓ Φορτώθηκε (Windows-1253): ${file.name}`);
+        return;
+      }
+
+      // Fallback
+      if (decoded) {
+        editor.setValue(decoded);
+        exampleSelector.value = '';
+        showToast(`✓ Φορτώθηκε: ${file.name}`);
+      } else {
+        alert('Το αρχείο δεν περιέχει έγκυρο κώδικα ψευδογλώσσας.');
+      }
+    };
+
+    reader.onerror = () => alert('Αποτυχία ανάγνωσης αρχείου.');
+    reader.readAsArrayBuffer(file);
+  });
+
+  // ---------------------------------------------------------------------------
+  // RESIZER & CONTAINER HEIGHT
+  // ---------------------------------------------------------------------------
+  const DEFAULT_EXPANDED_HEIGHT = '38vh';
+  let preferredHeight = SettingsManager.get('terminalExpandedHeight', DEFAULT_EXPANDED_HEIGHT);
   outputContainer.style.height = preferredHeight;
-
-  codeEditor.addEventListener('focus', collapseTerminal);
-  document
-    .querySelector('.editor-container')
-    .addEventListener('click', collapseTerminal);
-  outputContainer.addEventListener('click', expandTerminal);
-  terminalInput.addEventListener('focus', expandTerminal);
-  runButton.addEventListener('click', expandTerminal);
 
   let isResizing = false;
 
-  dragHandle.addEventListener('mousedown', (e) => {
+  dragHandle.addEventListener('mousedown', () => {
     isResizing = true;
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
@@ -1165,12 +1082,10 @@ fileInput.addEventListener('change', () => {
 
   document.addEventListener('mousemove', (e) => {
     if (!isResizing) return;
-    const containerRect = document
-      .querySelector('.container')
-      .getBoundingClientRect();
+    const containerRect = document.querySelector('.container').getBoundingClientRect();
     const newHeight = containerRect.bottom - e.clientY;
-    const maxHeight = containerRect.height * 0.8;
-    if (newHeight > 100 && newHeight < maxHeight) {
+    const maxHeight = containerRect.height * 0.85;
+    if (newHeight > 120 && newHeight < maxHeight) {
       outputContainer.style.height = newHeight + 'px';
     }
   });
@@ -1185,196 +1100,122 @@ fileInput.addEventListener('change', () => {
     }
   });
 
-  // -----------------------------------
-  // SYNTAX HELP
-  // -----------------------------------
+  // ---------------------------------------------------------------------------
+  // SYNTAX HELP MODAL
+  // ---------------------------------------------------------------------------
+  function createSyntaxModal() {
+    const modalId = 'syntax-help-modal';
+    let modal = document.getElementById(modalId);
+    if (modal) return modal;
 
+    modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal-overlay';
 
-    // Function to create the modal structure
-    function createModal(id, title, content) {
-        // 1. Create the main modal container
-        const modal = document.createElement('div');
-        modal.setAttribute('id', id);
-        modal.classList.add('modal-overlay'); // For background dimming and closing
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black background */
-            display: none; /* Hidden by default */
-            justify-content: center;
-            align-items: center;
-            z-index: 1000; /* Ensure it's on top of other content */
-        `;
-        
-        // 2. Create the modal content box
-        const modalContent = document.createElement('div');
-        modalContent.classList.add('modal-content');
-        modalContent.style.cssText = `
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            position: relative;
-        `;
-        
-        // 3. Create the close button
-        const closeButton = document.createElement('span');
-        closeButton.classList.add('modal-close');
-        closeButton.innerHTML = '&times;'; // HTML entity for 'x'
-        closeButton.style.cssText = `
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-        `;
-        closeButton.onclick = () => {
-            modal.style.display = 'none';
-        };
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
 
-        // 4. Create the title
-        const modalTitle = document.createElement('h2');
-        modalTitle.textContent = title;
+    const closeBtn = document.createElement('span');
+    closeBtn.className = 'modal-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = () => { modal.style.display = 'none'; };
 
-        // 5. Create the body content
-        const modalBody = document.createElement('p');
-        modalBody.innerHTML = content; // Using innerHTML to allow for simple formatting
+    const title = document.createElement('h2');
+    title.textContent = 'Συνοπτική Βοήθεια Σύνταξης Ψευδογλώσσας (ΠΛΗ10)';
 
-        // 6. Assemble the pieces
-        modalContent.appendChild(closeButton);
-        modalContent.appendChild(modalTitle);
-        modalContent.appendChild(modalBody);
-        modal.appendChild(modalContent);
-
-        // 7. Add to the document body
-        document.body.appendChild(modal);
-        
-        return modal;
-    }
-
-    // Modal Configuration
-    const modalTitle = 'Συνοπτική Βοήθεια Σύνταξης Ψευδοκώδικα';
-    const modalContentHTML = `
+    const body = document.createElement('div');
+    body.innerHTML = `
       <h4>1. Δηλώσεις (ΔΕΔΟΜΕΝΑ / ΣΤΑΘΕΡΕΣ)</h4>
       <ul>
-          <li><strong>Μεταβλητές (Απλές):</strong> <code>&lt;λίστα μεταβλητών&gt; : &lt;τύπος&gt; ;</code>
-              <br>Π.χ. <code>I, J: INTEGER;</code>, <code>X : REAL;</code></li>
-          <li><strong>Πίνακες (Arrays):</strong> <code>&lt;όνομα&gt; : ARRAY [&lt;αρχή&gt;..&lt;τέλος&gt;] OF &lt;τύπος&gt; ;</code>
-              <br>Π.χ. <code>BATHMOS : ARRAY [1..20] OF REAL;</code></li>
-          <li><strong>Σταθερές:</strong> <code>ΣΤΑΘΕΡΕΣ &lt;όνομα&gt; = &lt;τιμή&gt;</code>
-              <br>Π.χ. <code>MAX_DAYS = 31</code></li>
+        <li><strong>Μεταβλητές:</strong> <code>&lt;λίστα&gt; : &lt;τύπος&gt; ;</code><br>Π.χ. <code>I, J: INTEGER;</code>, <code>X: REAL;</code></li>
+        <li><strong>Πίνακες (Arrays):</strong> <code>&lt;όνομα&gt; : ARRAY [&lt;αρχή&gt;..&lt;τέλος&gt;] OF &lt;τύπος&gt; ;</code><br>Π.χ. <code>PIN : ARRAY [1..20] OF INTEGER;</code></li>
+        <li><strong>Δισδιάστατοι Πίνακες:</strong> <code>P : ARRAY [1..3, 1..4] OF INTEGER;</code></li>
+        <li><strong>Σταθερές:</strong> <code>ΣΤΑΘΕΡΕΣ N = 10, MAX = 100;</code></li>
       </ul>
-      
-      <h5 style="margin-top: 20px;">Επεξήγηση Τύπων Μεταβλητών:</h5>
-      <table border="1" style="width: 100%; border-collapse: collapse; font-size: 0.9em; margin-bottom: 20px;">
-          <thead>
-              <tr style="background-color: #f2f2f2;">
-                  <th style="padding: 8px;">Τύπος</th>
-                  <th style="padding: 8px;">Περιγραφή</th>
-                  <th style="padding: 8px;">Παράδειγμα</th>
-              </tr>
-          </thead>
-          <tbody>
-              <tr>
-                  <td style="padding: 8px;"><strong>INTEGER</strong></td>
-                  <td style="padding: 8px;">Ακέραιες τιμές.</td>
-                  <td style="padding: 8px;"><code>I : INTEGER;</code></td>
-              </tr>
-              <tr>
-                  <td style="padding: 8px;"><strong>REAL</strong></td>
-                  <td style="padding: 8px;">Πραγματικές/Δεκαδικές τιμές.</td>
-                  <td style="padding: 8px;"><code>ΒΑΘΜΟΣ : REAL;</code></td>
-              </tr>
-              <tr>
-                  <td style="padding: 8px;"><strong>BOOLEAN</strong></td>
-                  <td style="padding: 8px;">Λογικές τιμές (TRUE / FALSE).</td>
-                  <td style="padding: 8px;"><code>FLAG : BOOLEAN;</code></td>
-              </tr>
-              <tr>
-                  <td style="padding: 8px;"><strong>CHAR</strong></td>
-                  <td style="padding: 8px;">Ένας μοναδικός χαρακτήρας.</td>
-                  <td style="padding: 8px;"><code>KEY : CHAR;</code></td>
-              </tr>
-              <tr>
-                  <td style="padding: 8px;"><strong>STRING</strong></td>
-                  <td style="padding: 8px;">Ακολουθία χαρακτήρων (κειμένου).</td>
-                  <td style="padding: 8px;"><code>ΟΝΟΜΑ : STRING;</code></td>
-              </tr>
-          </tbody>
-      </table>
-      
-      <h4>2. Βασικές Εντολές</h4>
-      <ul>
-          <li><strong>Καταχώριση (Ανάθεση):</strong> <code>&lt;μεταβλητή&gt; := &lt;παράσταση&gt;</code>
-              <br>Π.χ. <code>X := (Y + 10) / 4</code></li>
-          <li><strong>Είσοδος (Input):</strong> <code>ΔΙΑΒΑΣΕ (&lt;λίστα μεταβλητών&gt;)</code>
-              <br>Π.χ. <code>ΔΙΑΒΑΣΕ (ΟΝΟΜΑ, ΑΡΙΘΜΟΣ)</code></li>
-          <li><strong>Έξοδος (Output):</strong> <code>ΤΥΠΩΣΕ (&lt;λίστα παραμέτρων&gt;)</code>
-              <br>Π.χ. <code>ΤΥΠΩΣΕ ("ΤΟ ΑΠΟΤΕΛΕΣΜΑ ΕΙΝΑΙ: ", ΑΠ)</code></li>
-      </ul>
-      
-      
-      <h4>3. Τελεστές</h4>
+
+      <h4>2. Τύποι Δεδομένων</h4>
       <table>
-          <tr><td><strong>Αριθμητικοί</strong></td><td><code>+, -, *, /, DIV (Ακέραια), MOD (Υπόλοιπο)</code></td></tr>
-          <tr><td><strong>Σύγκρισης</strong></td><td><code>=, >, >=, <, <=, <></code></td></tr>
-          <tr><td><strong>Λογικοί</strong></td><td><code>NOT, OR, AND</code></td></tr>
+        <thead><tr><th>Τύπος</th><th>Περιγραφή</th><th>Παράδειγμα</th></tr></thead>
+        <tbody>
+          <tr><td><strong>INTEGER</strong></td><td>Ακέραιοι αριθμοί</td><td><code>I : INTEGER;</code></td></tr>
+          <tr><td><strong>REAL</strong></td><td>Πραγματικοί αριθμοί</td><td><code>MO : REAL;</code></td></tr>
+          <tr><td><strong>BOOLEAN</strong></td><td>Λογικές τιμές (TRUE / FALSE)</td><td><code>FLAG : BOOLEAN;</code></td></tr>
+          <tr><td><strong>CHAR</strong></td><td>Ένας χαρακτήρας</td><td><code>CH : CHAR;</code></td></tr>
+          <tr><td><strong>STRING</strong></td><td>Συμβολοσειρά κειμένου</td><td><code>NAME : STRING;</code></td></tr>
+        </tbody>
       </table>
-      
-      <h4>4. Δομές Ελέγχου Ροής (Εντολές)</h4>
-      
-      <h5>Επιλογή (Selection)</h5>
-      <pre><code><strong>ΕΑΝ</strong> &lt;συνθήκη&gt; <strong>ΤΟΤΕ</strong>
-          &lt;εντολές1&gt;
-      <strong>ΑΛΛΙΩΣ</strong>
-          &lt;εντολές2&gt;
-      <strong>ΕΑΝ-ΤΕΛΟΣ</strong></code></pre>
-      
-      <h5>Επανάληψη (Repetition)</h5>
-      
-      <h6>α) ΓΙΑ-ΕΠΑΝΑΛΑΒΕ (For Loop)</h6>
-      <pre><code><strong>ΓΙΑ</strong> &lt;μτ&gt; := &lt;ατ&gt; <strong>ΕΩΣ</strong> &lt;ττ&gt; [<strong>ΜΕ ΒΗΜΑ</strong> &lt;βήμα&gt;] <strong>ΕΠΑΝΑΛΑΒΕ</strong>
-          &lt;εντολές&gt;
-      <strong>ΓΙΑ-ΤΕΛΟΣ</strong></code></pre>
-      
-      <h6>β) ΕΝΟΣΩ-ΕΠΑΝΑΛΑΒΕ (While Loop)</h6>
-      <pre><code><strong>ΕΝΟΣΩ</strong> &lt;συνθήκη&gt; <strong>ΕΠΑΝΑΛΑΒΕ</strong>
-          &lt;εντολές&gt;
-      <strong>ΕΝΟΣΩ-ΤΕΛΟΣ</strong></code></pre>
-      
-      <h6>γ) ΕΠΑΝΑΛΑΒΕ-ΜΕΧΡΙ (Repeat-Until Loop)</h6>
-      <pre><code><strong>ΕΠΑΝΑΛΑΒΕ</strong>
-          &lt;εντολές&gt;
-      <strong>ΜΕΧΡΙ</strong> &lt;συνθήκη&gt;</code></pre>
+
+      <h4>3. Βασικές Εντολές &amp; Είσοδος / Έξοδος</h4>
+      <ul>
+        <li><strong>Ανάθεση:</strong> <code>X := (Y + 10) / 4</code></li>
+        <li><strong>Είσοδος:</strong> <code>ΔΙΑΒΑΣΕ (X, Y)</code></li>
+        <li><strong>Έξοδος:</strong> <code>ΤΥΠΩΣΕ ("Αποτέλεσμα: ", RES, EOLN)</code></li>
+      </ul>
+
+      <h4>4. Δομές Επιλογής &amp; Επανάληψης</h4>
+      <pre><code>// Επιλογή:
+ΕΑΝ &lt;συνθήκη&gt; ΤΟΤΕ
+  &lt;εντολές&gt;
+ΑΛΛΙΩΣ
+  &lt;εντολές&gt;
+ΕΑΝ-ΤΕΛΟΣ
+
+// Βρόχος ΓΙΑ:
+ΓΙΑ I := 1 ΕΩΣ N [ΜΕ ΒΗΜΑ 1] ΕΠΑΝΑΛΑΒΕ
+  &lt;εντολές&gt;
+ΓΙΑ-ΤΕΛΟΣ
+
+// Βρόχος ΕΝΟΣΩ:
+ΕΝΟΣΩ &lt;συνθήκη&gt; ΕΠΑΝΑΛΑΒΕ
+  &lt;εντολές&gt;
+ΕΝΟΣΩ-ΤΕΛΟΣ
+
+// Βρόχος ΕΠΑΝΑΛΑΒΕ - ΜΕΧΡΙ:
+ΕΠΑΝΑΛΑΒΕ
+  &lt;εντολές&gt;
+ΜΕΧΡΙ &lt;συνθήκη&gt;</code></pre>
+
+      <h4>5. Διαδικασίες &amp; Συναρτήσεις</h4>
+      <ul>
+        <li><strong>Διαδικασία:</strong> <code>ΔΙΑΔΙΚΑΣΙΑ swap(%x, %y) ... ΤΕΛΟΣ-ΔΙΑΔΙΚΑΣΙΑΣ</code></li>
+        <li><strong>Κλήση Διαδικασίας:</strong> <code>ΥΠΟΛΟΓΙΣΕ swap(%a, %b)</code></li>
+        <li><strong>Πέρασμα με Αναφορά:</strong> Χρήση συμβόλου <code>%</code> (π.χ. <code>%PIN</code>, <code>%X</code>)</li>
+      </ul>
     `;
-    
-    // Create and insert the modal once when the script runs
-    const myModal = createModal(modalId, modalTitle, modalContentHTML);
 
-    // Event listener to show the modal when the button is clicked
-    triggerButton.addEventListener('click', () => {
-        myModal.style.display = 'flex'; // Change display to 'flex' to show it (centered)
+    modalContent.appendChild(closeBtn);
+    modalContent.appendChild(title);
+    modalContent.appendChild(body);
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.style.display = 'none';
     });
 
-    // Event listener to close the modal when the user clicks anywhere outside of the content
-    myModal.addEventListener('click', (event) => {
-        // Check if the click occurred directly on the overlay (not on the content)
-        if (event.target === myModal) {
-            myModal.style.display = 'none';
-        }
-    });
+    return modal;
+  }
 
-    // Optional: Close modal with the Escape key
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && myModal.style.display === 'flex') {
-            myModal.style.display = 'none';
-        }
-    });
+  const syntaxModal = createSyntaxModal();
 
+  syntaxHelpButton.addEventListener('click', () => {
+    syntaxModal.style.display = 'flex';
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && syntaxModal.style.display === 'flex') {
+      syntaxModal.style.display = 'none';
+    }
+  });
+
+  // Utility to escape HTML
+  function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 });

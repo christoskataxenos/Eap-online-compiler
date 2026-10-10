@@ -3,9 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EAP Pseudocode Interpreter</title>
+    <title>EAP Pseudocode Interpreter &amp; Debugger</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    
+    <!-- CodeMirror & Addons Stylesheets -->
+    <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
+    <link rel="stylesheet" href="vendor/codemirror/dracula.min.css">
+    <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
+    
+    <!-- App Stylesheet -->
     <link rel="stylesheet" href="style.css">
+    
     <script>
         // Inline script to prevent FOUC (Flash of Unstyled Content) / wrong theme
         (function() {
@@ -21,7 +29,6 @@
 
         // Handle BFCache
         window.addEventListener('pageshow', (event) => {
-             // Always update from storage to sync state (even if not strictly persisted)
              try {
                  const theme = localStorage.getItem('theme') || 'light';
                  document.documentElement.setAttribute('data-theme', theme);
@@ -33,66 +40,167 @@
 </head>
 <body>
     <header>
-        <a href="index.html" class="home-link">&larr; Home</a>
-        <h1>EAP Online Interpreter</h1>
-        <button id="theme-toggle">🌙 Dark Mode</button>
+        <div class="header-left">
+            <a href="index.html" class="home-link" title="Επιστροφή στην Αρχική">&larr; Home</a>
+            <h1>EAP Online Interpreter</h1>
+            <span class="version-tag">ΠΛΗ10</span>
+        </div>
+        <div class="header-right">
+            <button id="theme-toggle">🌙 Dark Mode</button>
+        </div>
     </header>
+
     <main>
         <div class="container">
+            <!-- Code Editor Section -->
             <div class="editor-container">
                 <div class="panel-header">
-                    <span>Κώδικας Ψευδογλώσσας</span>
-                    <select id="example-selector">
-                        <option value="" disabled selected>Επιλέξτε Παράδειγμα...</option>
-                        <option value="HELLO">Hello World</option>
-                        <option value="FIBONACCI">Fibonacci</option>
-                        <option value="BUBBLE_SORT">Ταξινόμηση Φυσαλίδας</option>
-                        <option value="AVERAGE">Μέσος Όρος</option>
-                    </select>
-                </div>
-                <div class="editor-wrapper">
-                    <div id="line-numbers">1</div>
-                    <div class="code-area">
-                        <pre id="highlighting" aria-hidden="true"><code id="highlighting-content"></code></pre>
-                        <textarea id="code-editor" placeholder="Επικολλήστε τον κώδικά σας εδώ..." autocomplete="off" autocorrect="off" autocapitalize="off" data-1p-ignore data-lpignore="true" data-form-type="other" spellcheck="false" ></textarea>
+                    <span id="editor-title">Κώδικας Ψευδογλώσσας</span>
+                    <div class="panel-header-actions">
+                        <select id="example-selector">
+                            <option value="" disabled selected>📚 Παραδείγματα (ΠΛΗ10)...</option>
+                        </select>
+                        <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">🎨 Format</button>
+                        <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με τον κώδικα">🔗 Share</button>
                     </div>
                 </div>
-                <!-- NEW: autocomplete dropdown -->
-                <div id="autocomplete-box" class="autocomplete-box" style="display:none;"></div>
-                <!-- NEW: syntax help button -->
-               <div class="syntax-help">
-               <button id="format-button">🎨 FORMAT (Ctrl+Shift+F)</button>
-               <button id="syntax-help-button">Βοήθεια Σύνταξης</button>
-               </div>
-
-            </div>
-
-            <div class="controls">
-                <button id="run-button">▶ ΕΚΤΕΛΕΣΗ</button>
-                <div class="secondary-controls">
-				            <button id="load-button">📂 ΦΟΡΤΩΣΗ</button>
-                    <button id="save-button">💾 ΑΠΟΘΗΚΕΥΣΗ</button>
-                    <button id="clear-button">🗑️ ΚΑΘΑΡΙΣΜΟΣ</button>
+                
+                <div class="editor-wrapper">
+                    <!-- CodeMirror Mount Element -->
+                    <div id="code-editor-mount"></div>
                 </div>
             </div>
-			<! -- NEW: file loading feature --> 
-			<input   type="file"   id="file-input"   accept=".eap,.txt"   style="display:none" />
 
-            <div class="resizer" id="drag-handle"></div>
+            <!-- Execution & Debugging Controls -->
+            <div class="controls">
+                <div class="primary-controls">
+                    <button id="run-button" class="btn-run" title="Εκτέλεση όλου του προγράμματος (F5)">▶ ΕΚΤΕΛΕΣΗ</button>
+                    <button id="step-button" class="btn-step" title="Εκτέλεση επόμενης εντολής (F10)">⏭ ΒΗΜΑ</button>
+                    <button id="continue-button" class="btn-continue" title="Συνέχιση κανονικής εκτέλεσης" disabled>⏩ ΣΥΝΕΧΕΙΑ</button>
+                    <button id="stop-button" class="btn-stop" title="Διακοπή εκτέλεσης" disabled>⏹ ΔΙΑΚΟΠΗ</button>
+                    
+                    <div class="speed-control-wrapper">
+                        <label for="speed-select" title="Καθυστέρηση ανά εντολή">⏱️</label>
+                        <select id="speed-select" title="Ταχύτητα εκτέλεσης">
+                            <option value="0">Άμεση (Normal)</option>
+                            <option value="200">Γρήγορη (200ms)</option>
+                            <option value="500">Κανονική (500ms)</option>
+                            <option value="1000">Αργή (1s)</option>
+                        </select>
+                    </div>
+                </div>
 
+                <div class="secondary-controls">
+                    <button id="load-button" title="Φόρτωση αρχείου .eap ή .txt">📂 ΦΟΡΤΩΣΗ</button>
+                    <button id="save-button" title="Αποθήκευση αρχείου .eap">💾 ΑΠΟΘΗΚΕΥΣΗ</button>
+                    <button id="clear-button" title="Καθαρισμός κώδικα">🗑️ ΚΑΘΑΡΙΣΜΟΣ</button>
+                    <button id="syntax-help-button" title="Βοήθεια Σύνταξης">❓ ΒΟΗΘΕΙΑ</button>
+                </div>
+            </div>
+
+            <!-- File Input for Loading Files (Windows-1253 & UTF-8) -->
+            <input type="file" id="file-input" accept=".eap,.txt" style="display:none" />
+
+            <!-- Resizer Handle -->
+            <div class="resizer" id="drag-handle" title="Σύρετε για αλλαγή μεγέθους"></div>
+
+            <!-- Output, Variables & Trace Container -->
             <div class="output-container">
-                <div class="panel-header">Αποτέλεσμα / Terminal</div>
-                <div id="terminal-window">
-                    <div id="terminal-output"></div>
-                    <div id="terminal-input-line" style="display: none;">
-                        <span id="terminal-prompt">&gt;</span>
-                        <input type="text" id="terminal-input" autocomplete="off" spellcheck="false">
+                <div class="panel-header tab-header">
+                    <div class="tabs-list">
+                        <button class="tab-btn active" data-tab="tab-terminal">💻 Τερματικό &amp; Έξοδος</button>
+                        <button class="tab-btn" data-tab="tab-variables">🔍 Μεταβλητές &amp; Μνήμη <span id="var-count-badge" class="tab-badge">0</span></button>
+                        <button class="tab-btn" data-tab="tab-trace">📊 Πίνακας Τιμών (Trace Table) <span id="trace-step-badge" class="tab-badge">0</span></button>
+                    </div>
+                    <div class="tab-actions">
+                        <button id="clear-terminal-btn" class="tab-action-btn" title="Καθαρισμός εξόδου τερματικού">🗑️ Καθαρισμός</button>
+                        <button id="copy-trace-btn" class="tab-action-btn" style="display:none;" title="Αντιγραφή Πίνακα Τιμών σε μορφή Markdown">📋 Αντιγραφή Markdown</button>
+                    </div>
+                </div>
+
+                <!-- Tab 1: Terminal / Console Output -->
+                <div class="tab-pane active" id="tab-terminal">
+                    <div id="terminal-window">
+                        <div id="terminal-output"></div>
+                        <div id="terminal-input-line" style="display: none;">
+                            <span id="terminal-prompt">&gt;</span>
+                            <input type="text" id="terminal-input" autocomplete="off" spellcheck="false" placeholder="Δώστε είσοδο και πατήστε Enter...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Memory / Variable Inspector -->
+                <div class="tab-pane" id="tab-variables">
+                    <div id="variables-window">
+                        <div id="variables-empty" class="panel-placeholder">
+                            <div class="placeholder-icon">🔍</div>
+                            <div class="placeholder-text">Δεν υπάρχουν ακόμη ενεργές μεταβλητές.</div>
+                            <div class="placeholder-sub">Ξεκινήστε την εκτέλεση ή πατήστε <strong>⏭ ΒΗΜΑ</strong> για παρακολούθηση της μνήμης.</div>
+                        </div>
+                        <div id="variables-content" style="display:none;">
+                            <div class="vars-section" id="section-primitives">
+                                <div class="vars-section-title">Απλές Μεταβλητές (Primitives)</div>
+                                <div id="primitives-grid" class="vars-grid"></div>
+                            </div>
+                            <div class="vars-section" id="section-arrays">
+                                <div class="vars-section-title">Πίνακες (Arrays)</div>
+                                <div id="arrays-container" class="arrays-list"></div>
+                            </div>
+                            <div class="vars-section" id="section-constants" style="display:none;">
+                                <div class="vars-section-title">Σταθερές (Constants)</div>
+                                <div id="constants-grid" class="vars-grid"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Trace Table (Πίνακας Τιμών) -->
+                <div class="tab-pane" id="tab-trace">
+                    <div id="trace-window">
+                        <div id="trace-empty" class="panel-placeholder">
+                            <div class="placeholder-icon">📊</div>
+                            <div class="placeholder-text">Ο Πίνακας Τιμών είναι κενός.</div>
+                            <div class="placeholder-sub">Εκτελέστε το πρόγραμμα με το κουμπί <strong>⏭ ΒΗΜΑ</strong> για βήμα-προς-βήμα ανάλυση (tracing).</div>
+                        </div>
+                        <div id="trace-table-container" style="display:none;">
+                            <table class="trace-table" id="trace-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th style="width: 70px;">Γραμμή</th>
+                                        <th style="min-width: 150px;">Εντολή</th>
+                                        <th style="min-width: 200px;">Μεταβολή Μεταβλητών</th>
+                                        <th style="min-width: 130px;">Έξοδος</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trace-table-body"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </main>
-    <footer><p>Ένας custom-made compiler για τον αγαπητό φοιτητή του ΕΑΠ</p></footer>
+
+    <footer>
+        <p>EAP Online Interpreter &amp; Debugger &bull; Ελληνικό Ανοικτό Πανεπιστήμιο (ΠΛΗ10)</p>
+    </footer>
+
+    <!-- CodeMirror Vendor Scripts -->
+    <script src="vendor/codemirror/codemirror.min.js"></script>
+    <script src="vendor/codemirror/closebrackets.min.js"></script>
+    <script src="vendor/codemirror/matchbrackets.min.js"></script>
+    <script src="vendor/codemirror/show-hint.min.js"></script>
+    <script src="vendor/codemirror/active-line.min.js"></script>
+    
+    <!-- Permalink LZ-String Compression -->
+    <script src="vendor/lz-string.min.js"></script>
+    
+    <!-- EAP Pseudocode Grammar & Examples -->
+    <script src="eap-mode.js"></script>
+    <script src="examples.js"></script>
+    
+    <!-- Compiler Core & UI Controller -->
     <script src="core.v6.js"></script>
     <script src="app.v6.js"></script>
 </body>
