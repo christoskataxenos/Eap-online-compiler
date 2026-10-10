@@ -1,0 +1,19 @@
+{
+  "name": "eap-online-compiler",
+  "version": "1.0.0",
+  "description": "Web-based interpreter and playground for the Hellenic Open University (EAP) pseudocode language",
+  "main": "core.v6.js",
+  "scripts": {
+    "test": "node tests/interpreter_test.js && node tests/eap_files_test.js"
+  },
+  "keywords": [
+    "eap",
+    "compiler",
+    "interpreter",
+    "pseudocode",
+    "plh10",
+    "hellenic-open-university"
+  ],
+  "author": "Christos Kataxenos",
+  "license": "MIT"
+}

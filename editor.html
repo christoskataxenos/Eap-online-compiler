@@ -54,18 +54,29 @@
                     <div id="line-numbers">1</div>
                     <div class="code-area">
                         <pre id="highlighting" aria-hidden="true"><code id="highlighting-content"></code></pre>
-                        <textarea id="code-editor" placeholder="Επικολλήστε τον κώδικά σας εδώ..." spellcheck="false"></textarea>
+                        <textarea id="code-editor" placeholder="Επικολλήστε τον κώδικά σας εδώ..." autocomplete="off" autocorrect="off" autocapitalize="off" data-1p-ignore data-lpignore="true" data-form-type="other" spellcheck="false" ></textarea>
                     </div>
                 </div>
+                <!-- NEW: autocomplete dropdown -->
+                <div id="autocomplete-box" class="autocomplete-box" style="display:none;"></div>
+                <!-- NEW: syntax help button -->
+               <div class="syntax-help">
+               <button id="format-button">🎨 FORMAT (Ctrl+Shift+F)</button>
+               <button id="syntax-help-button">Βοήθεια Σύνταξης</button>
+               </div>
+
             </div>
 
             <div class="controls">
                 <button id="run-button">▶ ΕΚΤΕΛΕΣΗ</button>
                 <div class="secondary-controls">
+				            <button id="load-button">📂 ΦΟΡΤΩΣΗ</button>
                     <button id="save-button">💾 ΑΠΟΘΗΚΕΥΣΗ</button>
                     <button id="clear-button">🗑️ ΚΑΘΑΡΙΣΜΟΣ</button>
                 </div>
             </div>
+			<! -- NEW: file loading feature --> 
+			<input   type="file"   id="file-input"   accept=".eap,.txt"   style="display:none" />
 
             <div class="resizer" id="drag-handle"></div>
 
@@ -82,7 +93,7 @@
         </div>
     </main>
     <footer><p>Ένας custom-made compiler για τον αγαπητό φοιτητή του ΕΑΠ</p></footer>
-    <script src="core.v5.js"></script>
-    <script src="app.v5.js"></script>
+    <script src="core.v6.js"></script>
+    <script src="app.v6.js"></script>
 </body>
 </html>

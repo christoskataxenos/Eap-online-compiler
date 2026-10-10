@@ -191,6 +191,40 @@ pre code {
     color: transparent;
 }
 
+/* Autocomplete dropdown */
+.autocomplete-box {
+  position: absolute;
+  background-color: var(--panel-bg);
+  color: var(--editor-text);
+  border: 1px solid var(--panel-header-border);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 20;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  min-width: 180px;
+}
+
+.autocomplete-item {
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.autocomplete-item.selected,
+.autocomplete-item:hover {
+  background-color: var(--button-bg);
+  color: #fff;
+}
+
+/* Syntax help button container */
+.syntax-help {
+  padding: 0.25rem 0.75rem 0.5rem 0.75rem;
+  display: flex;
+  justify-content: flex-end;
+}
+
+
 /* Terminal Styles */
 #terminal-window {
     flex: 1;
@@ -225,6 +259,16 @@ button:hover { background-color: var(--button-hover); transform: translateY(-1px
 #run-button { padding: 0.5rem 1.5rem; font-size: 1rem; clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%); border-radius: 0; }
 #save-button, #clear-button { background-color: var(--panel-header-border); color: var(--bg-color); }
 #save-button:hover, #clear-button:hover { background-color: var(--text-color); }
+
+#load-button, #clear-button { background-color: var(--panel-header-border); color: var(--bg-color); }
+#load-button:hover, #clear-button:hover { background-color: var(--text-color); }
+
+#format-button, #clear-button { background-color: var(--panel-header-border); color: var(--bg-color); }
+#format-button:hover, #clear-button:hover { background-color: var(--text-color); }
+
+#syntax-help-button, #clear-button { background-color: var(--panel-header-border); color: var(--bg-color); }
+#syntax-help-button:hover, #clear-button:hover { background-color: var(--text-color); }
+
 
 /* Syntax Highlighting Tokens */
 .token-keyword { color: var(--token-keyword); font-weight: bold; }
@@ -325,6 +369,82 @@ footer { text-align: center; padding: 1rem; color: var(--line-num-text); font-si
     /* header padding already handled in 600px block, but keeping this doesn't hurt */
 }
 
+
+/* Syntax help modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    
+    display: none; 
+    justify-content: center;
+    align-items: center;
+    
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+}
+.modal-content {
+  
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+ 
+    animation: modalFadeIn 0.3s ease-out;
+    max-width: 550px !important;  
+    width: 90% !important;       
+    max-height: 80vh !important;
+    overflow-y: auto;
+    padding: 30px;
+    box-sizing: border-box;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    position: relative;
+    
+}
+.modal-close {
+    color: #aaa !important; 
+    font-size: 32px !important; 
+    transition: color 0.2s;
+    line-height: 1; 
+}
+.modal-close:hover {
+    color: #333 !important;
+}
+.modal-content h2 {
+    color: #333;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+.modal-content p {
+    line-height: 1.6;
+    color: #555;
+}
+.modal-content ul {
+    list-style-type: disc;
+    padding-left: 25px;
+    margin-top: 0px;
+    margin-bottom: 15px;
+}
+.modal-content *:last-child {
+    margin-bottom: 0;
+}
+.modal-content strong {
+    color: #000;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Error line highlighting */
 .error-line {
     background-color: rgba(255, 0, 85, 0.2);
@@ -336,3 +456,15 @@ footer { text-align: center; padding: 1rem; color: var(--line-num-text); font-si
 ::-webkit-scrollbar-track { background: var(--scroll-track); }
 ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+
+/* Running stop button state */
+.running-stop {
+    background-color: var(--term-error, #dc322f) !important;
+    color: #ffffff !important;
+    animation: stopPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes stopPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.75; }
+}

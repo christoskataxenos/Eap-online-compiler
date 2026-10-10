@@ -1,5 +1,5 @@
 
-const { tokenize, Parser, Interpreter, Environment } = require('../core.v5.js');
+const { tokenize, Parser, Interpreter, Environment } = require('../core.v6.js');
 const assert = require('assert');
 
 // Helper to run code and check output
@@ -36,11 +36,11 @@ async function testArithmetic() {
     ΑΡΧΗ
         A := 10;
         B := 3;
-        ΤΥΠΩΣΕ(A + B);
-        ΤΥΠΩΣΕ(A - B);
-        ΤΥΠΩΣΕ(A * B);
-        ΤΥΠΩΣΕ(A DIV B);
-        ΤΥΠΩΣΕ(A MOD B);
+        ΤΥΠΩΣΕ(A + B, EOLN);
+        ΤΥΠΩΣΕ(A - B, EOLN);
+        ΤΥΠΩΣΕ(A * B, EOLN);
+        ΤΥΠΩΣΕ(A DIV B, EOLN);
+        ΤΥΠΩΣΕ(A MOD B, EOLN);
     ΤΕΛΟΣ`;
     const result = await runCode(code);
     const lines = result.output.trim().split('\n');
@@ -73,7 +73,7 @@ async function testLoop() {
     ΔΕΔΟΜΕΝΑ I : ΑΚΕΡΑΙΟΣ;
     ΑΡΧΗ
         ΓΙΑ I := 1 ΕΩΣ 5 ΕΠΑΝΑΛΑΒΕ
-            ΤΥΠΩΣΕ(I)
+            ΤΥΠΩΣΕ(I, EOLN)
         ΓΙΑ-ΤΕΛΟΣ
     ΤΕΛΟΣ`;
     const result = await runCode(code);
@@ -104,12 +104,7 @@ async function testRead() {
         ΤΥΠΩΣΕ(X * 2);
     ΤΕΛΟΣ`;
     const result = await runCode(code, ["21"]);
-    // Output includes the input echoed? Based on my implementation in core.js:
-    // this.outputBuffer.push(input);
-    // So output will be "21\n42"
-    const lines = result.output.trim().split('\n');
-    assert.strictEqual(lines[0].trim(), "21");
-    assert.strictEqual(lines[1].trim(), "42");
+    assert.strictEqual(result.output.trim(), "42");
     console.log("testRead passed");
 }
 
@@ -137,7 +132,7 @@ async function testBubbleSort() {
 
     /* Εκτύπωση */
     ΓΙΑ I:=1 ΕΩΣ N ΕΠΑΝΑΛΑΒΕ
-        ΤΥΠΩΣΕ(A[I])
+        ΤΥΠΩΣΕ(A[I], EOLN)
     ΓΙΑ-ΤΕΛΟΣ
 ΤΕΛΟΣ`;
     const result = await runCode(code);
@@ -151,6 +146,25 @@ async function testBubbleSort() {
     console.log("testBubbleSort passed");
 }
 
+async function testInfiniteLoopProtection() {
+    const code = `ΑΛΓΟΡΙΘΜΟΣ Infinite
+    ΔΕΔΟΜΕΝΑ X: ΑΚΕΡΑΙΟΣ;
+    ΑΡΧΗ
+        X := 1;
+        ΕΝΟΣΩ X > 0 ΕΠΑΝΑΛΑΒΕ
+            X := X + 1;
+        ΕΝΟΣΩ-ΤΕΛΟΣ
+    ΤΕΛΟΣ`;
+    const tokens = tokenize(code);
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+    const interpreter = new Interpreter({ maxSteps: 50 });
+    const result = await interpreter.interpret(ast);
+    assert(result.error !== null);
+    assert(result.error.includes("Υπέρβαση μέγιστου ορίου εκτέλεσης"));
+    console.log("testInfiniteLoopProtection passed");
+}
+
 (async () => {
     try {
         await testHello();
@@ -160,6 +174,7 @@ async function testBubbleSort() {
         await testCaseInsensitive();
         await testRead();
         await testBubbleSort();
+        await testInfiniteLoopProtection();
         console.log("All tests passed!");
     } catch (e) {
         console.error("Test failed:", e);
