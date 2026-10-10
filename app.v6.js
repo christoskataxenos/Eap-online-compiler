@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // POPULATE EXAMPLE SELECTOR
   // ---------------------------------------------------------------------------
   if (typeof EXAMPLE_CATEGORIES !== 'undefined' && Array.isArray(EXAMPLE_CATEGORIES)) {
-    exampleSelector.innerHTML = '<option value="" disabled selected>📚 Παραδείγματα (ΠΛΗ10)...</option>';
+    exampleSelector.innerHTML = '<option value="" disabled selected>Παραδείγματα (ΠΛΗ10)...</option>';
     EXAMPLE_CATEGORIES.forEach(cat => {
       const optgroup = document.createElement('optgroup');
       optgroup.label = cat.category;
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTerminal();
       resetInspector();
       resetTraceTable();
-      showToast('✓ Φορτώθηκε το παράδειγμα: ' + (e.target.options[e.target.selectedIndex]?.text || key));
+      showToast('Φορτώθηκε το παράδειγμα: ' + (e.target.options[e.target.selectedIndex]?.text || key));
     }
   });
 
@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatted = autoFormatCode(editor.getValue());
     editor.setValue(formatted);
     editor.setCursor(cursor);
-    showToast('✓ Ο κώδικας μορφοποιήθηκε επιτυχώς!');
+    showToast('Ο κώδικας μορφοποιήθηκε επιτυχώς!');
   }
 
   formatButton.addEventListener('click', formatEditorCode);
@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url.toString()).then(() => {
-          showToast('🔗 Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!');
+          showToast('Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!');
         }).catch(() => {
           prompt('Αντιγράψτε τον σύνδεσμο:', url.toString());
         });
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeName = isDark ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', themeName);
     document.body.setAttribute('data-theme', themeName);
-    themeToggle.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+    themeToggle.textContent = isDark ? 'Light Mode' : 'Dark Mode';
     SettingsManager.set('theme', themeName);
 
     // Update CodeMirror theme
@@ -648,8 +648,8 @@ document.addEventListener('DOMContentLoaded', () => {
       let heroValueHtml = '';
       if (typeof val === 'boolean') {
         heroValueHtml = val
-          ? `<div class="val-boolean-chip is-true">🟢 TRUE / ΑΛΗΘΗΣ</div>`
-          : `<div class="val-boolean-chip is-false">🔴 FALSE / ΨΕΥΔΗΣ</div>`;
+          ? `<div class="val-boolean-chip is-true">TRUE / ΑΛΗΘΗΣ</div>`
+          : `<div class="val-boolean-chip is-false">FALSE / ΨΕΥΔΗΣ</div>`;
       } else if (typeof val === 'string') {
         heroValueHtml = `
           <div class="mem-value-hero val-string-chip">"${escapeHTML(val)}"</div>
@@ -661,17 +661,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let footerHtml = '';
       if (hasChanged) {
-        footerHtml = `<span class="mem-diff-text">⚡ Άλλαξε: ${prev} ➔ ${val}</span>`;
+        footerHtml = `<span class="mem-diff-text">Αλλαγή: ${prev} &rarr; ${val}</span>`;
       } else if (prev === undefined) {
-        footerHtml = `<span>✨ Αρχική τιμή: ${val}</span>`;
+        footerHtml = `<span>Αρχική τιμή: ${val}</span>`;
       } else {
-        footerHtml = `<span>✓ Αμετάβλητη</span>`;
+        footerHtml = `<span>Αμετάβλητη</span>`;
       }
 
       card.innerHTML = `
         <div class="mem-header">
           <div class="mem-title-group">
-            <span class="mem-icon">📦</span>
             <span class="mem-name">${escapeHTML(name)}</span>
           </div>
           <span class="mem-type-badge ${typeClass}">${typeName}</span>
@@ -724,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const countTotal = (b.to - b.from + 1);
         box.innerHTML = `
           <div class="array-title">
-            <span>📊 ${escapeHTML(name)}</span>
+            <span>${escapeHTML(name)}</span>
             <span class="array-dim-badge">ARRAY[${dimStr}] &bull; ${countTotal} Θέσεις</span>
           </div>
           <div class="array-cells">${cellsHtml}</div>
@@ -761,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const colsCount = (colB.to - colB.from + 1);
         box.innerHTML = `
           <div class="array-title">
-            <span>📊 ${escapeHTML(name)}</span>
+            <span>${escapeHTML(name)}</span>
             <span class="array-dim-badge">ARRAY[${dimStr}] (2D Matrix: ${rowsCount}x${colsCount})</span>
           </div>
           ${tableHtml}
@@ -782,7 +781,6 @@ document.addEventListener('DOMContentLoaded', () => {
         card.innerHTML = `
           <div class="mem-header">
             <div class="mem-title-group">
-              <span class="mem-icon">🔒</span>
               <span class="mem-name">${escapeHTML(name)}</span>
             </div>
             <span class="mem-type-badge type-constant">ΣΤΑΘΕΡΑ</span>
@@ -792,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="mem-value-hero">${escapeHTML(String(val))}</div>
           </div>
           <div class="mem-footer">
-            <span>🔒 Δεν τροποποιείται</span>
+            <span>Δεν τροποποιείται</span>
           </div>
         `;
         constantsGrid.appendChild(card);
@@ -823,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td><span class="mem-type-badge type-${typeStr.toLowerCase()}">${typeStr}</span></td>
           <td><strong style="color:var(--button-bg); font-size:1.1rem;">${escapeHTML(String(displayVal))}</strong></td>
           <td>${prev !== undefined ? escapeHTML(String(prev)) : '-'}</td>
-          <td><span class="status-pill ${isChanged ? 'updated' : 'initial'}">${isChanged ? '⚡ Ενημερώθηκε' : 'Αμετάβλητη'}</span></td>
+          <td><span class="status-pill ${isChanged ? 'updated' : 'initial'}">${isChanged ? 'Ενημερώθηκε' : 'Αμετάβλητη'}</span></td>
         `;
         variablesTableBody.appendChild(row);
       }
@@ -837,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td><span class="mem-type-badge type-constant">ΣΤΑΘΕΡΑ</span></td>
           <td><strong style="color:var(--button-bg); font-size:1.1rem;">${escapeHTML(String(val))}</strong></td>
           <td>-</td>
-          <td><span class="status-pill initial">🔒 Σταθερά</span></td>
+          <td><span class="status-pill initial">Σταθερά</span></td>
         `;
         variablesTableBody.appendChild(row);
       }
@@ -852,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td><strong>${escapeHTML(name)}</strong></td>
           <td><span class="mem-type-badge type-integer">ARRAY[${dimStr}]</span></td>
           <td colspan="2"><small>Δείτε αναλυτικά τα κελιά στην προβολή "Κάρτες"</small></td>
-          <td><span class="status-pill initial">📊 Πίνακας</span></td>
+          <td><span class="status-pill initial">Πίνακας</span></td>
         `;
         variablesTableBody.appendChild(row);
       }
@@ -863,13 +861,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const pCount = Object.keys(currentPrimitives).length;
       const aCount = Object.keys(currentArrays).length;
       const cCount = Object.keys(currentConstants).length;
-      varStatusText.textContent = `📦 ${totalVarCount} Ενεργές (${pCount} Απλές, ${aCount} Πίνακες, ${cCount} Σταθερές)`;
+      varStatusText.textContent = `${totalVarCount} Ενεργές (${pCount} Απλές, ${aCount} Πίνακες, ${cCount} Σταθερές)`;
     }
 
     if (varLastChangeBadge) {
       if (latestChangeText) {
         varLastChangeBadge.style.display = 'inline-block';
-        varLastChangeBadge.textContent = `⚡ Τελευταία αλλαγή: ${latestChangeText}`;
+        varLastChangeBadge.textContent = `Τελευταία αλλαγή: ${latestChangeText}`;
       } else {
         varLastChangeBadge.style.display = 'none';
       }
@@ -959,7 +957,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(md).then(() => {
-        showToast('📋 Ο Πίνακας Τιμών αντιγράφηκε σε Markdown!');
+        showToast('Ο Πίνακας Τιμών αντιγράφηκε σε Markdown!');
       }).catch(() => {
         prompt('Αντιγράψτε τον Πίνακα Τιμών (Markdown):', md);
       });
@@ -983,7 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
     isPausedInDebug = pausedInDebug;
 
     if (!executing) {
-      runButton.textContent = '▶ ΕΚΤΕΛΕΣΗ';
+      runButton.textContent = 'ΕΚΤΕΛΕΣΗ';
       runButton.disabled = false;
       stepButton.disabled = false;
       continueButton.disabled = true;
@@ -997,7 +995,7 @@ document.addEventListener('DOMContentLoaded', () => {
       speedSelect.disabled = false;
     } else {
       // Running continuously
-      runButton.textContent = '⏳ ΕΚΤΕΛΕΣΗ...';
+      runButton.textContent = 'ΕΚΤΕΛΕΣΗ...';
       runButton.disabled = true;
       stepButton.disabled = true;
       continueButton.disabled = true;
@@ -1179,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast(`💾 Το αρχείο αποθηκεύτηκε ως ${progName}.eap`);
+    showToast(`Το αρχείο αποθηκεύτηκε ως ${progName}.eap`);
   });
 
   clearButton.addEventListener('click', () => {
@@ -1271,7 +1269,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (decoded && containsGreekKeywords(decoded)) {
         editor.setValue(decoded);
         exampleSelector.value = '';
-        showToast(`✓ Φορτώθηκε (UTF-8): ${file.name}`);
+        showToast(`Φορτώθηκε (UTF-8): ${file.name}`);
         return;
       }
 
@@ -1280,7 +1278,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (decoded && containsGreekKeywords(decoded)) {
         editor.setValue(decoded);
         exampleSelector.value = '';
-        showToast(`✓ Φορτώθηκε (Windows-1253): ${file.name}`);
+        showToast(`Φορτώθηκε (Windows-1253): ${file.name}`);
         return;
       }
 
@@ -1288,7 +1286,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (decoded) {
         editor.setValue(decoded);
         exampleSelector.value = '';
-        showToast(`✓ Φορτώθηκε: ${file.name}`);
+        showToast(`Φορτώθηκε: ${file.name}`);
       } else {
         alert('Το αρχείο δεν περιέχει έγκυρο κώδικα ψευδογλώσσας.');
       }

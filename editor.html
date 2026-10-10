@@ -46,7 +46,7 @@
             <span class="version-tag">ΠΛΗ10</span>
         </div>
         <div class="header-right">
-            <button id="theme-toggle">🌙 Dark Mode</button>
+            <button id="theme-toggle">Dark Mode</button>
         </div>
     </header>
 
@@ -58,10 +58,10 @@
                     <span id="editor-title">Κώδικας Ψευδογλώσσας</span>
                     <div class="panel-header-actions">
                         <select id="example-selector">
-                            <option value="" disabled selected>📚 Παραδείγματα (ΠΛΗ10)...</option>
+                            <option value="" disabled selected>Παραδείγματα (ΠΛΗ10)...</option>
                         </select>
-                        <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">🎨 Format</button>
-                        <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με τον κώδικα">🔗 Share</button>
+                        <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
+                        <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με τον κώδικα">Share</button>
                     </div>
                 </div>
                 
@@ -74,13 +74,13 @@
             <!-- Execution & Debugging Controls -->
             <div class="controls">
                 <div class="primary-controls">
-                    <button id="run-button" class="btn-run" title="Εκτέλεση όλου του προγράμματος (F5)">▶ ΕΚΤΕΛΕΣΗ</button>
-                    <button id="step-button" class="btn-step" title="Εκτέλεση επόμενης εντολής (F10)">⏭ ΒΗΜΑ</button>
-                    <button id="continue-button" class="btn-continue" title="Συνέχιση κανονικής εκτέλεσης" disabled>⏩ ΣΥΝΕΧΕΙΑ</button>
-                    <button id="stop-button" class="btn-stop" title="Διακοπή εκτέλεσης" disabled>⏹ ΔΙΑΚΟΠΗ</button>
+                    <button id="run-button" class="btn-run" title="Εκτέλεση όλου του προγράμματος (F5)">ΕΚΤΕΛΕΣΗ</button>
+                    <button id="step-button" class="btn-step" title="Εκτέλεση επόμενης εντολής (F10)">ΒΗΜΑ</button>
+                    <button id="continue-button" class="btn-continue" title="Συνέχιση κανονικής εκτέλεσης" disabled>ΣΥΝΕΧΕΙΑ</button>
+                    <button id="stop-button" class="btn-stop" title="Διακοπή εκτέλεσης" disabled>ΔΙΑΚΟΠΗ</button>
                     
                     <div class="speed-control-wrapper">
-                        <label for="speed-select" title="Καθυστέρηση ανά εντολή">⏱️</label>
+                        <label for="speed-select" title="Καθυστέρηση ανά εντολή">Ταχύτητα:</label>
                         <select id="speed-select" title="Ταχύτητα εκτέλεσης">
                             <option value="0">Άμεση (Normal)</option>
                             <option value="200">Γρήγορη (200ms)</option>
@@ -91,10 +91,10 @@
                 </div>
 
                 <div class="secondary-controls">
-                    <button id="load-button" title="Φόρτωση αρχείου .eap ή .txt">📂 ΦΟΡΤΩΣΗ</button>
-                    <button id="save-button" title="Αποθήκευση αρχείου .eap">💾 ΑΠΟΘΗΚΕΥΣΗ</button>
-                    <button id="clear-button" title="Καθαρισμός κώδικα">🗑️ ΚΑΘΑΡΙΣΜΟΣ</button>
-                    <button id="syntax-help-button" title="Βοήθεια Σύνταξης">❓ ΒΟΗΘΕΙΑ</button>
+                    <button id="load-button" title="Φόρτωση αρχείου .eap ή .txt">ΦΟΡΤΩΣΗ</button>
+                    <button id="save-button" title="Αποθήκευση αρχείου .eap">ΑΠΟΘΗΚΕΥΣΗ</button>
+                    <button id="clear-button" title="Καθαρισμός κώδικα">ΚΑΘΑΡΙΣΜΟΣ</button>
+                    <button id="syntax-help-button" title="Βοήθεια Σύνταξης">ΒΟΗΘΕΙΑ</button>
                 </div>
             </div>
 
@@ -108,16 +108,16 @@
             <div class="output-container">
                 <div class="panel-header tab-header">
                     <div class="tabs-list">
-                        <button class="tab-btn active" data-tab="tab-terminal">💻 Τερματικό &amp; Έξοδος</button>
-                        <button class="tab-btn" data-tab="tab-variables">🔍 Μεταβλητές &amp; Μνήμη <span id="var-count-badge" class="tab-badge">0</span></button>
-                        <button class="tab-btn" data-tab="tab-trace">📊 Πίνακας Τιμών (Trace Table) <span id="trace-step-badge" class="tab-badge">0</span></button>
+                        <button class="tab-btn active" data-tab="tab-terminal">Τερματικό &amp; Έξοδος</button>
+                        <button class="tab-btn" data-tab="tab-variables">Μεταβλητές &amp; Μνήμη <span id="var-count-badge" class="tab-badge">0</span></button>
+                        <button class="tab-btn" data-tab="tab-trace">Πίνακας Τιμών (Trace Table) <span id="trace-step-badge" class="tab-badge">0</span></button>
                     </div>
                     <div class="tab-actions">
-                        <button id="clear-terminal-btn" class="tab-action-btn" title="Καθαρισμός εξόδου τερματικού">🗑️ Καθαρισμός</button>
-                        <button id="copy-trace-btn" class="tab-action-btn" style="display:none;" title="Αντιγραφή Πίνακα Τιμών σε μορφή Markdown">📋 Αντιγραφή Markdown</button>
+                        <button id="clear-terminal-btn" class="tab-action-btn" title="Καθαρισμός εξόδου τερματικού">Καθαρισμός</button>
+                        <button id="copy-trace-btn" class="tab-action-btn" style="display:none;" title="Αντιγραφή Πίνακα Τιμών σε μορφή Markdown">Αντιγραφή Markdown</button>
                         <div id="var-view-toggle" class="var-toggle-group" style="display:none;">
-                            <button id="var-cards-btn" class="tab-action-btn active" title="Προβολή σε Κάρτες Μνήμης">🗂️ Κάρτες</button>
-                            <button id="var-table-btn" class="tab-action-btn" title="Προβολή σε Αναλυτικό Πίνακα">📋 Πίνακας</button>
+                            <button id="var-cards-btn" class="tab-action-btn active" title="Προβολή σε Κάρτες Μνήμης">Κάρτες</button>
+                            <button id="var-table-btn" class="tab-action-btn" title="Προβολή σε Αναλυτικό Πίνακα">Πίνακας</button>
                         </div>
                     </div>
                 </div>
@@ -137,35 +137,34 @@
                 <div class="tab-pane" id="tab-variables">
                     <div id="variables-window">
                         <div id="variables-empty" class="panel-placeholder">
-                            <div class="placeholder-icon">🔍</div>
                             <div class="placeholder-text">Δεν υπάρχουν ακόμη ενεργές μεταβλητές.</div>
-                            <div class="placeholder-sub">Ξεκινήστε την εκτέλεση ή πατήστε <strong>⏭ ΒΗΜΑ</strong> για παρακολούθηση της μνήμης.</div>
+                            <div class="placeholder-sub">Ξεκινήστε την εκτέλεση ή πατήστε <strong>ΒΗΜΑ</strong> για παρακολούθηση της μνήμης.</div>
                         </div>
                         
                         <div id="variables-content" style="display:none;">
                             <!-- Variables Status Bar -->
                             <div class="var-status-bar" id="var-status-bar">
                                 <div class="var-status-summary" id="var-status-summary">
-                                    <span id="var-status-text">📦 Ενεργές Μεταβλητές</span>
+                                    <span id="var-status-text">Ενεργές Μεταβλητές</span>
                                     <span id="var-last-change-badge" class="var-last-change-badge" style="display:none;"></span>
                                 </div>
                                 <div class="var-search-wrapper">
-                                    <input type="text" id="var-search-input" placeholder="🔍 Αναζήτηση μεταβλητής..." autocomplete="off">
+                                    <input type="text" id="var-search-input" placeholder="Αναζήτηση μεταβλητής..." autocomplete="off">
                                 </div>
                             </div>
 
                             <!-- Cards View -->
                             <div id="variables-cards-view">
                                 <div class="vars-section" id="section-primitives">
-                                    <div class="vars-section-title">📦 Απλές Μεταβλητές (Scalars &amp; Primitives)</div>
+                                    <div class="vars-section-title">Απλές Μεταβλητές (Scalars &amp; Primitives)</div>
                                     <div id="primitives-grid" class="vars-grid"></div>
                                 </div>
                                 <div class="vars-section" id="section-arrays">
-                                    <div class="vars-section-title">📊 Πίνακες στη Μνήμη (Array Memory Tapes)</div>
+                                    <div class="vars-section-title">Πίνακες στη Μνήμη (Array Memory Tapes)</div>
                                     <div id="arrays-container" class="arrays-list"></div>
                                 </div>
                                 <div class="vars-section" id="section-constants" style="display:none;">
-                                    <div class="vars-section-title">🔒 Σταθερές (Constants)</div>
+                                    <div class="vars-section-title">Σταθερές (Constants)</div>
                                     <div id="constants-grid" class="vars-grid"></div>
                                 </div>
                             </div>
@@ -193,9 +192,8 @@
                 <div class="tab-pane" id="tab-trace">
                     <div id="trace-window">
                         <div id="trace-empty" class="panel-placeholder">
-                            <div class="placeholder-icon">📊</div>
                             <div class="placeholder-text">Ο Πίνακας Τιμών είναι κενός.</div>
-                            <div class="placeholder-sub">Εκτελέστε το πρόγραμμα με το κουμπί <strong>⏭ ΒΗΜΑ</strong> για βήμα-προς-βήμα ανάλυση (tracing).</div>
+                            <div class="placeholder-sub">Εκτελέστε το πρόγραμμα με το κουμπί <strong>ΒΗΜΑ</strong> για βήμα-προς-βήμα ανάλυση (tracing).</div>
                         </div>
                         <div id="trace-table-container" style="display:none;">
                             <table class="trace-table" id="trace-table">
