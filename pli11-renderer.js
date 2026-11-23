@@ -485,7 +485,7 @@
 
   function renderPillLabel(x, y, text, pal, anchor = 'middle', fontSize = 11) {
     const clean = String(text || '');
-    const estW = Math.max(22, clean.length * (fontSize * 0.68) + 14);
+    const estW = Math.max(22, clean.length * (fontSize * 0.72) + 14);
     const estH = fontSize + 8;
     let rx = x - estW / 2;
     if (anchor === 'start') rx = x - 4;
@@ -567,7 +567,10 @@
     const colSpacing = 225;
     const rowSpacing = 125;
     const hasTopStores = dfd.stores.length > 0;
-    const topMargin = hasTopStores ? 128 : 56;
+    const hasCentral = dfd.processes.some((p) => p.isCentral);
+    // Extra headroom when the store lane shares the top with the ΚΜ frame,
+    // so the dashed container never touches stores or their flow lines.
+    const topMargin = hasTopStores ? (hasCentral ? 172 : 128) : 56;
 
     // Determine max rows in process/entity columns
     let maxRows = 1;
@@ -578,15 +581,29 @@
 
     const coords = new Map(); // id -> { cx, cy, w, h, shape }
     const colKeys = Array.from(colBuckets.keys()).sort((a, b) => a - b);
+    const col0Nodes = colBuckets.get(colKeys[0]) || [];
+    const maxCol0W = col0Nodes.reduce((m, n) => {
+      const w = n.type === 'process'
+        ? Math.max(64, Math.min(92, ((n.label || '').length * 4.5 + 18) * 2))
+        : Math.max(120, Math.min(210, (n.label || '').length * 7.8 + 24));
+      return Math.max(m, w);
+    }, 120);
+    const startColX = Math.max(124, Math.ceil(maxCol0W / 2 + 36));
+
     const colToX = new Map();
     colKeys.forEach((col, i) => {
-      colToX.set(col, 110 + i * colSpacing);
+      colToX.set(col, startColX + i * colSpacing);
     });
 
     for (const col of colKeys) {
       const list = colBuckets.get(col);
-      // Sort central processes nicely together
-      list.sort((a, b) => (b.isCentral ? 1 : 0) - (a.isCentral ? 1 : 0));
+      // Group central processes at the primary row to maintain horizontal alignment
+      const centrals = list.filter((n) => n.isCentral);
+      const others = list.filter((n) => !n.isCentral);
+      if (centrals.length > 0 && others.length > 0) {
+        list.length = 0;
+        list.push(...centrals, ...others);
+      }
       const x = colToX.get(col);
       const startY = centerY - ((list.length - 1) * rowSpacing) / 2;
       list.forEach((node, idx) => {
@@ -616,55 +633,61 @@
       });
       storeInfos.sort((a, b) => a.desiredX - b.desiredX);
 
-      let prevRight = 30;
+      let prevRight = 36;
       for (const info of storeInfos) {
-        const cx = Math.max(prevRight + info.w / 2 + 24, info.desiredX);
+        const cx = Math.max(prevRight + info.w / 2 + 30, info.desiredX);
         coords.set(info.store.id, { cx, cy: 52, w: info.w, h: 38, shape: 'store' });
         prevRight = cx + info.w / 2;
       }
     }
 
-    let maxX = 680;
-    let maxY = 260;
-    for (const c of coords.values()) {
-      maxX = Math.max(maxX, c.cx + c.w / 2 + 80);
-      maxY = Math.max(maxY, c.cy + c.h / 2 + 60);
-    }
-    const legendH = showLegend ? 44 : 10;
-    const totalW = Math.ceil(maxX);
-    const totalH = Math.ceil(maxY + legendH);
-
-    const svgParts = [];
-    svgParts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" style="font-family:${escXml(pal.font)}">`,
-      `<defs>`,
-      `  <marker id="dfd-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">`,
-      `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.edge}" />`,
-      `  </marker>`,
-      `</defs>`,
-      `<rect width="${totalW}" height="${totalH}" fill="${pal.bg}" />`
-    );
-
-    // Subtle Central Transformation / Transaction Center container box
+    // Central Transformation (ΚΜ) container box and header.
+    // Bounding box wraps the central processes with generous padding and sits
+    // safely below the store lane with ample headroom above the central circle(s).
     const centralCoords = dfd.processes.filter((p) => p.isCentral).map((p) => coords.get(p.id)).filter(Boolean);
+    let kmFrame = null;
     if (centralCoords.length > 0) {
-      const minCX = Math.min(...centralCoords.map((c) => c.cx - c.r)) - 22;
-      const maxCX = Math.max(...centralCoords.map((c) => c.cx + c.r)) + 22;
-      const minCY = Math.min(...centralCoords.map((c) => c.cy - c.r)) - 28;
-      const maxCY = Math.max(...centralCoords.map((c) => c.cy + c.r)) + 20;
-      const kmTitle = dfd.architecture === 'TRANSACTION_CENTER'
-        ? 'Κέντρο Δοσοληψιών (ΚΔ)'
-        : 'Κεντρικός Μετασχηματισμός (ΚΜ)';
-      svgParts.push(
-        `<rect x="${minCX.toFixed(1)}" y="${minCY.toFixed(1)}" width="${(maxCX - minCX).toFixed(1)}" height="${(maxCY - minCY).toFixed(1)}" rx="12" fill="${pal.kmBg}" stroke="${pal.kmStroke}" stroke-width="1.3" stroke-dasharray="6 4" />`,
-        `<text x="${((minCX + maxCX) / 2).toFixed(1)}" y="${(minCY + 14).toFixed(1)}" text-anchor="middle" fill="${pal.kmStroke}" font-size="11" font-weight="700">${escXml(kmTitle)}</text>`
-      );
+      const cMinX = Math.min(...centralCoords.map((c) => c.cx - c.r));
+      const cMaxX = Math.max(...centralCoords.map((c) => c.cx + c.r));
+      const cMinY = Math.min(...centralCoords.map((c) => c.cy - c.r));
+      const cMaxY = Math.max(...centralCoords.map((c) => c.cy + c.r));
+
+      const kmTitle = 'Κεντρικός Μετασχηματισμός (ΚΜ)';
+      const kmTitleW = kmTitle.length * 7.2 + 20;
+      const kmTitleH = 20;
+
+      let minCX = cMinX - 32;
+      let maxCX = cMaxX + 32;
+      if (maxCX - minCX < kmTitleW + 28) {
+        const extra = (kmTitleW + 28) - (maxCX - minCX);
+        minCX -= extra / 2;
+        maxCX += extra / 2;
+      }
+
+      // Ample headroom above central processes (at least 50px so M1 is never overlapped)
+      const storeLaneBottom = hasTopStores ? 52 + 19 + 20 : -Infinity;
+      let minCY = cMinY - 50;
+      if (minCY < storeLaneBottom) minCY = storeLaneBottom;
+      const maxCY = cMaxY + 28;
+
+      // Centered on the top border with a solid background badge
+      const badgeY = minCY - kmTitleH / 2;
+      const badgeX = (minCX + maxCX) / 2 - kmTitleW / 2;
+
+      kmFrame = {
+        minCX,
+        maxCX,
+        minCY,
+        maxCY,
+        title: kmTitle,
+        titleW: kmTitleW,
+        titleH: kmTitleH,
+        badgeX,
+        badgeY
+      };
     }
 
-    // Track bidirectional pairs to offset curves cleanly
-    const pairSet = new Set(dfd.flows.map((f) => `${f.from}->${f.to}`));
-    const flowLabelParts = [];
-
+    // Boundary point helper on node borders
     function boundaryPoint(c, targetX, targetY) {
       const dx = targetX - c.cx;
       const dy = targetY - c.cy;
@@ -680,6 +703,10 @@
       return { x: c.cx + dx * s, y: c.cy + dy * s };
     }
 
+    // Track bidirectional pairs to offset curves cleanly
+    const pairSet = new Set(dfd.flows.map((f) => `${f.from}->${f.to}`));
+    const flowRenderData = [];
+
     for (const f of dfd.flows) {
       const cFrom = coords.get(f.from);
       const cTo = coords.get(f.to);
@@ -689,26 +716,254 @@
       const dx = cTo.cx - cFrom.cx;
       const dy = cTo.cy - cFrom.cy;
       const dist = Math.hypot(dx, dy) || 1;
-      const nx = -dy / dist;
-      const ny = dx / dist;
+      let nx = -dy / dist;
+      let ny = dx / dist;
 
-      // Slight arc offset even on unidirectional horizontal edges if crossing multiple columns
-      const colDiff = Math.abs(cTo.cx - cFrom.cx) > colSpacing * 1.3 ? -26 : 0;
-      const curveOff = isBidir ? 26 : colDiff;
+      let curveOff = 0;
+      if (isBidir) {
+        curveOff = 28;
+      } else if (Math.abs(dx) < 36) {
+        // Vertical / same-column flows
+        const minCy = Math.min(cFrom.cy, cTo.cy);
+        const maxCy = Math.max(cFrom.cy, cTo.cy);
+        // Check if there are intervening nodes in this column
+        let hasIntervening = false;
+        for (const [nid, node] of coords.entries()) {
+          if (nid === f.from || nid === f.to) continue;
+          if (Math.abs(node.cx - cFrom.cx) < 36 && node.cy > minCy + 20 && node.cy < maxCy - 20) {
+            hasIntervening = true;
+            break;
+          }
+        }
+        if (hasIntervening) {
+          // Arc around intervening column nodes so lines never cut through intermediate nodes
+          nx = 1;
+          ny = 0;
+          curveOff = 96;
+        } else if (cFrom.shape === 'store' || cTo.shape === 'store') {
+          // Flow between store lane and process: gentle arc away from KM header
+          nx = 1;
+          ny = 0;
+          curveOff = 38;
+        } else if (maxCy - minCy > rowSpacing * 0.7) {
+          nx = 1;
+          ny = 0;
+          curveOff = 30;
+        }
+      } else if (Math.abs(dx) > colSpacing * 1.3) {
+        // Multi-column span: find an offset that cleanly clears all intermediate nodes
+        const minX = Math.min(cFrom.cx, cTo.cx);
+        const maxX = Math.max(cFrom.cx, cTo.cx);
+        const interNodes = [];
+        for (const [nid, node] of coords.entries()) {
+          if (nid === f.from || nid === f.to) continue;
+          if (node.cx > minX + 24 && node.cx < maxX - 24) {
+            interNodes.push(node);
+          }
+        }
+
+        const candidateOffsets = [-30, 30, -75, 75, -115, 115, -155, 155];
+        let chosenOff = -30;
+        for (const off of candidateOffsets) {
+          const testCtrlX = (cFrom.cx + cTo.cx) / 2 + nx * off;
+          const testCtrlY = (cFrom.cy + cTo.cy) / 2 + ny * off;
+          const pS = boundaryPoint(cFrom, testCtrlX, testCtrlY);
+          const pE = boundaryPoint(cTo, testCtrlX, testCtrlY);
+          let clean = true;
+          for (const node of interNodes) {
+            if (Math.abs(pE.x - pS.x) < 1) continue;
+            const t = (node.cx - pS.x) / (pE.x - pS.x);
+            if (t <= 0.05 || t >= 0.95) continue;
+            const u = 1 - t;
+            const cyAtNode = u * u * pS.y + 2 * u * t * testCtrlY + t * t * pE.y;
+            const safeR = (node.shape === 'circle' ? node.r : node.h / 2) + 16;
+            if (Math.abs(cyAtNode - node.cy) < safeR) {
+              clean = false;
+              break;
+            }
+          }
+          if (clean) {
+            chosenOff = off;
+            break;
+          }
+        }
+        curveOff = chosenOff;
+      }
+
       const ctrlX = (cFrom.cx + cTo.cx) / 2 + nx * curveOff;
       const ctrlY = (cFrom.cy + cTo.cy) / 2 + ny * curveOff;
 
       const pStart = boundaryPoint(cFrom, ctrlX, ctrlY);
       const pEnd = boundaryPoint(cTo, ctrlX, ctrlY);
 
-      svgParts.push(
-        `<path d="M ${pStart.x.toFixed(1)} ${pStart.y.toFixed(1)} Q ${ctrlX.toFixed(1)} ${ctrlY.toFixed(1)}, ${pEnd.x.toFixed(1)} ${pEnd.y.toFixed(1)}" fill="none" stroke="${pal.edge}" stroke-width="1.65" marker-end="url(#dfd-arrow)" />`
-      );
+      flowRenderData.push({
+        flow: f,
+        cFrom,
+        cTo,
+        ctrlX,
+        ctrlY,
+        pStart,
+        pEnd
+      });
+    }
 
-      // Midpoint of quadratic bezier at t=0.5: 0.25*P0 + 0.5*Ctrl + 0.25*P1
-      const mx = 0.25 * pStart.x + 0.5 * ctrlX + 0.25 * pEnd.x;
-      const my = 0.25 * pStart.y + 0.5 * ctrlY + 0.25 * pEnd.y;
-      flowLabelParts.push(renderPillLabel(mx, my, f.data.join(', '), pal, 'middle', 11));
+    // Place Flow Labels with anti-overlap clearance against nodes, KM frame borders, KM badge & other labels
+    const placedPills = [];
+    const flowLabelParts = [];
+
+    function pillHitsObstacle(pt, pillW, pillH) {
+      const pLeft = pt.x - pillW / 2;
+      const pRight = pt.x + pillW / 2;
+      const pTop = pt.y - pillH / 2;
+      const pBottom = pt.y + pillH / 2;
+
+      // 1. All nodes
+      for (const c of coords.values()) {
+        const nW = c.shape === 'circle' ? c.r * 2 : c.w;
+        const nH = c.shape === 'circle' ? c.r * 2 : c.h;
+        const nLeft = c.cx - nW / 2 - 8;
+        const nRight = c.cx + nW / 2 + 8;
+        const nTop = c.cy - nH / 2 - 8;
+        const nBottom = c.cy + nH / 2 + 8;
+        if (pRight > nLeft && pLeft < nRight && pBottom > nTop && pTop < nBottom) {
+          return true;
+        }
+      }
+
+      // 2. KM dashed frame boundaries & title badge
+      if (kmFrame) {
+        const frameMargin = 10;
+        // Top border
+        if (pRight > kmFrame.minCX - frameMargin && pLeft < kmFrame.maxCX + frameMargin &&
+            Math.abs(pt.y - kmFrame.minCY) < pillH / 2 + frameMargin) return true;
+        // Bottom border
+        if (pRight > kmFrame.minCX - frameMargin && pLeft < kmFrame.maxCX + frameMargin &&
+            Math.abs(pt.y - kmFrame.maxCY) < pillH / 2 + frameMargin) return true;
+        // Left border
+        if (pBottom > kmFrame.minCY - frameMargin && pTop < kmFrame.maxCY + frameMargin &&
+            Math.abs(pt.x - kmFrame.minCX) < pillW / 2 + frameMargin) return true;
+        // Right border
+        if (pBottom > kmFrame.minCY - frameMargin && pTop < kmFrame.maxCY + frameMargin &&
+            Math.abs(pt.x - kmFrame.maxCX) < pillW / 2 + frameMargin) return true;
+        // KM badge rect
+        const bLeft = kmFrame.badgeX - 8;
+        const bRight = kmFrame.badgeX + kmFrame.titleW + 8;
+        const bTop = kmFrame.badgeY - 8;
+        const bBottom = kmFrame.badgeY + kmFrame.titleH + 8;
+        if (pRight > bLeft && pLeft < bRight && pBottom > bTop && pTop < bBottom) return true;
+      }
+
+      // 3. Previously placed labels
+      for (const placed of placedPills) {
+        if (pRight > placed.left - 6 && pLeft < placed.right + 6 &&
+            pBottom > placed.top - 6 && pTop < placed.bottom + 6) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    for (const fr of flowRenderData) {
+      const text = fr.flow.data.join(', ');
+      const clean = String(text || '');
+      const pillW = Math.max(22, clean.length * (11 * 0.72) + 14);
+      const pillH = 19;
+
+      const labelAt = (t) => {
+        const u = 1 - t;
+        return {
+          x: u * u * fr.pStart.x + 2 * u * t * fr.ctrlX + t * t * fr.pEnd.x,
+          y: u * u * fr.pStart.y + 2 * u * t * fr.ctrlY + t * t * fr.pEnd.y
+        };
+      };
+
+      let bestPt = labelAt(0.5);
+      if (pillHitsObstacle(bestPt, pillW, pillH)) {
+        const candidates = [0.44, 0.56, 0.38, 0.62, 0.32, 0.68, 0.25, 0.75, 0.20, 0.80];
+        for (const t of candidates) {
+          const cand = labelAt(t);
+          if (!pillHitsObstacle(cand, pillW, pillH)) {
+            bestPt = cand;
+            break;
+          }
+        }
+      }
+
+      placedPills.push({
+        left: bestPt.x - pillW / 2,
+        right: bestPt.x + pillW / 2,
+        top: bestPt.y - pillH / 2,
+        bottom: bestPt.y + pillH / 2
+      });
+
+      flowLabelParts.push(renderPillLabel(bestPt.x, bestPt.y, text, pal, 'middle', 11));
+    }
+
+    // Calculate Comprehensive Bounding Box across ALL elements
+    let maxX = 680;
+    let maxY = 260;
+
+    // 1. All nodes
+    for (const c of coords.values()) {
+      const halfW = c.shape === 'circle' ? c.r : c.w / 2;
+      const halfH = c.shape === 'circle' ? c.r : c.h / 2;
+      maxX = Math.max(maxX, c.cx + halfW);
+      maxY = Math.max(maxY, c.cy + halfH);
+    }
+
+    // 2. KM Frame
+    if (kmFrame) {
+      maxX = Math.max(maxX, kmFrame.maxCX, kmFrame.badgeX + kmFrame.titleW);
+      maxY = Math.max(maxY, kmFrame.maxCY);
+    }
+
+    // 3. Flow curves
+    for (const fr of flowRenderData) {
+      maxX = Math.max(maxX, fr.pStart.x, fr.pEnd.x, fr.ctrlX);
+      maxY = Math.max(maxY, fr.pStart.y, fr.pEnd.y, fr.ctrlY);
+    }
+
+    // 4. Flow labels
+    for (const pill of placedPills) {
+      maxX = Math.max(maxX, pill.right);
+      maxY = Math.max(maxY, pill.bottom);
+    }
+
+    // 5. Legend
+    if (showLegend) {
+      maxX = Math.max(maxX, 660);
+    }
+
+    const totalW = Math.ceil(maxX + 36);
+    const legendH = showLegend ? 58 : 10;
+    const totalH = Math.ceil(maxY + legendH + 34);
+
+    const svgParts = [];
+    svgParts.push(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" style="font-family:${escXml(pal.font)}">`,
+      `<defs>`,
+      `  <marker id="dfd-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">`,
+      `    <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="${pal.edge}" />`,
+      `  </marker>`,
+      `</defs>`,
+      `<rect width="${totalW}" height="${totalH}" fill="${pal.bg}" />`
+    );
+
+    // Draw Central Transformation (ΚΜ) Frame
+    if (kmFrame) {
+      svgParts.push(
+        `<rect x="${kmFrame.minCX.toFixed(1)}" y="${kmFrame.minCY.toFixed(1)}" width="${(kmFrame.maxCX - kmFrame.minCX).toFixed(1)}" height="${(kmFrame.maxCY - kmFrame.minCY).toFixed(1)}" rx="12" fill="${pal.kmBg}" stroke="${pal.kmStroke}" stroke-width="1.3" stroke-dasharray="6 4" />`,
+        `<rect x="${kmFrame.badgeX.toFixed(1)}" y="${kmFrame.badgeY.toFixed(1)}" width="${kmFrame.titleW.toFixed(1)}" height="${kmFrame.titleH.toFixed(1)}" rx="4" fill="${pal.labelBg}" fill-opacity="0.96" stroke="${pal.kmStroke}" stroke-width="0.8" />`,
+        `<text x="${(kmFrame.badgeX + kmFrame.titleW / 2).toFixed(1)}" y="${(kmFrame.badgeY + kmFrame.titleH / 2 + 3.5).toFixed(1)}" text-anchor="middle" fill="${pal.kmStroke}" font-size="11" font-weight="700">${escXml(kmFrame.title)}</text>`
+      );
+    }
+
+    // Draw Flow Curves
+    for (const fr of flowRenderData) {
+      svgParts.push(
+        `<path d="M ${fr.pStart.x.toFixed(1)} ${fr.pStart.y.toFixed(1)} Q ${fr.ctrlX.toFixed(1)} ${fr.ctrlY.toFixed(1)}, ${fr.pEnd.x.toFixed(1)} ${fr.pEnd.y.toFixed(1)}" fill="none" stroke="${pal.edge}" stroke-width="1.65" marker-end="url(#dfd-arrow)" />`
+      );
     }
 
     // Draw Nodes
@@ -753,7 +1008,7 @@
     svgParts.push(...flowLabelParts);
 
     if (showLegend) {
-      const ly = totalH - 18;
+      const ly = totalH - 30;
       svgParts.push(
         `<g class="dfd-legend" font-size="11" fill="${pal.muted}">`,
         `  <circle cx="28" cy="${ly - 2}" r="9" fill="${pal.ctrlFill}" stroke="${pal.ctrlStroke}" stroke-width="1.5" />`,
@@ -763,6 +1018,8 @@
         `  <text x="208" y="${ly + 2}">Αποθήκη Δεδομένων</text>`,
         `  <rect x="348" y="${ly - 10}" width="26" height="16" rx="2" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.5" />`,
         `  <text x="382" y="${ly + 2}">Πηγή / Αποδέκτης</text>`,
+        `  <rect x="512" y="${ly - 9}" width="26" height="14" rx="3" fill="none" stroke="${pal.kmStroke}" stroke-width="1.2" stroke-dasharray="4 3" />`,
+        `  <text x="546" y="${ly + 2}">Περίγραμμα ΚΜ</text>`,
         `</g>`
       );
     }

@@ -2186,6 +2186,12 @@
           const kdEp = processes.get(kdKey);
           const targetTag = splitCompositeTags(extractProcessTag(child.canonicalName))[0];
           const targetEp = processes.get(targetTag);
+          if (kdEp) {
+            for (const item of [...edge.args, ...edge.inputs]) {
+              const slot = varFlows.get(getSlot(item.canonical, item.name));
+              if (slot) slot.producers.add(kdEp.id);
+            }
+          }
           if (kdEp && targetEp) {
             const flowLabels = edge.inputs.length > 0 ? edge.inputs.map((x) => x.name) : [edge.conditional.label];
             for (const lbl of flowLabels) {
@@ -2392,9 +2398,7 @@
     const otherProcs = dfd.processes.filter((p) => !p.isCentral);
 
     if (centralProcs.length > 0) {
-      const sgTitle = dfd.architecture === 'TRANSACTION_CENTER'
-        ? 'Κέντρο Δοσοληψιών (ΚΔ)'
-        : 'Κεντρικός Μετασχηματισμός (ΚΜ)';
+      const sgTitle = 'Κεντρικός Μετασχηματισμός (ΚΜ)';
       lines.push(`  subgraph KM["${sgTitle}"]`);
       for (const p of centralProcs) {
         lines.push(`    ${p.id}(("${escapeMermaidLabel(p.label)}"))`);

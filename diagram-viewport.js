@@ -56,8 +56,8 @@
       const scaleX = (vw - pad * 2) / size.sw;
       const scaleY = (vh - pad * 2) / size.sh;
       state.scale = Math.max(fitMin, Math.min(fitMax, Math.min(scaleX, scaleY)));
-      state.tx = Math.max(16, (vw - size.sw * state.scale) / 2);
-      state.ty = Math.max(16, (vh - size.sh * state.scale) / 2);
+      state.tx = Math.max(pad, (vw - size.sw * state.scale) / 2);
+      state.ty = Math.max(pad, (vh - size.sh * state.scale) / 2);
       applyTransform();
     }
 
