@@ -1,3 +1,8 @@
+/* Cascade layers: tokens -> base -> overrides (declared order decides ties) */
+@layer tokens, base, overrides;
+
+@layer tokens {
+
 :root {
     /* Base Variables */
     --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -5,103 +10,120 @@
 
     /* LIGHT MODE: Linux Terminal Style (Solarized Light inspired) */
     --bg-color: #fdf6e3;
-    --text-color: #657b83;
+    --text-color: #4f6a75;
     --header-bg: #eee8d5;
-    --header-text: #586e75;
+    --header-text: #4d6570;
     --panel-bg: #fdf6e3;
     --panel-header-bg: #eee8d5;
-    --panel-header-border: #93a1a1;
+    --panel-header-border: #b0a488;
     --line-num-bg: #eee8d5;
-    --line-num-text: #93a1a1;
-    --line-num-border: #93a1a1;
-    --editor-text: #586e75;
+    --line-num-text: #4d6570;
+    --line-num-border: #c9bfa5;
     --output-bg: #002b36; /* Dark terminal for output contrast */
     --output-text: #839496;
     --card-bg: #f7f1df;
-    --card-border: #d3cbb7;
-    --button-bg: #2aa198;
-    --button-hover: #268bd2;
-    --button-secondary-bg: #93a1a1;
+    --card-border: #d8cfb8;
+    --button-bg: #0f766e;
+    --button-hover: #115e59;
+    --button-secondary-bg: #6b7f88;
     --button-secondary-text: #fdf6e3;
-    --scroll-track: transparent;
-    --scroll-thumb: #93a1a1;
-    --scroll-thumb-hover: #586e75;
 
-    --selection-bg: rgba(38, 139, 210, 0.25);
+    /* Semantic design tokens (light) — WCAG AA verified */
+    --page-bg: var(--bg-color);
+    --surface-1: var(--panel-bg);
+    --surface-2: var(--card-bg);
+    --surface-elevated: #fffdf4;
+    --border: var(--card-border);
+    --border-strong: var(--panel-header-border);
+    --text-primary: #4d6570;
+    --text-secondary: var(--text-color);
+    --text-muted: #5c7480;
+    --accent: var(--button-bg);
+    --accent-hover: var(--button-hover);
+    --on-accent: #ffffff;
+    --info-text: #1a6aa8;
+    --error-text: #c02828;
+    --warning-text: #7a5f00;
+    --success-text: #567200;
+    --error-bg: #c02828;
+    --success-bg: #5f7700;
 
-    /* Debugger & Stepping Colors (Light) */
+    /* Debugger & Stepping Colors (Light) — filled buttons AA with white text */
     --debug-active-bg: rgba(181, 137, 0, 0.22);
     --debug-active-border: #b58900;
-    --debug-btn-bg: #268bd2;
-    --debug-btn-hover: #1e75b3;
-    --debug-continue-bg: #859900;
-    --debug-continue-hover: #6c7c00;
+    --debug-btn-bg: #1a6aa8;
+    --debug-btn-hover: #155688;
+    --debug-continue-bg: #5f7700;
+    --debug-continue-hover: #4e6300;
     --debug-stop-bg: #dc322f;
     --debug-stop-hover: #b82725;
     --changed-highlight: rgba(211, 54, 130, 0.25);
 
     /* Syntax Highlighting Colors (Light/Solarized) */
-    --token-keyword: #859900;
-    --token-builtin: #268bd2;
     --token-string: #2aa198;
-    --token-number: #d33682;
-    --token-comment: #93a1a1;
-    --token-operator: #b58900;
-    --token-type: #6c71c4;
 
-    /* Terminal Specifics (Light Mode) */
+    /* Terminal Specifics (Light Mode) — tuned for the always-dark output bg */
     --term-font: "Fira Code", Consolas, "Courier New", Courier, monospace;
     --term-success: #859900;
-    --term-error: #dc322f;
-    --term-info: #268bd2;
-    --term-input: #b58900;
+    --term-error: #ff6b64;
+    --term-info: #3aa0e8;
+    --term-input: #e8b23a;
 }
 
 [data-theme="dark"] {
     /* DARK MODE: Cyberpunk (Neon / Dark) */
     --bg-color: #0b0c15;
-    --text-color: #e0e6ed;
+    --text-color: #a9b4c4;
     --header-bg: #12141d;
     --header-text: #00f3ff;
     --panel-bg: #12141d;
     --panel-header-bg: #1a1c29;
-    --panel-header-border: #ff0055;
+    --panel-header-border: #3a3f58;
     --line-num-bg: #0b0c15;
-    --line-num-text: #565b70;
+    --line-num-text: #8290a5;
     --line-num-border: #2a2d3e;
-    --editor-text: #e0e6ed;
     --output-bg: #050505;
     --output-text: #00ff9f;
     --card-bg: #181a27;
     --card-border: #2d3148;
-    --button-bg: #ff0055;
-    --button-hover: #ff2a75;
+    --button-bg: #d60047;
+    --button-hover: #e0005f;
     --button-secondary-bg: #2a2d3e;
     --button-secondary-text: #e0e6ed;
-    --scroll-thumb: #ff0055;
-    --scroll-thumb-hover: #ff2a75;
 
-    --selection-bg: rgba(255, 0, 85, 0.3);
+    /* Semantic design tokens (dark) — WCAG AA verified */
+    --page-bg: var(--bg-color);
+    --surface-1: var(--panel-bg);
+    --surface-2: var(--card-bg);
+    --surface-elevated: #1e2130;
+    --border: var(--card-border);
+    --border-strong: #3a3f58;
+    --text-primary: #eef2f7;
+    --text-secondary: var(--text-color);
+    --text-muted: #8290a5;
+    --accent: #ff5c8a;
+    --accent-hover: #ff2a75;
+    --on-accent: #ffffff;
+    --info-text: #55c7ff;
+    --error-text: #ff5c7a;
+    --warning-text: #ffee00;
+    --success-text: #00ff9f;
+    --error-bg: #d60047;
+    --success-bg: #00875a;
 
-    /* Debugger & Stepping Colors (Dark) */
+    /* Debugger & Stepping Colors (Dark) — filled buttons AA with white text */
     --debug-active-bg: rgba(0, 243, 255, 0.22);
     --debug-active-border: #00f3ff;
-    --debug-btn-bg: #bd00ff;
-    --debug-btn-hover: #a100db;
-    --debug-continue-bg: #00ff9f;
-    --debug-continue-hover: #00d685;
-    --debug-stop-bg: #ff0055;
+    --debug-btn-bg: #9d00d6;
+    --debug-btn-hover: #8400b3;
+    --debug-continue-bg: #00875a;
+    --debug-continue-hover: #006e48;
+    --debug-stop-bg: #d60047;
     --debug-stop-hover: #e0004c;
     --changed-highlight: rgba(255, 238, 0, 0.3);
 
     /* Syntax Highlighting Colors (Cyberpunk) */
-    --token-keyword: #ff0055;
-    --token-builtin: #00f3ff;
     --token-string: #ffee00;
-    --token-number: #bd00ff;
-    --token-comment: #565b70;
-    --token-operator: #00ff9f;
-    --token-type: #00f3ff;
 
     /* Terminal Specifics (Dark Mode) */
     --term-font: "Fira Code", Consolas, "Courier New", Courier, monospace;
@@ -111,8 +133,60 @@
     --term-input: #ffee00;
 }
 
+} /* end @layer tokens */
+
+@layer base {
+
 * {
     box-sizing: border-box;
+}
+
+/* hidden attribute must always win over class-based display rules */
+[hidden] {
+    display: none !important;
+}
+
+/* Skip-to-content link (accessibility) */
+.skip-link {
+    position: absolute;
+    left: 0.75rem;
+    top: -4rem;
+    z-index: 3000;
+    padding: 0.55rem 1rem;
+    background: var(--button-bg);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border-radius: 0 0 6px 6px;
+    text-decoration: none;
+    transition: top 0.18s ease-out;
+}
+.skip-link:focus {
+    top: 0;
+}
+
+/* Visible keyboard focus for all interactive elements */
+:focus-visible {
+    outline: 2px solid var(--button-bg);
+    outline-offset: 2px;
+}
+
+/* Inline SVG icon inside a button */
+.btn-icon-svg {
+    vertical-align: -1px;
+    margin-right: 3px;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 body {
@@ -156,6 +230,28 @@ header {
     gap: 0.5rem;
 }
 
+.course-switch-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.36rem 0.7rem;
+    border: 1px solid color-mix(in srgb, var(--button-bg) 55%, var(--panel-header-border));
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--button-bg) 10%, transparent);
+    color: var(--header-text);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+}
+.course-switch-link:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--button-bg) 20%, transparent);
+    color: var(--accent);
+    transform: translateY(-1px);
+}
+
 h1 {
     margin: 0;
     font-size: 1.35rem;
@@ -167,7 +263,7 @@ h1 {
 .version-tag {
     font-size: 0.75rem;
     padding: 2px 8px;
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
     border-radius: 12px;
     font-weight: bold;
@@ -186,9 +282,9 @@ h1 {
     transition: all 0.2s;
 }
 .home-link:hover {
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
-    border-color: var(--button-bg);
+    border-color: var(--accent);
 }
 
 #theme-toggle {
@@ -203,8 +299,8 @@ h1 {
 }
 #theme-toggle:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: var(--button-bg);
-    border-color: var(--button-bg);
+    color: var(--accent);
+    border-color: var(--accent);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -347,9 +443,9 @@ main {
     transition: all 0.2s;
 }
 .action-btn:hover {
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
-    border-color: var(--button-bg);
+    border-color: var(--accent);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -365,15 +461,24 @@ main {
     flex-wrap: wrap;
 }
 
-.primary-controls, .secondary-controls {
+.primary-controls {
     display: flex;
     align-items: center;
     gap: 0.4rem;
     flex-wrap: wrap;
 }
 
+.secondary-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    padding-left: 0.65rem;
+    border-left: 1px solid var(--panel-header-border);
+}
+
 button {
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: white;
     border: none;
     padding: 0.45rem 0.9rem;
@@ -404,7 +509,7 @@ button:disabled {
 
 /* Primary Execution Controls */
 .btn-run {
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
     font-weight: 700;
 }
@@ -490,7 +595,7 @@ button:disabled {
 }
 .resizer:hover::after {
     opacity: 1;
-    background-color: var(--button-bg);
+    background-color: var(--accent);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -545,26 +650,26 @@ button:disabled {
 }
 .tab-btn:hover {
     background-color: rgba(0, 0, 0, 0.05);
-    color: var(--button-bg);
+    color: var(--accent);
     transform: none;
     box-shadow: none;
 }
 .tab-btn.active {
     background-color: var(--panel-bg);
-    color: var(--button-bg);
+    color: var(--accent);
     border-bottom: 2px solid var(--button-bg);
 }
 
 .tab-badge {
-    background-color: var(--panel-header-border);
-    color: var(--panel-bg);
+    background-color: var(--border-strong);
+    color: var(--text-primary);
     font-size: 0.7rem;
     padding: 1px 6px;
     border-radius: 10px;
     font-weight: bold;
 }
 .tab-btn.active .tab-badge {
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
 }
 
@@ -587,9 +692,9 @@ button:disabled {
     transition: all 0.2s;
 }
 .tab-action-btn:hover {
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
-    border-color: var(--button-bg);
+    border-color: var(--accent);
     transform: none;
     box-shadow: none;
 }
@@ -657,7 +762,6 @@ button:disabled {
 .term-info {
     color: var(--term-info);
     font-style: italic;
-    opacity: 0.85;
 }
 .term-error {
     color: var(--term-error);
@@ -669,7 +773,6 @@ button:disabled {
 }
 .term-input-echo {
     color: var(--term-input);
-    opacity: 0.8;
 }
 .term-output {
     color: var(--output-text);
@@ -691,15 +794,10 @@ button:disabled {
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: var(--text-color);
-    opacity: 0.75;
+    color: var(--text-secondary);
     text-align: center;
     padding: 2rem;
     gap: 0.5rem;
-}
-.placeholder-icon {
-    font-size: 2.2rem;
-    margin-bottom: 0.25rem;
 }
 .placeholder-text {
     font-size: 1rem;
@@ -739,7 +837,7 @@ button:disabled {
     padding: 0.2rem 0.6rem;
 }
 .var-toggle-group .tab-action-btn.active {
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
 }
 
@@ -808,12 +906,12 @@ button:disabled {
     transition: transform 0.2s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 .memory-box-card:hover {
-    border-color: var(--button-bg);
+    border-color: var(--accent);
     transform: translateY(-1px);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 .memory-box-card.just-changed {
-    border-color: var(--button-bg) !important;
+    border-color: var(--accent) !important;
     background-color: var(--changed-highlight) !important;
     box-shadow: 0 0 12px var(--changed-highlight) !important;
 }
@@ -830,9 +928,6 @@ button:disabled {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-}
-.mem-icon {
-    font-size: 0.95rem;
 }
 .mem-name {
     font-family: var(--font-mono);
@@ -876,7 +971,7 @@ button:disabled {
     font-family: var(--font-mono);
     font-size: 1.45rem;
     font-weight: 800;
-    color: var(--button-bg);
+    color: var(--accent);
     word-break: break-all;
     text-align: center;
 }
@@ -917,7 +1012,7 @@ button:disabled {
 }
 .mem-diff-text {
     font-weight: 600;
-    color: var(--button-bg);
+    color: var(--accent);
     font-family: var(--font-mono);
 }
 
@@ -972,7 +1067,7 @@ button:disabled {
     transition: all 0.25s ease;
 }
 .array-cell.just-changed {
-    border-color: var(--button-bg) !important;
+    border-color: var(--accent) !important;
     background-color: var(--changed-highlight) !important;
     transform: scale(1.06);
     box-shadow: 0 0 10px var(--changed-highlight);
@@ -993,7 +1088,7 @@ button:disabled {
     font-size: 1.15rem;
     font-weight: 800;
     padding: 6px 8px;
-    color: var(--button-bg);
+    color: var(--accent);
     text-align: center;
 }
 
@@ -1015,7 +1110,7 @@ button:disabled {
     color: var(--text-color);
 }
 .matrix-2d-table td {
-    color: var(--button-bg);
+    color: var(--accent);
     font-weight: 800;
     font-size: 1rem;
 }
@@ -1059,12 +1154,12 @@ button:disabled {
     font-weight: 700;
 }
 .status-pill.updated {
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
 }
 .status-pill.initial {
-    background-color: var(--panel-header-border);
-    color: var(--panel-bg);
+    background-color: var(--border-strong);
+    color: var(--text-primary);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1112,7 +1207,7 @@ button:disabled {
 }
 .trace-step-num {
     font-weight: bold;
-    color: var(--button-bg);
+    color: var(--accent);
 }
 .trace-line-num {
     color: var(--line-num-text);
@@ -1131,10 +1226,10 @@ button:disabled {
     font-size: 0.78rem;
 }
 .trace-var-item strong {
-    color: var(--button-bg);
+    color: var(--accent);
 }
 .trace-output-text {
-    color: var(--term-success);
+    color: var(--success-text);
     font-style: italic;
 }
 
@@ -1145,7 +1240,7 @@ button:disabled {
     position: fixed;
     bottom: 24px;
     right: 24px;
-    background-color: var(--button-bg);
+    background-color: var(--accent);
     color: #ffffff;
     padding: 10px 18px;
     border-radius: 6px;
@@ -1201,20 +1296,66 @@ button:disabled {
     position: relative;
 }
 .modal-close {
-    color: var(--text-color) !important; 
-    font-size: 28px !important; 
+    color: var(--text-color) !important;
+    font-size: 28px !important;
     transition: color 0.2s;
-    line-height: 1; 
+    line-height: 1;
     position: absolute;
     top: 14px;
     right: 18px;
     cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0 0.35rem;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared dialog components (confirm / prompt built by common.js) */
+/* -------------------------------------------------------------------------- */
+.eap-dialog-msg {
+    margin: 0 0 1rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.eap-dialog-input {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.9rem;
+    border-radius: 5px;
+    border: 1px solid var(--panel-header-border);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-mono);
+    outline: none;
+    margin-bottom: 1rem;
+}
+.eap-dialog-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--button-bg) 30%, transparent);
+}
+
+.eap-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.eap-dialog-actions .eap-dialog-cancel {
+    background: transparent;
+    border: 1px solid var(--panel-header-border);
+    color: var(--text-color);
+    text-transform: none;
+    letter-spacing: 0;
+}
+.eap-dialog-actions .eap-dialog-ok {
+    text-transform: none;
+    letter-spacing: 0;
 }
 .modal-close:hover {
-    color: var(--button-bg) !important;
+    color: var(--accent) !important;
 }
 .modal-content h2 {
-    color: var(--button-bg);
+    color: var(--accent);
     border-bottom: 2px solid var(--panel-header-border);
     padding-bottom: 8px;
     margin-top: 0;
@@ -1318,9 +1459,13 @@ footer {
     }
 }
 
+} /* end @layer base */
+
 /* -------------------------------------------------------------------------- */
-/* Modern editor workspace */
+/* Modern editor workspace — override layer (always wins over base) */
 /* -------------------------------------------------------------------------- */
+@layer overrides {
+
 body {
     background:
         radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--button-bg) 9%, transparent), transparent 30rem),
@@ -1477,8 +1622,8 @@ button:hover:not(:disabled) {
 
 .tab-btn.active {
     background: transparent;
-    border-bottom-color: var(--button-bg);
-    color: var(--button-bg);
+    border-bottom-color: var(--accent);
+    color: var(--accent);
 }
 
 .tab-action-btn {
@@ -1548,3 +1693,5 @@ footer {
         white-space: nowrap;
     }
 }
+
+} /* end @layer overrides */

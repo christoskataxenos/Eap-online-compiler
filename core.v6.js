@@ -1306,8 +1306,6 @@ class Interpreter {
                     let input;
                     if (this.inputProvider) {
                         input = await this.inputProvider();
-                    } else if (typeof window !== 'undefined' && window.prompt) {
-                        input = window.prompt('Enter value:');
                     } else {
                         throw new Error("Input not supported in this environment");
                     }

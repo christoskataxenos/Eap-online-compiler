@@ -1,0 +1,1180 @@
+/* -----------------------------------------------------------------------------
+ * EAP ΠΛΗ11 Compiler Workspace Styles (Scoped cleanly under .pli11-page)
+ * Inherits Light (Solarized) and Dark (Cyberpunk) theme tokens from style.css
+ * -------------------------------------------------------------------------- */
+
+.course-switch-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.78rem;
+  border: 1px solid color-mix(in srgb, var(--button-bg) 55%, var(--panel-header-border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--button-bg) 10%, transparent);
+  color: var(--header-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+}
+
+.course-switch-link:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--button-bg) 20%, transparent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* -----------------------------------------------------------------------------
+ * Modern Side-by-Side (Left-Right) Workspace Architecture
+ * -------------------------------------------------------------------------- */
+.pli11-page main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem 0.65rem 0.2rem 0.65rem;
+  gap: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.pli11-page footer {
+  padding: 0.2rem 0.8rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.pli11-page .container {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left Pane: Editor & Authoring Controls */
+.pli11-page .pane-left {
+  display: flex;
+  flex-direction: column;
+  width: 46%;
+  min-width: 320px;
+  max-width: calc(100% - 360px);
+  height: 100%;
+  min-height: 0;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.pli11-page .pane-left .editor-container {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--panel-bg);
+  border-radius: 6px;
+  border: 1px solid var(--panel-header-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.pli11-page .pane-left .editor-wrapper {
+  flex: 1;
+  position: relative;
+  min-height: 120px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pli11-page .pane-left #code-editor-mount {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pli11-page .pane-left .CodeMirror {
+  height: 100% !important;
+  font-size: 0.93rem !important;
+  line-height: 1.55 !important;
+}
+
+/* Quick Snippets Bar */
+.editor-quick-snippets {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  background: color-mix(in srgb, var(--panel-header-bg) 85%, var(--card-bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--panel-header-border) 70%, transparent);
+  flex-wrap: wrap;
+  user-select: none;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+.snippet-title {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--header-text);
+  margin-right: 0.2rem;
+  white-space: nowrap;
+}
+
+.snippet-chip {
+  padding: 0.22rem 0.5rem;
+  font-size: 0.73rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+  color: var(--text-color);
+  border: 1px solid color-mix(in srgb, var(--panel-header-border) 60%, transparent);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.snippet-chip:hover {
+  background: color-mix(in srgb, var(--button-bg) 20%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* Docked Bottom Controls */
+.pli11-page .editor-bottom-controls {
+  padding: 0.42rem 0.65rem;
+  background: var(--panel-header-bg);
+  border-top: 1px solid var(--panel-header-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.pli11-page .editor-bottom-controls .primary-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.pli11-page .editor-bottom-controls .secondary-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--panel-header-border);
+}
+
+.pli11-page .editor-bottom-controls button {
+  padding: 0.36rem 0.68rem;
+  font-size: 0.78rem;
+}
+
+.pli11-page .btn-builder-quick {
+  background: var(--surface-2, rgba(255, 255, 255, 0.08));
+  color: var(--text-color);
+  border: 1px solid var(--panel-header-border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.pli11-page .btn-builder-quick:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--button-bg) 12%, transparent);
+}
+
+/* Vertical Column Resizer */
+.pli11-page .resizer.resizer-col {
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.pli11-page .resizer.resizer-col::after {
+  content: "";
+  width: 4px;
+  height: 52px;
+  background-color: var(--panel-header-border);
+  border-radius: 3px;
+  opacity: 0.65;
+  transition: all 0.2s ease;
+}
+
+.pli11-page .resizer.resizer-col:hover::after,
+.pli11-page .resizer.resizer-col.resizing::after {
+  opacity: 1;
+  background-color: var(--accent);
+  height: 80px;
+  width: 5px;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--button-bg) 60%, transparent);
+}
+
+/* Right Output & Diagram Pane */
+.pli11-page .pane-right {
+  flex: 1;
+  min-width: 360px;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.pli11-page .pane-right .output-container {
+  height: 100% !important;
+  max-height: none !important;
+  flex: 1 !important;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--panel-bg);
+  border-radius: 6px;
+  border: 1px solid var(--panel-header-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+/* Layout Switcher Button in Header */
+.layout-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.72rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card-bg) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--button-bg) 40%, var(--panel-header-border));
+  color: var(--header-text);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.layout-toggle-btn:hover {
+  background: color-mix(in srgb, var(--button-bg) 18%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* Stacked Layout Mode Override (Up/Down) */
+.pli11-page .container.layout-stacked {
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.pli11-page .container.layout-stacked .pane-left {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1;
+  min-height: 160px;
+}
+
+.pli11-page .container.layout-stacked .resizer {
+  width: 100% !important;
+  height: 8px !important;
+  cursor: row-resize !important;
+  margin: -2px 0;
+}
+
+.pli11-page .container.layout-stacked .resizer::after {
+  width: 48px !important;
+  height: 4px !important;
+}
+
+.pli11-page .container.layout-stacked .pane-right {
+  width: 100% !important;
+  min-width: 100% !important;
+  height: auto;
+  flex: none;
+}
+
+.pli11-page .container.layout-stacked .output-container {
+  height: 52vh !important;
+  max-height: 85vh !important;
+  flex: none !important;
+}
+
+.pli11-page .header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.pli11-page .arch-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--button-bg) 14%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--button-bg) 35%, transparent);
+  margin-left: 0.5rem;
+  cursor: default;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.pli11-page .arch-badge::before {
+  content: "●";
+  font-size: 0.62rem;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.pli11-page .live-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card-bg) 78%, transparent);
+  color: var(--text-color);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pli11-page .live-toggle-label input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Error / Trace CodeMirror line gutters & highlights */
+.cm-pli11-error-line {
+  background: color-mix(in srgb, var(--term-error) 18%, transparent) !important;
+}
+
+.cm-pli11-trace-line {
+  background: var(--debug-active-bg) !important;
+  box-shadow: inset 3px 0 0 var(--debug-active-border);
+}
+
+/* Right output panel panes inside pli11 */
+.pli11-page .tab-pane {
+  overflow: hidden;
+}
+
+.pli11-page .tab-pane.active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Stats strip & Diagram toolbar */
+.pli11-stats-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--card-bg) 82%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--card-border) 80%, transparent);
+}
+
+.pli11-stat-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pli11-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 5px;
+  border: 1px solid var(--card-border);
+  background: var(--panel-bg);
+  font-size: 0.75rem;
+  color: var(--text-color);
+}
+
+.pli11-stat-pill strong {
+  color: var(--header-text);
+  font-family: var(--font-mono);
+}
+
+.diagram-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.42rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--card-border) 75%, transparent);
+  background: color-mix(in srgb, var(--panel-bg) 90%, transparent);
+}
+
+.diagram-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.tool-mini-btn {
+  padding: 0.28rem 0.58rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.tool-mini-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tool-mini-btn.active {
+  background: var(--button-bg);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.zoom-readout {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  min-width: 3.1rem;
+  text-align: center;
+  color: var(--text-color);
+}
+
+/* Pan & Zoom Diagram Viewport */
+.diagram-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  overflow: hidden;
+  background: var(--bg-color);
+  cursor: grab;
+  user-select: none;
+}
+
+.diagram-viewport:active {
+  cursor: grabbing;
+}
+
+.diagram-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.diagram-canvas svg {
+  display: block;
+}
+
+.diagram-hint {
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.55rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+
+/* Call-Trace Status Bar */
+.trace-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.55rem 0.75rem;
+  border-top: 2px solid var(--debug-active-border);
+  background: color-mix(in srgb, var(--debug-active-bg) 65%, var(--panel-bg));
+  font-size: 0.78rem;
+}
+
+.trace-status-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.trace-step-pill {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+  background: var(--debug-btn-bg);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-right: 0.45rem;
+}
+
+.trace-stack-line {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.trace-vars-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.trace-var-chip {
+  padding: 0.16rem 0.48rem;
+  border-radius: 4px;
+  border: 1px solid var(--card-border);
+  background: var(--panel-bg);
+  font-family: var(--font-mono);
+  font-size: 0.71rem;
+}
+
+.trace-var-chip.ready {
+  border-color: var(--success-text);
+  color: var(--success-text);
+}
+
+/* DFD Info Banner */
+.dfd-info-banner {
+  padding: 0.42rem 0.75rem;
+  background: color-mix(in srgb, var(--term-info) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--term-info) 35%, transparent);
+  color: var(--text-color);
+  font-size: 0.76rem;
+}
+
+/* Validator Tab */
+.validator-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.val-summary-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: 7px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+}
+
+.val-summary-card.ok {
+  border-color: var(--success-text);
+  background: color-mix(in srgb, var(--success-text) 10%, var(--card-bg));
+}
+
+.val-summary-card.has-errors {
+  border-color: var(--error-text);
+  background: color-mix(in srgb, var(--error-text) 10%, var(--card-bg));
+}
+
+.val-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.5rem;
+}
+
+.val-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  background: var(--panel-bg);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.val-check-mark {
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.val-check-mark.pass {
+  background: color-mix(in srgb, var(--success-text) 18%, transparent);
+  color: var(--success-text);
+  border: 1px solid color-mix(in srgb, var(--success-text) 45%, transparent);
+}
+
+.val-check-mark.fail {
+  background: color-mix(in srgb, var(--error-text) 18%, transparent);
+  color: var(--error-text);
+  border: 1px solid color-mix(in srgb, var(--error-text) 45%, transparent);
+}
+
+.val-check-mark.warn {
+  background: color-mix(in srgb, var(--warning-text) 18%, transparent);
+  color: var(--warning-text);
+  border: 1px solid color-mix(in srgb, var(--warning-text) 45%, transparent);
+}
+
+.val-diag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.val-diag-item {
+  padding: 0.65rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--card-border);
+  border-left-width: 4px;
+  background: var(--panel-bg);
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.15s;
+}
+
+.val-diag-item:hover {
+  transform: translateX(2px);
+}
+
+.val-diag-item.error { border-left-color: var(--error-text); }
+.val-diag-item.warning { border-left-color: var(--warning-text); }
+.val-diag-item.info { border-left-color: var(--term-info); }
+
+.val-diag-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.28rem;
+  font-size: 0.74rem;
+}
+
+.val-diag-code {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.val-diag-item.error .val-diag-code { color: var(--error-text); }
+.val-diag-item.warning .val-diag-code { color: var(--warning-text); }
+.val-diag-item.info .val-diag-code { color: var(--info-text); }
+
+.val-diag-loc {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.val-diag-msg {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--header-text);
+  line-height: 1.4;
+}
+
+.val-diag-hint {
+  margin-top: 0.25rem;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.tab-badge.has-errors {
+  background: var(--error-bg);
+  color: #ffffff;
+}
+
+.tab-badge.all-ok {
+  background: var(--success-bg);
+  color: #ffffff;
+}
+
+/* Mermaid Tab (Editable & Exportable) */
+.mermaid-split {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.mermaid-editor-wrap {
+  height: 38%;
+  min-height: 120px;
+  max-height: 50%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--output-bg);
+  border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0;
+}
+
+.mermaid-code-editor {
+  flex: 1;
+  width: 100%;
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  overflow: auto;
+  background: transparent;
+  color: var(--output-text);
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  border: none;
+  outline: none;
+  resize: none;
+  white-space: pre;
+  tab-size: 2;
+  box-sizing: border-box;
+}
+
+.mermaid-code-editor:focus {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--button-bg) 50%, transparent);
+}
+
+.mermaid-preview-box {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem;
+  background: var(--bg-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  position: relative;
+}
+
+.mermaid-preview-box svg {
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.08));
+}
+
+.mermaid-offline-note {
+  max-width: 46ch;
+  text-align: center;
+  padding: 1.25rem;
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-color);
+}
+
+/* DFD Reverse Builder Tab */
+.builder-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.builder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.builder-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 160px;
+}
+
+.builder-field label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--header-text);
+}
+
+.builder-input,
+.builder-select,
+.builder-textarea {
+  padding: 0.42rem 0.58rem;
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  background: var(--panel-bg);
+  color: var(--text-color);
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+}
+
+.builder-textarea {
+  font-family: var(--font-mono);
+  min-height: 145px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.builder-flows-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+}
+
+.builder-flows-table th,
+.builder-flows-table td {
+  padding: 0.35rem 0.35rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.builder-flows-table th {
+  font-size: 0.72rem;
+  color: var(--header-text);
+  font-weight: 700;
+}
+
+.builder-flows-table input,
+.builder-flows-table select {
+  width: 100%;
+  padding: 0.28rem 0.4rem;
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  background: var(--panel-bg);
+  color: var(--text-color);
+  font-size: 0.76rem;
+}
+
+.builder-primary-btn {
+  padding: 0.55rem 1.1rem;
+  border-radius: 6px;
+  background: var(--button-bg);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border: none;
+}
+
+.builder-primary-btn:hover {
+  background: var(--button-hover);
+}
+
+@media (max-width: 960px) {
+  .pli11-page main {
+    height: auto;
+    overflow-y: auto;
+  }
+  .pli11-page .container {
+    flex-direction: column !important;
+    gap: 0.5rem;
+    overflow-y: visible;
+  }
+  .pli11-page .pane-left,
+  .pli11-page .pane-right {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  .pli11-page .pane-left {
+    height: 48vh !important;
+    min-height: 260px !important;
+  }
+  .pli11-page .pane-right .output-container {
+    height: 52vh !important;
+    min-height: 360px !important;
+  }
+  .pli11-page .resizer {
+    display: none !important;
+  }
+  .pli11-page .header-right {
+    gap: 0.4rem;
+  }
+  .course-switch-link {
+    padding: 0.36rem 0.55rem;
+    font-size: 0.72rem;
+  }
+}
+
+
+/* -----------------------------------------------------------------------------
+ * Shared ΠΛΗ11 Header Sub-Navigation (ΔΔΠ / ΔΡΔ <-> Διαγράμματα Κλάσεων)
+ * -------------------------------------------------------------------------- */
+.pli11-subnav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.18rem;
+  border-radius: 7px;
+  border: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 82%, transparent);
+  margin-left: 0.35rem;
+}
+
+.pli11-subnav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.26rem 0.65rem;
+  border-radius: 5px;
+  color: var(--text-color);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.pli11-subnav-link:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--button-bg) 10%, transparent);
+}
+
+.pli11-subnav-link.active {
+  background: var(--button-bg);
+  color: #ffffff;
+}
+
+/* -----------------------------------------------------------------------------
+ * ΠΛΗ11 Class Diagrams Studio Scoped Styles (.pli11-cls-page)
+ * -------------------------------------------------------------------------- */
+.cls-check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.48rem;
+  border-radius: 5px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-color);
+  cursor: pointer;
+  user-select: none;
+}
+
+.cls-check-label input {
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+
+.cls-builder-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+
+.cls-builder-section-head h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--header-text);
+}
+
+.cls-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 0.75rem;
+}
+
+.cls-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border-radius: 7px;
+  border: 1px solid var(--card-border);
+  background: var(--panel-bg);
+}
+
+.cls-card.is-implicit {
+  border-style: dashed;
+  border-color: var(--term-input);
+}
+
+.cls-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cls-card-header input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.32rem 0.5rem;
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--header-text);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.cls-card-parent-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.74rem;
+}
+
+.cls-card-parent-row label {
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.cls-card-parent-row select {
+  flex: 1;
+  padding: 0.26rem 0.45rem;
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 0.76rem;
+}
+
+.cls-subblock-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--header-text);
+  margin-bottom: 0.25rem;
+}
+
+.cls-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.cls-member-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.cls-member-row select {
+  width: 58px;
+  padding: 0.24rem 0.25rem;
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+}
+
+.cls-member-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.42rem;
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 0.75rem;
+}
+
+.cls-member-row input.cls-type-input {
+  max-width: 92px;
+}
+
+.cls-member-row input.cls-params-input {
+  max-width: 110px;
+}
+
+.cls-icon-btn {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--card-border);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cls-icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cls-icon-btn.danger:hover {
+  border-color: var(--error-text);
+  color: var(--error-text);
+}
+
+.cls-rel-table {
+  min-width: 720px;
+}
+
+.cls-pseudocode-box {
+  flex: 1;
+  margin: 0;
+  padding: 0.95rem 1.15rem;
+  overflow: auto;
+  background: var(--output-bg);
+  color: var(--output-text);
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+@media (max-width: 900px) {
+  .pli11-page header {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+  .pli11-subnav {
+    margin-left: 0;
+  }
+  .pli11-subnav-link {
+    padding: 0.22rem 0.5rem;
+    font-size: 0.72rem;
+  }
+}

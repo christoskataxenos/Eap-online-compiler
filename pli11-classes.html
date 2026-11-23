@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EAP ΠΛΗ11 - Διαγράμματα Κλάσεων &amp; OO-Ψευδοκώδικας</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+  <!-- CodeMirror & Addons Stylesheets -->
+  <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
+  <link rel="stylesheet" href="vendor/codemirror/dracula.min.css">
+  <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
+
+  <!-- Shared Theme & Layout + ΠΛΗ11 Scoped Styles -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="pli11.css">
+
+  <!-- Shared utilities: applies saved theme immediately (FOUC prevention) -->
+  <script src="common.js"></script>
+</head>
+<body class="pli11-page pli11-cls-page">
+  <a href="#main-content" class="skip-link">Μετάβαση στο περιεχόμενο</a>
+  <header>
+    <div class="header-left">
+      <a href="index.html" class="home-link" data-base="index.html" title="Επιστροφή στην Αρχική">&larr; Home</a>
+      <h1>EAP Online Compiler</h1>
+      <span class="version-tag">ΠΛΗ11</span>
+      <nav class="pli11-subnav" aria-label="Εργαλεία ΠΛΗ11">
+        <a href="pli11.html" id="nav-pli11-ddp" class="pli11-subnav-link" data-base="pli11.html">ΔΔΠ &amp; ΔΡΔ</a>
+        <a href="pli11-classes.html" id="nav-pli11-classes" class="pli11-subnav-link active" data-base="pli11-classes.html">Διαγράμματα Κλάσεων</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <button id="layout-toggle" class="layout-toggle-btn" type="button" title="Εναλλαγή διάταξης: Left/Right ή Up/Down">
+        <span class="layout-icon">◫</span> <span class="layout-text">Side-by-Side</span>
+      </button>
+      <a href="editor.html" id="switch-course-link" class="course-switch-link" data-base="editor.html" title="Μετάβαση στον Interpreter Ψευδογλώσσας ΠΛΗ10">ΠΛΗ10 (Ψευδογλώσσα) &rarr;</a>
+      <button id="theme-toggle" type="button" aria-label="Εναλλαγή θέματος (φωτεινό / σκοτεινό)" aria-pressed="false">Dark Mode</button>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <div class="container">
+      <!-- Left Pane: Editor & Authoring Tools -->
+      <div class="pane-left" id="pane-left">
+        <div class="editor-container">
+          <div class="panel-header">
+            <div>
+              <span id="editor-title">Ψευδοκώδικας Κλάσεων &amp; Σχέσεις</span>
+              <span id="cls-summary-badge" class="arch-badge">Αναμονή</span>
+            </div>
+            <div class="panel-header-actions">
+              <select id="example-selector" title="Παραδείγματα Διαγραμμάτων Κλάσεων ΠΛΗ11">
+                <option value="" disabled selected>Παραδείγματα (Κλάσεις ΠΛΗ11)...</option>
+              </select>
+              <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
+              <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με το διάγραμμα">Share</button>
+            </div>
+          </div>
+
+          <!-- Quick Snippets Bar -->
+          <div class="editor-quick-snippets" aria-label="Γρήγορη Εισαγωγή Προτύπων">
+            <span class="snippet-title">Εισαγωγη:</span>
+            <button type="button" class="snippet-chip" data-snippet="class" title="Προσθήκη σκελετού νέας Κλάσης">+ Κλάση</button>
+            <button type="button" class="snippet-chip" data-snippet="attr" title="Προσθήκη Κατηγορήματος / Ιδιότητας">+ Πεδίο</button>
+            <button type="button" class="snippet-chip" data-snippet="meth" title="Προσθήκη Μεθόδου">+ Μέθοδος</button>
+            <button type="button" class="snippet-chip" data-snippet="assoc" title="Απλή Συσχέτιση (--)">+ Συσχέτιση</button>
+            <button type="button" class="snippet-chip" data-snippet="agg" title="Συναρμογή (<>--)">+ Συναρμογή</button>
+            <button type="button" class="snippet-chip" data-snippet="comp" title="Σύνθεση (*--)">+ Σύνθεση</button>
+            <button type="button" class="snippet-chip" data-snippet="inh" title="Κληρονομικότητα (--|>)">+ Κληρονομικότητα</button>
+            <button type="button" class="snippet-chip" data-snippet="assoc-class" title="Κλάση Συσχέτισης (::)">+ Κλάση Συσχ.</button>
+          </div>
+
+          <div class="editor-wrapper">
+            <div id="code-editor-mount"></div>
+          </div>
+
+          <!-- Controls Docked at Bottom of Editor -->
+          <div class="controls editor-bottom-controls">
+            <div class="primary-controls">
+              <button id="compile-button" class="btn-run" title="Σχεδίαση και έλεγχος ΕΑΠ (F5)">
+                <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                ΣΧΕΔΙΑΣΗ
+              </button>
+              <button id="quick-add-class-btn" class="btn-builder-quick" title="Προσθήκη νέας κλάσης στον Οπτικό Builder">+ Νέα Κλάση</button>
+              <button id="quick-add-rel-btn" class="btn-builder-quick" title="Προσθήκη νέας σχέσης στον Οπτικό Builder">+ Νέα Σχέση</button>
+
+              <label class="live-toggle-label" title="Αυτόματη ενημέρωση κατά την πληκτρολόγηση">
+                <input type="checkbox" id="live-compile-toggle" checked>
+                Live
+              </label>
+            </div>
+
+            <div class="secondary-controls">
+              <button id="load-button" title="Φόρτωση αρχείου .txt ή .pli11 (UTF-8 & Windows-1253)">ΦΟΡΤΩΣΗ</button>
+              <button id="save-button" title="Αποθήκευση ορισμού κλάσεων">ΑΠΟΘΗΚΕΥΣΗ</button>
+              <button id="clear-button" title="Καθαρισμός editor">ΚΑΘΑΡΙΣΜΟΣ</button>
+              <button id="syntax-help-button" title="Οδηγός Σύνταξης Κλάσεων &amp; Σχέσεων ΕΑΠ">ΒΟΗΘΕΙΑ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resizer Handle (Column Splitter) -->
+      <div class="resizer resizer-col" id="drag-handle" title="Σύρετε για αλλαγή πλάτους • Διπλό κλικ για επαναφορά (50/50)"></div>
+
+      <!-- Right Pane: Output / Diagram & Visual Tools -->
+      <div class="pane-right" id="pane-right">
+        <div class="output-container">
+        <div class="panel-header tab-header">
+          <div class="tabs-list">
+            <button class="tab-btn active" data-tab="tab-diagram">Διάγραμμα Κλάσεων</button>
+            <button class="tab-btn" data-tab="tab-builder">Οπτικός Builder</button>
+            <button class="tab-btn" data-tab="tab-validator">Έλεγχος ΕΑΠ <span id="val-badge" class="tab-badge">0</span></button>
+            <button class="tab-btn" data-tab="tab-pseudocode">Ψευδοκώδικας ΕΑΠ</button>
+            <button class="tab-btn" data-tab="tab-mermaid">Mermaid</button>
+          </div>
+          <div class="tab-actions">
+            <button id="copy-pseudocode-btn" class="tab-action-btn" hidden title="Αντιγραφή ΕΑΠ Ψευδοκώδικα (ΟΣΣ2 Διαφ. 8)">Αντιγραφή Ψευδοκώδικα</button>
+          </div>
+        </div>
+
+        <!-- Tab 1: Class Diagram SVG Viewport -->
+        <div class="tab-pane active" id="tab-diagram">
+          <div class="pli11-stats-bar">
+            <div class="pli11-stat-pills">
+              <span class="pli11-stat-pill">Κλάσεις: <strong id="cnt-classes">0</strong></span>
+              <span class="pli11-stat-pill">Κληρονομικότητα: <strong id="cnt-inh">0</strong></span>
+              <span class="pli11-stat-pill">Συναρμογή/Σύνθεση: <strong id="cnt-agg">0</strong></span>
+              <span class="pli11-stat-pill">Συσχετίσεις: <strong id="cnt-assoc">0</strong></span>
+              <span class="pli11-stat-pill">Εξαρτήσεις: <strong id="cnt-dep">0</strong></span>
+            </div>
+          </div>
+
+          <div class="diagram-toolbar">
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="cls-zoom-out" title="Σμίκρυνση">-</button>
+              <span class="zoom-readout" id="cls-zoom-label">100%</span>
+              <button class="tool-mini-btn" id="cls-zoom-in" title="Μεγέθυνση">+</button>
+              <button class="tool-mini-btn" id="cls-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
+              <button class="tool-mini-btn" id="cls-auto-layout" title="Επαναφορά αυτόματης διάταξης">Auto-Layout</button>
+            </div>
+            <div class="diagram-toolbar-group">
+              <label class="cls-check-label" title="Απόκρυψη συμβόλων ορατότητας (+/-/#), όπως ζητείται στις ΓΕ1">
+                <input type="checkbox" id="opt-hide-vis">
+                Χωρίς Ορατότητες
+              </label>
+              <label class="cls-check-label" title="Απόκρυψη 3ου τμήματος μεθόδων (π.χ. ΓΕ1 2025–26)">
+                <input type="checkbox" id="opt-hide-methods">
+                Χωρίς Μεθόδους
+              </label>
+              <label class="cls-check-label" title="Απόκρυψη τύπων δεδομένων (: String, : Number)">
+                <input type="checkbox" id="opt-hide-types">
+                Χωρίς Τύπους
+              </label>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="cls-print-btn" title="Ασπρόμαυρη μορφή ΕΑΠ έτοιμη για επικόλληση σε MS Word">Ασπρόμαυρο (Word)</button>
+              <button class="tool-mini-btn" id="cls-export-svg" title="Λήψη διαγράμματος ως αρχείο SVG">Export SVG</button>
+              <button class="tool-mini-btn" id="cls-export-png" title="Λήψη διαγράμματος υψηλής ανάλυσης PNG για MS Word">Export PNG</button>
+            </div>
+          </div>
+
+          <div class="diagram-viewport" id="cls-viewport">
+            <div class="diagram-canvas" id="cls-canvas"></div>
+            <div class="diagram-hint">Σύρετε κλάση για μετακίνηση &bull; Σύρετε φόντο για pan &bull; Ροδέλα για zoom &bull; Διπλό κλικ σε κλάση για μετάβαση στον κώδικα</div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Interactive Visual Class & Relation Builder (2-Way Sync) -->
+        <div class="tab-pane" id="tab-builder">
+          <div class="builder-scroll">
+            <div>
+              <div class="cls-builder-section-head">
+                <h3>Κλάσεις, Κατηγορήματα &amp; Μέθοδοι (αμφίδρομος συγχρονισμός)</h3>
+                <button type="button" class="tool-mini-btn" id="builder-add-class-btn">+ Προσθήκη Κλάσης</button>
+              </div>
+              <div class="cls-cards-grid" id="builder-classes-grid"></div>
+            </div>
+
+            <div>
+              <div class="cls-builder-section-head">
+                <h3>Σχέσεις Κλάσεων (Συσχετίσεις, Συναρμογή, Σύνθεση, Κληρονομικότητα)</h3>
+                <button type="button" class="tool-mini-btn" id="builder-add-rel-btn">+ Προσθήκη Σχέσης</button>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="builder-flows-table cls-rel-table">
+                  <thead>
+                    <tr>
+                      <th style="width:15%;">Είδος</th>
+                      <th style="width:16%;">Από Κλάση</th>
+                      <th style="width:9%;">Πληθ. 1</th>
+                      <th style="width:16%;">Όνομα Σχέσης</th>
+                      <th style="width:9%;">Πληθ. 2</th>
+                      <th style="width:16%;">Προς Κλάση</th>
+                      <th style="width:13%;">Κλάση Συσχέτ.</th>
+                      <th style="width:6%;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="builder-rels-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: EAP Validator -->
+        <div class="tab-pane" id="tab-validator">
+          <div class="validator-scroll">
+            <div class="val-summary-card" id="val-summary-card">
+              <div>
+                <strong id="val-summary-title">Έλεγχος Διαγράμματος Κλάσεων (ΠΛΗ11)</strong>
+                <div id="val-summary-sub" style="font-size:0.78rem; margin-top:0.2rem;"></div>
+              </div>
+              <div id="val-summary-counts" style="font-family:var(--font-mono); font-size:0.78rem;"></div>
+            </div>
+
+            <div>
+              <div style="font-size:0.78rem; font-weight:700; margin-bottom:0.45rem; color:var(--header-text);">Λίστα Ελέγχου Μεθοδολογίας ΕΑΠ (6 Κανόνες)</div>
+              <div class="val-checklist-grid" id="val-checklist"></div>
+            </div>
+
+            <div>
+              <div style="font-size:0.78rem; font-weight:700; margin-bottom:0.45rem; color:var(--header-text);">Αναλυτικές Παρατηρήσεις (κλικ για μετάβαση στη γραμμή)</div>
+              <div class="val-diag-list" id="val-diagnostics-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Official EAP OO-Pseudocode (OSS2 Slide 8) -->
+        <div class="tab-pane" id="tab-pseudocode">
+          <div class="diagram-toolbar">
+            <div class="diagram-toolbar-group">
+              <label class="cls-check-label" title="Αυτόματη απόδοση PRIVATE στα κατηγορήματα χωρίς ορατότητα (ΟΣΣ2 Διαφ. 7–8)">
+                <input type="checkbox" id="pseudo-default-private" checked>
+                Προεπιλογή PRIVATE στα κατηγορήματα
+              </label>
+              <label class="cls-check-label" title="Αυτόματη παραγωγή μεθόδου ΔΗΜΙΟΥΡΓΟΣ(...) όπως στη Διαφάνεια 8 της ΟΣΣ2">
+                <input type="checkbox" id="pseudo-add-ctor">
+                Προσθήκη ΔΗΜΙΟΥΡΓΟΣ()
+              </label>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button type="button" class="tool-mini-btn" id="pseudo-copy-inline-btn">Αντιγραφή Ψευδοκώδικα</button>
+            </div>
+          </div>
+          <pre class="cls-pseudocode-box"><code id="official-pseudocode-view"></code></pre>
+        </div>
+
+        <!-- Tab 5: Mermaid ClassDiagram Code & Preview (Editable & Exportable) -->
+        <div class="tab-pane" id="tab-mermaid">
+          <div class="diagram-toolbar">
+            <div class="diagram-toolbar-group">
+              <span style="font-size:0.75rem; font-weight:700; color:var(--header-text);">Mermaid Editor &amp; Preview</span>
+              <span id="mermaid-edit-status" class="pli11-stat-pill" style="font-size:0.7rem; padding:0.15rem 0.45rem;">Αυτόματο</span>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="mermaid-rerender-btn" title="Ανανέωση προεπισκόπησης από τον κώδικα Mermaid">Ανανέωση Preview</button>
+              <button class="tool-mini-btn" id="mermaid-reset-btn" title="Επαναφορά Mermaid από τον κύριο Ψευδοκώδικα">Επαναφορά από Κώδικα</button>
+              <button class="tool-mini-btn" id="mermaid-export-svg" title="Λήψη του Mermaid διαγράμματος ως αρχείο SVG">Export SVG</button>
+              <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης για Word">Export PNG</button>
+              <button class="tool-mini-btn" id="mermaid-copy-code-btn" title="Αντιγραφή κώδικα Mermaid στο πρόχειρο">Αντιγραφή Κώδικα</button>
+            </div>
+          </div>
+
+          <div class="mermaid-split">
+            <div class="mermaid-editor-wrap">
+              <textarea id="mermaid-code-view" class="mermaid-code-editor" spellcheck="false" placeholder="Κώδικας Mermaid classDiagram... Μπορείτε να τον επεξεργαστείτε απευθείας!"></textarea>
+            </div>
+            <div class="mermaid-preview-box" id="mermaid-preview-host"></div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>EAP Online Compiler &bull; Ελληνικό Ανοικτό Πανεπιστήμιο (ΠΛΗ11 - Τεχνολογία Λογισμικού)</p>
+  </footer>
+
+  <!-- CodeMirror Vendor Scripts -->
+  <script src="vendor/codemirror/codemirror.min.js"></script>
+  <script src="vendor/codemirror/closebrackets.min.js"></script>
+  <script src="vendor/codemirror/matchbrackets.min.js"></script>
+  <script src="vendor/codemirror/show-hint.min.js"></script>
+  <script src="vendor/codemirror/active-line.min.js"></script>
+
+  <!-- Permalink LZ-String Compression -->
+  <script src="vendor/lz-string.min.js"></script>
+
+  <!-- Mermaid Live Preview (progressive enhancement; core and SVG renderer work offline) -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js" defer></script>
+
+  <!-- ΠΛΗ11 Class Diagrams Modules -->
+  <script src="pli11-classes-mode.js"></script>
+  <script src="pli11-classes-examples.js"></script>
+  <script src="pli11-classes-core.js"></script>
+  <script src="pli11-classes-renderer.js"></script>
+  <script src="diagram-viewport.js"></script>
+  <script src="pli11-classes-app.js"></script>
+</body>
+</html>

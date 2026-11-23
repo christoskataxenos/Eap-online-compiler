@@ -3,419 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ψευδογλώσσα Interpreter - Landing</title>
+    <meta name="description" content="Browser-based εργαλεία για το ΕΑΠ: ΠΛΗ10 Ψευδογλώσσα Interpreter & Debugger (βήμα-βήμα, μνήμη, trace table) και ΠΛΗ11 ΔΔΠ/ΔΡΔ/Διαγράμματα Κλάσεων. Χωρίς εγκατάσταση.">
+    <meta name="theme-color" id="meta-theme-color" content="#fdf6e3">
+    <meta property="og:title" content="EAP Online Compiler — ΠΛΗ10 & ΠΛΗ11">
+    <meta property="og:description" content="Interpreter & debugger για την Ψευδογλώσσα ΠΛΗ10 και μεταγλωττιστές ΔΔΠ/ΔΡΔ/Κλάσεων για την ΠΛΗ11, απευθείας στον browser.">
+    <meta property="og:type" content="website">
+    <title>EAP Online Compiler - ΠΛΗ10 &amp; ΠΛΗ11</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="style.css">
-    <script>
-        // Inline script to prevent FOUC
-        (function() {
-            let savedTheme = 'light';
-            try {
-                const params = new URLSearchParams(window.location.search);
-                savedTheme = params.get('theme') || localStorage.getItem('theme') || 'light';
-            } catch (e) {
-                console.warn('Theme access error:', e);
-            }
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        })();
-
-        // Handle BFCache (Back/Forward Cache)
-        window.addEventListener('pageshow', (event) => {
-            // Always re-check storage on page show, whether persisted or not, to ensure consistency
-            try {
-                const theme = localStorage.getItem('theme') || 'light';
-                document.documentElement.setAttribute('data-theme', theme);
-            } catch (e) {
-                console.warn('Theme access error:', e);
-            }
-        });
-    </script>
-    <style>
-        /* Landing page */
-        body {
-            height: auto;
-            min-height: 100vh;
-            overflow-x: hidden;
-            overflow-y: auto;
-            background:
-                radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--button-bg) 12%, transparent), transparent 28rem),
-                radial-gradient(circle at 88% 70%, color-mix(in srgb, var(--term-info) 10%, transparent), transparent 24rem),
-                var(--bg-color);
-        }
-
-        .landing-header,
-        .landing-main {
-            width: min(1120px, calc(100% - 2.5rem));
-            margin: 0 auto;
-        }
-
-        .landing-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1.25rem 0;
-            background: transparent;
-            border: 0;
-            box-shadow: none;
-            color: var(--text-color);
-            position: static;
-        }
-
-        .landing-brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.6rem;
-            color: var(--header-text);
-            font-family: var(--font-mono);
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .landing-brand::before {
-            width: 0.55rem;
-            height: 0.55rem;
-            border-radius: 50%;
-            background: var(--button-bg);
-            box-shadow: 0 0 0 5px color-mix(in srgb, var(--button-bg) 14%, transparent);
-            content: "";
-        }
-
-        .landing-main {
-            padding: 3.5rem 0 4rem;
-        }
-
-        .hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
-            align-items: center;
-            gap: clamp(2rem, 6vw, 6rem);
-            animation: fadeIn 0.8s ease-out;
-        }
-
-        .hero-copy {
-            max-width: 650px;
-        }
-
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin: 0 0 1rem;
-            color: var(--button-bg);
-            font-family: var(--font-mono);
-            font-size: 0.8rem;
-            font-weight: 700;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-        }
-
-        .eyebrow::before {
-            width: 2rem;
-            height: 2px;
-            background: currentColor;
-            content: "";
-        }
-
-        .hero h1 {
-            max-width: 11ch;
-            margin: 0 0 1.25rem;
-            color: var(--header-text);
-            font-size: clamp(2.6rem, 6vw, 5rem);
-            line-height: 0.98;
-            letter-spacing: -0.055em;
-        }
-
-        .hero p {
-            max-width: 58ch;
-            margin: 0 0 2rem;
-            color: var(--text-color);
-            font-size: 1.08rem;
-            line-height: 1.6;
-        }
-
-        .actions {
-            display: flex;
-            gap: 0.85rem;
-            flex-wrap: wrap;
-        }
-
-        .btn-large {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 3.25rem;
-            padding: 0.85rem 1.25rem;
-            border: 1px solid transparent;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            text-decoration: none;
-            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
-        }
-
-        .btn-primary {
-            background-color: var(--button-bg);
-            color: white;
-            box-shadow: 0 10px 24px color-mix(in srgb, var(--button-bg) 25%, transparent);
-        }
-
-        .btn-primary:hover {
-            background-color: var(--button-hover);
-            transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-            background-color: transparent;
-            border-color: var(--panel-header-border);
-            color: var(--text-color);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--button-bg);
-            color: var(--button-bg);
-            transform: translateY(-2px);
-        }
-
-        .hero-preview {
-            position: relative;
-            padding: 1px;
-            border: 1px solid color-mix(in srgb, var(--button-bg) 40%, var(--panel-header-border));
-            border-radius: 10px;
-            background: color-mix(in srgb, var(--button-bg) 8%, var(--panel-bg));
-            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.16);
-            transform: rotate(2deg);
-        }
-
-        .preview-window {
-            overflow: hidden;
-            border-radius: 9px;
-            background: var(--output-bg);
-            color: var(--output-text);
-            font-family: var(--font-mono);
-            font-size: 0.82rem;
-            line-height: 1.8;
-        }
-
-        .preview-bar {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.8rem 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-            color: var(--output-text);
-        }
-
-        .preview-dot {
-            width: 0.55rem;
-            height: 0.55rem;
-            border-radius: 50%;
-            background: var(--term-error);
-            box-shadow: 1rem 0 var(--term-input), 2rem 0 var(--term-success);
-        }
-
-        .preview-code {
-            margin: 0;
-            padding: 1.3rem 1.5rem 1.5rem;
-            white-space: pre-wrap;
-        }
-
-        .code-keyword { color: var(--term-info); }
-        .code-string { color: var(--term-input); }
-        .code-comment { color: var(--line-num-text); }
-
-        .features {
-            margin-top: 6rem;
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 1rem;
-        }
-
-        .feature-card {
-            min-height: 190px;
-            padding: 1.25rem;
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            background: color-mix(in srgb, var(--card-bg) 85%, transparent);
-            text-align: left;
-            transition: transform 0.2s, border-color 0.2s;
-        }
-
-        .feature-card:hover {
-            border-color: var(--button-bg);
-            transform: translateY(-4px);
-        }
-
-        .feature-card h3 {
-            margin: 0 0 0.75rem;
-            color: var(--header-text);
-            font-size: 1rem;
-            line-height: 1.3;
-        }
-
-        .feature-card p {
-            margin: 0;
-            color: var(--text-color);
-            font-size: 0.9rem;
-            line-height: 1.55;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        #theme-toggle-landing {
-            background: transparent;
-            border: 1px solid var(--text-color);
-            border-radius: 5px;
-            color: var(--text-color);
-            padding: 0.55rem 0.9rem;
-            cursor: pointer;
-            font-family: var(--font-ui);
-            clip-path: none;
-            transition: color 0.2s, border-color 0.2s;
-        }
-        #theme-toggle-landing:hover {
-            color: var(--button-bg);
-            border-color: var(--button-bg);
-        }
-
-        @media (max-width: 820px) {
-            .hero {
-                grid-template-columns: 1fr;
-            }
-
-            .hero-preview {
-                max-width: 620px;
-                transform: rotate(1deg);
-            }
-
-            .features {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-
-        @media (max-width: 520px) {
-            .landing-header,
-            .landing-main {
-                width: min(100% - 1.5rem, 1120px);
-            }
-
-            .landing-main {
-                padding-top: 2rem;
-            }
-
-            .hero h1 {
-                font-size: clamp(2.5rem, 14vw, 4rem);
-            }
-
-            .btn-large {
-                width: 100%;
-            }
-
-            .features {
-                grid-template-columns: 1fr;
-                margin-top: 4rem;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="landing.css">
+    <!-- Shared utilities: applies saved theme immediately (FOUC prevention) -->
+    <script src="common.js"></script>
 </head>
 <body>
 
     <header class="landing-header">
         <span class="landing-brand">EAP Online Compiler</span>
-        <button id="theme-toggle-landing" type="button">Dark Mode</button>
+        <div class="landing-nav-group">
+            <div class="course-submenu" id="course-submenu">
+                <button type="button" class="submenu-trigger" id="tools-submenu-btn" aria-expanded="false" aria-controls="tools-submenu-panel">
+                    <span>Εργαλεία</span>
+                    <span class="submenu-caret" aria-hidden="true">&#9662;</span>
+                </button>
+                <div class="submenu-panel" id="tools-submenu-panel" role="menu">
+                    <a href="editor.html" class="submenu-item course-link" data-base="editor.html" role="menuitem">
+                        <div class="submenu-item-head">
+                            <span class="submenu-badge">ΠΛΗ10</span>
+                            <span class="submenu-title">Ψευδογλώσσα Interpreter</span>
+                        </div>
+                        <span class="submenu-desc">Εκτέλεση, βήμα-βήμα debugger, επιθεωρητής μνήμης &amp; πίνακας τιμών.</span>
+                    </a>
+                    <a href="pli11.html" class="submenu-item course-link" data-base="pli11.html" role="menuitem">
+                        <div class="submenu-item-head">
+                            <span class="submenu-badge alt">ΠΛΗ11</span>
+                            <span class="submenu-title">ΔΔΠ / ΔΡΔ &amp; Ψευδοκώδικας</span>
+                        </div>
+                        <span class="submenu-desc">Μεταγλώττιση σε ΔΔΠ &amp; ΔΡΔ, έλεγχος κανόνων ΕΑΠ, Mermaid &amp; ΔΡΔ Builder.</span>
+                    </a>
+                    <a href="pli11-classes.html" class="submenu-item course-link" data-base="pli11-classes.html" role="menuitem">
+                        <div class="submenu-item-head">
+                            <span class="submenu-badge alt">ΠΛΗ11</span>
+                            <span class="submenu-title">Διαγράμματα Κλάσεων</span>
+                        </div>
+                        <span class="submenu-desc">Υβριδικός DSL &amp; Visual Builder, Drag &amp; Drop SVG, OO-Ψευδοκώδικας (ΟΣΣ2) &amp; Mermaid.</span>
+                    </a>
+                </div>
+            </div>
+            <button id="theme-toggle-landing" type="button" aria-label="Εναλλαγή θέματος (φωτεινό / σκοτεινό)" aria-pressed="false">Dark Mode</button>
+        </div>
     </header>
 
     <main class="landing-main">
         <section class="hero">
             <div class="hero-copy">
-                <p class="eyebrow">ΕΑΠ · Online εργαλεία</p>
+                <p class="eyebrow">ΕΑΠ · ΠΛΗ10 &amp; ΠΛΗ11</p>
                 <h1>Γράψε. Εκτέλεσε. Κατανόησε.</h1>
                 <p>
-                    Ένα μοντέρνο, web-based περιβάλλον για την εκτέλεση και αποσφαλμάτωση κώδικα Ψευδογλώσσας.
-                    Δούλεψε άμεσα στον browser, χωρίς εγκατάσταση.
+                    Εργαλεία στον browser για την <strong>ΠΛΗ10</strong> (Ψευδογλώσσα Interpreter) και την
+                    <strong>ΠΛΗ11</strong> (ΔΔΠ, ΔΡΔ και Διαγράμματα Κλάσεων), χωρίς εγκατάσταση.
                 </p>
 
                 <div class="actions">
-                    <a href="editor.html" class="btn-large btn-primary">Άνοιγμα Compiler &amp; Debugger</a>
-                    <a href="https://github.com/christoskataxenos/Eap-online-compiler" target="_blank" rel="noopener noreferrer" class="btn-large btn-secondary">GitHub Repo</a>
+                    <a href="editor.html" class="btn-large btn-primary course-link" data-base="editor.html">Άνοιγμα ΠΛΗ10 (Ψευδογλώσσα)</a>
+                    <a href="pli11.html" class="btn-large btn-secondary course-link" data-base="pli11.html">Άνοιγμα ΠΛΗ11 (ΔΔΠ/ΔΡΔ &amp; Κλάσεις)</a>
+                    <div class="actions-tertiary">
+                        <a href="https://github.com/christoskataxenos/Eap-online-compiler" target="_blank" rel="noopener noreferrer" class="btn-large btn-tertiary">GitHub Repo</a>
+                        <span class="actions-sep" aria-hidden="true">&middot;</span>
+                        <a href="https://christoskataxenos.com" target="_blank" rel="noopener noreferrer" class="btn-large btn-tertiary">christoskataxenos.com</a>
+                    </div>
                 </div>
             </div>
 
             <div class="hero-preview" aria-label="Προεπισκόπηση του editor">
                 <div class="preview-window">
-                    <div class="preview-bar"><span class="preview-dot"></span></div>
-                    <pre class="preview-code"><span class="code-comment">! Το πρώτο σου πρόγραμμα</span>
-<span class="code-keyword">ΠΡΟΓΡΑΜΜΑ</span> HelloWorld
-<span class="code-keyword">ΑΡΧΗ</span>
-  ΓΡΑΨΕ <span class="code-string">"Καλημέρα, κόσμε!"</span>
-<span class="code-keyword">ΤΕΛΟΣ_ΠΡΟΓΡΑΜΜΑΤΟΣ</span></pre>
+                    <div class="preview-bar">
+                        <div class="preview-dots"><span class="preview-dot"></span></div>
+                        <div class="preview-tabs">
+                            <button type="button" class="preview-tab-btn active" id="preview-tab-pli10">ΠΛΗ10</button>
+                            <button type="button" class="preview-tab-btn" id="preview-tab-pli11">ΠΛΗ11 ΔΔΠ</button>
+                            <button type="button" class="preview-tab-btn" id="preview-tab-pli11-cls">Κλάσεις</button>
+                        </div>
+                    </div>
+                    <pre class="preview-code" id="hero-preview-code"></pre>
                 </div>
             </div>
         </section>
 
+        <section class="courses-grid" aria-label="Επιλογή Θεματικής Ενότητας">
+            <article class="course-card">
+                <div>
+                    <div class="course-card-head">
+                        <span class="course-pill">ΠΛΗ10</span>
+                        <span class="course-meta">Εισαγωγή στην Πληροφορική</span>
+                    </div>
+                    <h2>Ψευδογλώσσα Interpreter &amp; Debugger</h2>
+                    <p>Γράψε, τρέξε και βρες τα bugs στους αλγορίθμους σου κατευθείαν στον browser — τέλος το ψάξιμο και τα κολλήματα με το παλιό <code>plh10.exe</code>.</p>
+                    <ul class="course-bullets">
+                        <li>Βήμα-βήμα εκτέλεση (με έλεγχο ταχύτητας)</li>
+                        <li>Πίνακες και μνήμη με οπτική εποπτεία (1D/2D &amp; κάρτες)</li>
+                        <li>Πίνακας Τιμών (Trace Table) με εξαγωγή σε Markdown</li>
+                        <li>Άνοιγμα και αποθήκευση αρχείων <code>.eap</code> (Windows-1253 / UTF-8)</li>
+                    </ul>
+                </div>
+                <a href="editor.html" class="course-cta course-link" data-base="editor.html">Μετάβαση στον ΠΛΗ10 Interpreter &rarr;</a>
+            </article>
+
+            <article class="course-card">
+                <div>
+                    <div class="course-card-head">
+                        <span class="course-pill pli11">ΠΛΗ11</span>
+                        <span class="course-meta">Αρχές Τεχνολογίας Λογισμικού</span>
+                    </div>
+                    <h2>Ψευδοκώδικας &rarr; ΔΔΠ / ΔΡΔ Compiler</h2>
+                    <p>Μετάτρεψε τον ψευδοκώδικα (Κεφ. 4, Σχήμα 4.28) σε ΔΔΠ και ΔΡΔ, αποφεύγοντας επί τόπου τις κλασικές παγίδες ΟΕ1 / ΓΕ1.</p>
+                    <ul class="course-bullets">
+                        <li>ΔΔΠ ΕΑΠ (<code>○&rarr;</code>, <code>●&rarr;</code>, <code>◇</code>, <code>↻</code>) και αντίστροφο ΔΡΔ</li>
+                        <li>Έλεγχος των 6 κανόνων ΕΑΠ (LOCAL VAR, IN/OUT, σειρά κλήσεων)</li>
+                        <li>Εξαγωγή PNG / SVG για Word και κώδικα Mermaid</li>
+                        <li>Αντίστροφη κατασκευή από ΔΡΔ σε ΔΔΠ και ψευδοκώδικα</li>
+                    </ul>
+                </div>
+                <a href="pli11.html" class="course-cta course-link" data-base="pli11.html">Μετάβαση στον ΠΛΗ11 Compiler &rarr;</a>
+            </article>
+
+            <article class="course-card">
+                <div>
+                    <div class="course-card-head">
+                        <span class="course-pill pli11">ΠΛΗ11</span>
+                        <span class="course-meta">Αντικειμενοστρεφής Σχεδίαση</span>
+                    </div>
+                    <h2>Διαγράμματα Κλάσεων &amp; OO-Ψευδοκώδικας</h2>
+                    <p>Σχεδίασε διαγράμματα κλάσεων (στο ύφος του Θέματος 5 ΓΕ1) με DSL ή φόρμες, τακτοποίησε τα κουτιά στον καμβά και πάρ' τα έτοιμα για το Word.</p>
+                    <ul class="course-bullets">
+                        <li>Συγχρονισμός DSL και οπτικού καμβά (drag &amp; drop)</li>
+                        <li>Κληρονομικότητα (<code>&#9651;</code>), συναρμογή (<code>&#9671;</code>), σύνθεση (<code>&#9670;</code>) και συσχετίσεις</li>
+                        <li>Αυτόματη παραγωγή ΟΟ-Ψευδοκώδικα κλάσεων ΕΑΠ (ΟΣΣ2, Διαφ. 8)</li>
+                        <li>Έλεγχος 6 κανόνων και έτοιμα θέματα ΓΕ1 (2022–2026)</li>
+                    </ul>
+                </div>
+                <a href="pli11-classes.html" class="course-cta course-link" data-base="pli11-classes.html">Μετάβαση στα Διαγράμματα Κλάσεων &rarr;</a>
+            </article>
+        </section>
+
         <section class="features" aria-label="Βασικές δυνατότητες">
             <div class="feature-card">
-                <h3>Άμεση Εκτέλεση &amp; Editor</h3>
-                <p>Συντάκτης CodeMirror με αυτόματη συμπλήρωση, σύνταξη ΕΑΠ και προστασία από ατέρμονους βρόχους.</p>
+                <h3>100% στον browser</h3>
+                <p>Τρέχει τοπικά χωρίς εγκατάσταση ή server, ακόμα και απευθείας από αρχεία στον δίσκο.</p>
             </div>
             <div class="feature-card">
-                <h3>Step-by-Step Debugger</h3>
-                <p>Βήμα-προς-βήμα εκτέλεση εντολών με οπτική επισήμανση της ενεργής γραμμής και ρύθμιση ταχύτητας.</p>
+                <h3>Έτοιμα παραδείγματα από παλιότερα έτη</h3>
+                <p>Χαρακτηριστικά παραδείγματα προηγούμενων ετών για ΠΛΗ10 &amp; ΠΛΗ11 — δοκίμασέ τα άμεσα.</p>
             </div>
             <div class="feature-card">
-                <h3>Επιθεωρητής Μνήμης</h3>
-                <p>Παρακολούθηση τιμών μεταβλητών και οπτικοποίηση μονοδιάστατων και 2D πινάκων σε πραγματικό χρόνο.</p>
+                <h3>Έτοιμα για παραδοτέα</h3>
+                <p>Αντιγραφή Trace Table σε Markdown (ΠΛΗ10) και καθαρά ασπρόμαυρα PNG/SVG για Word (ΠΛΗ11).</p>
             </div>
             <div class="feature-card">
-                <h3>Πίνακας Τιμών</h3>
-                <p>Αυτόματη παραγωγή του πίνακα τιμών για ασκήσεις και εξετάσεις, με δυνατότητα εξαγωγής σε Markdown.</p>
+                <h3>Μοίρασμα &amp; Θέματα</h3>
+                <p>Κοινοποίηση μέσω συμπιεσμένου URL (LZ-String) και εναλλαγή light / dark θέματος.</p>
             </div>
         </section>
     </main>
 
     <script>
-        // Simple Theme Logic for Landing Page
-        const themeToggle = document.getElementById('theme-toggle-landing');
-
-        // Initialize from current state
-        let isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
-
-        const applyTheme = () => {
-            const theme = isDarkMode ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', theme);
-            document.body.setAttribute('data-theme', theme);
-            themeToggle.textContent = isDarkMode ? 'Light Mode' : 'Dark Mode';
-
-            try {
-                localStorage.setItem('theme', theme);
-            } catch (e) {
-                console.warn('LocalStorage write failed:', e);
-            }
-
-            // Update Link to pass theme state via URL
-            const link = document.querySelector('.btn-primary');
-            if (link) {
-                link.href = `editor.html?theme=${theme}`;
-            }
-
-            // Update current URL for history consistency
-            const url = new URL(window.location);
-            url.searchParams.set('theme', theme);
-            window.history.replaceState({}, '', url);
+        // Hero code snippets switcher (ΠΛΗ10 vs ΠΛΗ11)
+        const PREVIEW_SNIPPETS = {
+            pli10: `<span class="code-comment">/* ΠΛΗ10 - Εκτελέσιμη Ψευδογλώσσα */</span>
+<span class="code-keyword">ΑΛΓΟΡΙΘΜΟΣ</span> HelloWorld
+<span class="code-keyword">ΑΡΧΗ</span>
+  ΤΥΠΩΣΕ(<span class="code-string">"Καλημέρα, κόσμε!"</span>);
+<span class="code-keyword">ΤΕΛΟΣ</span>`,
+            pli11: `<span class="code-comment">/* ΠΛΗ11 - ΔΔΠ &amp; ΔΡΔ Compiler */</span>
+<span class="code-keyword">PROCEDURE</span> EXEC_M3_M4
+  <span class="code-keyword">LOCAL VAR</span> Δ, Κ, Ι, Ρ, Ε, Φ;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ Δ, Κ, Ι, Ρ, Ε, Φ;
+  <span class="code-keyword">CALL</span> GET_Δ(Δ);
+  <span class="code-keyword">CALL</span> EXEC_M1(Κ);
+  <span class="code-keyword">CALL</span> CALC_M3(Κ, Δ, Ι, Ρ);
+  <span class="code-keyword">CALL</span> CALC_M4(Ι, Ε, Φ);
+<span class="code-keyword">END_PROCEDURE</span>;`,
+            pli11cls: `<span class="code-comment">/* ΠΛΗ11 - Διαγράμματα Κλάσεων (ΟΣΣ2 / ΓΕ1) */</span>
+<span class="code-keyword">ΚΛΑΣΗ</span> Φορτηγό <span class="code-keyword">ΕΠΕΚΤΕΙΝΕΙ</span> Όχημα
+  <span class="code-keyword">ΚΑΤΗΓΟΡΗΜΑΤΑ</span>
+    PRIVATE ΑριθμόςΑξόνων: INTEGER;
+<span class="code-keyword">ΤΕΛΟΣ</span>
+Αποστολή (1) &lt;&gt;-- (1..*) Πακέτο`
         };
 
-        themeToggle.addEventListener('click', () => {
-            isDarkMode = !isDarkMode;
-            applyTheme();
+        const previewCodeEl = document.getElementById('hero-preview-code');
+        const tabPli10 = document.getElementById('preview-tab-pli10');
+        const tabPli11 = document.getElementById('preview-tab-pli11');
+        const tabPli11Cls = document.getElementById('preview-tab-pli11-cls');
+
+        function setPreviewTab(which) {
+            if (!previewCodeEl) return;
+            previewCodeEl.innerHTML = PREVIEW_SNIPPETS[which] || PREVIEW_SNIPPETS.pli10;
+            tabPli10.classList.toggle('active', which === 'pli10');
+            tabPli11.classList.toggle('active', which === 'pli11');
+            tabPli11Cls.classList.toggle('active', which === 'pli11cls');
+        }
+        tabPli10.addEventListener('click', () => setPreviewTab('pli10'));
+        tabPli11.addEventListener('click', () => setPreviewTab('pli11'));
+        tabPli11Cls.addEventListener('click', () => setPreviewTab('pli11cls'));
+        setPreviewTab('pli10');
+
+        // Submenu Dropdown Interactions
+        const submenu = document.getElementById('course-submenu');
+        const submenuBtn = document.getElementById('tools-submenu-btn');
+        let isPinnedByClick = false;
+        let closeTimeout = null;
+
+        function setSubmenuOpen(open, pinned = false) {
+            if (closeTimeout) {
+                clearTimeout(closeTimeout);
+                closeTimeout = null;
+            }
+            if (!open) {
+                isPinnedByClick = false;
+            } else if (pinned) {
+                isPinnedByClick = true;
+            }
+            submenu.classList.toggle('open', open);
+            submenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+
+        submenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (submenu.classList.contains('open') && isPinnedByClick) {
+                setSubmenuOpen(false);
+            } else {
+                setSubmenuOpen(true, true);
+            }
         });
 
-        // Update button text and link initially
-        themeToggle.textContent = isDarkMode ? 'Light Mode' : 'Dark Mode';
-        applyTheme();
+        submenu.addEventListener('mouseenter', () => {
+            if (closeTimeout) {
+                clearTimeout(closeTimeout);
+                closeTimeout = null;
+            }
+            if (window.matchMedia('(hover: hover)').matches) {
+                setSubmenuOpen(true, isPinnedByClick);
+            }
+        });
+
+        submenu.addEventListener('mouseleave', () => {
+            if (isPinnedByClick) return;
+            closeTimeout = setTimeout(() => {
+                setSubmenuOpen(false);
+            }, 200);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!submenu.contains(e.target)) {
+                setSubmenuOpen(false);
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && submenu.classList.contains('open')) {
+                setSubmenuOpen(false);
+                submenuBtn.focus();
+            }
+        });
+
+        submenu.querySelectorAll('.submenu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                setSubmenuOpen(false);
+            });
+        });
+
+        // Theme toggle (shared via EAPCommon) — rewrites a[data-base] links with ?theme=
+        window.EAPCommon.wireThemeToggle();
     </script>
 
 </body>

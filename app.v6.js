@@ -4,13 +4,17 @@
 // -----------------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
+  const Common = window.EAPCommon;
+  const Viewport = window.EAPViewport;
+  const escapeHTML = Common.escapeHTML;
+  const showToast = (msg, dur) => Common.showToast(msg, dur);
+
   // DOM Elements - Editor & Toolbar
   const editorMount = document.getElementById('code-editor-mount');
   const editorTitle = document.getElementById('editor-title');
   const exampleSelector = document.getElementById('example-selector');
   const formatButton = document.getElementById('format-button');
   const shareButton = document.getElementById('share-button');
-  const themeToggle = document.getElementById('theme-toggle');
 
   // DOM Elements - Primary Controls
   const runButton = document.getElementById('run-button');
@@ -24,13 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveButton = document.getElementById('save-button');
   const clearButton = document.getElementById('clear-button');
   const syntaxHelpButton = document.getElementById('syntax-help-button');
-  const fileInput = document.getElementById('file-input');
   const dragHandle = document.getElementById('drag-handle');
   const outputContainer = document.querySelector('.output-container');
 
   // DOM Elements - Tabs & Content
-  const tabButtons = document.querySelectorAll('.tab-btn');
-  const tabPanes = document.querySelectorAll('.tab-pane');
   const varCountBadge = document.getElementById('var-count-badge');
   const traceStepBadge = document.getElementById('trace-step-badge');
   const clearTerminalBtn = document.getElementById('clear-terminal-btn');
@@ -41,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const terminalOutput = document.getElementById('terminal-output');
   const terminalInputLine = document.getElementById('terminal-input-line');
   const terminalInput = document.getElementById('terminal-input');
-  const terminalPrompt = document.getElementById('terminal-prompt');
 
   // DOM Elements - Memory & Variables Inspector
   const variablesEmpty = document.getElementById('variables-empty');
@@ -53,7 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const varViewToggle = document.getElementById('var-view-toggle');
   const varCardsBtn = document.getElementById('var-cards-btn');
   const varTableBtn = document.getElementById('var-table-btn');
-  const varStatusBar = document.getElementById('var-status-bar');
   const varStatusText = document.getElementById('var-status-text');
   const varLastChangeBadge = document.getElementById('var-last-change-badge');
   const varSearchInput = document.getElementById('var-search-input');
@@ -67,43 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const traceTableBody = document.getElementById('trace-table-body');
 
   // ---------------------------------------------------------------------------
-  // SETTINGS MANAGER
+  // SETTINGS (shared via EAPCommon)
   // ---------------------------------------------------------------------------
-  const SettingsManager = {
-    get: (key, defaultValue) => {
-      try {
-        const val = localStorage.getItem(key);
-        return val !== null ? val : defaultValue;
-      } catch (e) {
-        console.warn('LocalStorage read error:', e);
-        return defaultValue;
-      }
-    },
-    set: (key, value) => {
-      try {
-        localStorage.setItem(key, value);
-      } catch (e) {
-        console.warn('LocalStorage write error:', e);
-      }
-    }
-  };
-
-  // ---------------------------------------------------------------------------
-  // TOAST NOTIFICATIONS
-  // ---------------------------------------------------------------------------
-  function showToast(message, duration = 2500) {
-    const existing = document.querySelector('.eap-toast');
-    if (existing) existing.remove();
-
-    const toast = document.createElement('div');
-    toast.className = 'eap-toast';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-
-    setTimeout(() => {
-      if (toast.parentNode) toast.remove();
-    }, duration);
-  }
+  const SettingsManager = Common.SettingsManager;
 
   // ---------------------------------------------------------------------------
   // INITIALIZE CODEMIRROR
@@ -111,23 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let initialCode = EXAMPLES && EXAMPLES.HELLO ? EXAMPLES.HELLO : 'ΑΛΓΟΡΙΘΜΟΣ Hello\nΑΡΧΗ\n  ΤΥΠΩΣΕ("Καλημέρα Κόσμε")\nΤΕΛΟΣ';
 
   // Check URL hash for shared code permalink
-  try {
-    const hash = window.location.hash;
-    if (hash && hash.startsWith('#code=')) {
-      const compressed = hash.substring(6);
-      if (window.LZString) {
-        const decompressed = LZString.decompressFromEncodedURIComponent(compressed);
-        if (decompressed && decompressed.trim().length > 0) {
-          initialCode = decompressed;
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('Failed to parse code from URL hash:', e);
-  }
+  const sharedCode = Common.loadCodeFromHash();
+  if (sharedCode) initialCode = sharedCode;
 
-  const currentTheme = document.documentElement.getAttribute('data-theme') || SettingsManager.get('theme', 'light');
-  const isDarkMode = currentTheme === 'dark';
+  const isDarkMode = Common.getTheme() === 'dark';
 
   const editor = CodeMirror(editorMount, {
     value: initialCode,
@@ -171,8 +123,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Autosave draft to localStorage — restores on next visit (crash/tab-close safe)
+  const autosave = Common.createAutosave({
+    key: 'eapDraftCode',
+    getValue: () => editor.getValue(),
+    setValue: (code) => { editor.setValue(code); editor.clearHistory(); updateProgramName(); },
+    onRestore: () => showToast('Επαναφέρθηκε το πρόχειρο από την προηγούμενη συνεδρία!')
+  });
+
   editor.on('change', () => {
     updateProgramName();
+    autosave.onChange();
   });
 
   updateProgramName();
@@ -180,23 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   // POPULATE EXAMPLE SELECTOR
   // ---------------------------------------------------------------------------
-  if (typeof EXAMPLE_CATEGORIES !== 'undefined' && Array.isArray(EXAMPLE_CATEGORIES)) {
-    exampleSelector.innerHTML = '<option value="" disabled selected>Παραδείγματα (ΠΛΗ10)...</option>';
-    EXAMPLE_CATEGORIES.forEach(cat => {
-      const optgroup = document.createElement('optgroup');
-      optgroup.label = cat.category;
-      cat.items.forEach(item => {
-        const option = document.createElement('option');
-        option.value = item.id;
-        option.textContent = item.title;
-        optgroup.appendChild(option);
-      });
-      exampleSelector.appendChild(optgroup);
-    });
-  }
-
-  exampleSelector.addEventListener('change', (e) => {
-    const key = e.target.value;
+  Common.populateExampleSelector(exampleSelector, EXAMPLE_CATEGORIES, 'Παραδείγματα (ΠΛΗ10)...', (key, label) => {
     if (EXAMPLES && EXAMPLES[key]) {
       if (isExecuting) stopExecution();
       editor.setValue(EXAMPLES[key]);
@@ -205,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTerminal();
       resetInspector();
       resetTraceTable();
-      showToast('Φορτώθηκε το παράδειγμα: ' + (e.target.options[e.target.selectedIndex]?.text || key));
+      showToast('Φορτώθηκε το παράδειγμα: ' + label);
     }
   });
 
@@ -293,109 +238,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // SHARE / PERMALINK (LZ-STRING)
   // ---------------------------------------------------------------------------
   shareButton.addEventListener('click', () => {
-    try {
-      const code = editor.getValue();
-      if (!window.LZString) {
-        alert('Η βιβλιοθήκη συμπίεσης δεν είναι διαθέσιμη.');
-        return;
-      }
-      const compressed = LZString.compressToEncodedURIComponent(code);
-      const url = new URL(window.location.href);
-      url.hash = `code=${compressed}`;
-      window.history.replaceState(null, '', url.toString());
-
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url.toString()).then(() => {
-          showToast('Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!');
-        }).catch(() => {
-          prompt('Αντιγράψτε τον σύνδεσμο:', url.toString());
-        });
-      } else {
-        prompt('Αντιγράψτε τον σύνδεσμο:', url.toString());
-      }
-    } catch (e) {
-      console.error('Error sharing code:', e);
-      alert('Σφάλμα δημιουργίας συνδέσμου.');
-    }
+    Common.shareCode(editor.getValue(), 'Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!');
   });
 
   // ---------------------------------------------------------------------------
   // THEME MANAGEMENT
   // ---------------------------------------------------------------------------
-  const applyTheme = (isDark) => {
-    const themeName = isDark ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', themeName);
-    document.body.setAttribute('data-theme', themeName);
-    themeToggle.textContent = isDark ? 'Light Mode' : 'Dark Mode';
-    SettingsManager.set('theme', themeName);
-
-    // Update CodeMirror theme
-    if (editor) {
-      editor.setOption('theme', isDark ? 'dracula' : 'default');
+  Common.wireThemeToggle({
+    onChange: (themeName) => {
+      if (editor) editor.setOption('theme', themeName === 'dark' ? 'dracula' : 'default');
     }
-
-    const url = new URL(window.location);
-    url.searchParams.set('theme', themeName);
-    window.history.replaceState({}, '', url);
-
-    const homeLink = document.querySelector('.home-link');
-    if (homeLink) {
-      homeLink.href = `index.html?theme=${themeName}`;
-    }
-  };
-
-  applyTheme(isDarkMode);
-
-  themeToggle.addEventListener('click', () => {
-    const isNowDark = document.documentElement.getAttribute('data-theme') !== 'dark';
-    applyTheme(isNowDark);
   });
 
   // ---------------------------------------------------------------------------
   // TABS LOGIC
   // ---------------------------------------------------------------------------
-  tabButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const targetId = btn.getAttribute('data-tab');
-      switchTab(targetId);
-    });
+  const tabs = Common.wireTabs((tabId) => {
+    copyTraceBtn.hidden = tabId !== 'tab-trace';
+    clearTerminalBtn.hidden = tabId !== 'tab-terminal';
+    if (varViewToggle) varViewToggle.hidden = tabId !== 'tab-variables';
   });
 
   function switchTab(tabId) {
-    tabButtons.forEach(b => {
-      if (b.getAttribute('data-tab') === tabId) {
-        b.classList.add('active');
-      } else {
-        b.classList.remove('active');
-      }
-    });
-
-    tabPanes.forEach(pane => {
-      if (pane.id === tabId) {
-        pane.classList.add('active');
-      } else {
-        pane.classList.remove('active');
-      }
-    });
-
-    // Toggle contextual buttons
-    if (tabId === 'tab-trace') {
-      copyTraceBtn.style.display = 'inline-flex';
-      clearTerminalBtn.style.display = 'none';
-      if (varViewToggle) varViewToggle.style.display = 'none';
-    } else if (tabId === 'tab-terminal') {
-      copyTraceBtn.style.display = 'none';
-      clearTerminalBtn.style.display = 'inline-flex';
-      if (varViewToggle) varViewToggle.style.display = 'none';
-    } else if (tabId === 'tab-variables') {
-      copyTraceBtn.style.display = 'none';
-      clearTerminalBtn.style.display = 'none';
-      if (varViewToggle) varViewToggle.style.display = 'inline-flex';
-    } else {
-      copyTraceBtn.style.display = 'none';
-      clearTerminalBtn.style.display = 'none';
-      if (varViewToggle) varViewToggle.style.display = 'none';
-    }
+    tabs.switchTo(tabId);
   }
 
   // Variable View Toggle (Cards vs Table)
@@ -403,15 +268,15 @@ document.addEventListener('DOMContentLoaded', () => {
     varCardsBtn.addEventListener('click', () => {
       varCardsBtn.classList.add('active');
       varTableBtn.classList.remove('active');
-      if (variablesCardsView) variablesCardsView.style.display = 'block';
-      if (variablesTableView) variablesTableView.style.display = 'none';
+      if (variablesCardsView) variablesCardsView.hidden = false;
+      if (variablesTableView) variablesTableView.hidden = true;
     });
 
     varTableBtn.addEventListener('click', () => {
       varTableBtn.classList.add('active');
       varCardsBtn.classList.remove('active');
-      if (variablesCardsView) variablesCardsView.style.display = 'none';
-      if (variablesTableView) variablesTableView.style.display = 'block';
+      if (variablesCardsView) variablesCardsView.hidden = true;
+      if (variablesTableView) variablesTableView.hidden = false;
     });
   }
 
@@ -423,25 +288,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function filterVariablesDisplay(query) {
-    const cards = document.querySelectorAll('.memory-box-card');
-    cards.forEach(card => {
-      const name = (card.getAttribute('data-var-name') || '').toUpperCase();
-      card.style.display = (!query || name.includes(query)) ? '' : 'none';
+  const filterVariablesDisplay = Common.debounce((query) => {
+    const q = query.toUpperCase();
+    document.querySelectorAll('.memory-box-card, .array-box, #variables-table-body tr').forEach((node) => {
+      const name = (node.getAttribute('data-var-name') || '').toUpperCase();
+      node.hidden = Boolean(q) && !name.includes(q);
     });
-
-    const arrayBoxes = document.querySelectorAll('.array-box');
-    arrayBoxes.forEach(box => {
-      const name = (box.getAttribute('data-var-name') || '').toUpperCase();
-      box.style.display = (!query || name.includes(query)) ? '' : 'none';
-    });
-
-    const tableRows = document.querySelectorAll('#variables-table-body tr');
-    tableRows.forEach(row => {
-      const name = (row.getAttribute('data-var-name') || '').toUpperCase();
-      row.style.display = (!query || name.includes(query)) ? '' : 'none';
-    });
-  }
+  }, 120);
 
   clearTerminalBtn.addEventListener('click', () => {
     clearTerminal();
@@ -492,14 +345,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const clearTerminal = () => {
     terminalOutput.innerHTML = '';
-    terminalInputLine.style.display = 'none';
+    terminalInputLine.hidden = true;
   };
 
   const inputProvider = () =>
     new Promise((resolve) => {
       // Ensure Terminal tab is visible
       switchTab('tab-terminal');
-      terminalInputLine.style.display = 'flex';
+      terminalInputLine.hidden = false;
       scrollToBottom();
       terminalInput.value = '';
       terminalInput.focus();
@@ -508,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') {
           e.preventDefault();
           const val = terminalInput.value;
-          terminalInputLine.style.display = 'none';
+          terminalInputLine.hidden = true;
           terminalInput.removeEventListener('keydown', handleEnter);
 
           printToTerminal(val + '\n', 'input-echo', true);
@@ -568,14 +421,14 @@ document.addEventListener('DOMContentLoaded', () => {
   function resetInspector() {
     previousVariableValues = {};
     if (varCountBadge) varCountBadge.textContent = '0';
-    if (variablesEmpty) variablesEmpty.style.display = 'flex';
-    if (variablesContent) variablesContent.style.display = 'none';
+    if (variablesEmpty) variablesEmpty.hidden = false;
+    if (variablesContent) variablesContent.hidden = true;
     if (primitivesGrid) primitivesGrid.innerHTML = '';
     if (arraysContainer) arraysContainer.innerHTML = '';
     if (constantsGrid) constantsGrid.innerHTML = '';
-    if (sectionConstants) sectionConstants.style.display = 'none';
+    if (sectionConstants) sectionConstants.hidden = true;
     if (variablesTableBody) variablesTableBody.innerHTML = '';
-    if (varLastChangeBadge) varLastChangeBadge.style.display = 'none';
+    if (varLastChangeBadge) varLastChangeBadge.hidden = true;
   }
 
   function updateVariableInspector(variables) {
@@ -584,8 +437,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (variablesEmpty) variablesEmpty.style.display = 'none';
-    if (variablesContent) variablesContent.style.display = 'block';
+    if (variablesEmpty) variablesEmpty.hidden = true;
+    if (variablesContent) variablesContent.hidden = false;
 
     let totalVarCount = 0;
     const currentPrimitives = {};
@@ -772,7 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Render Constants
     if (Object.keys(currentConstants).length > 0) {
-      sectionConstants.style.display = 'block';
+      sectionConstants.hidden = false;
       constantsGrid.innerHTML = '';
       for (const [name, val] of Object.entries(currentConstants)) {
         const card = document.createElement('div');
@@ -796,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
         constantsGrid.appendChild(card);
       }
     } else {
-      sectionConstants.style.display = 'none';
+      sectionConstants.hidden = true;
     }
 
     // 4. Render Table View
@@ -866,10 +719,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (varLastChangeBadge) {
       if (latestChangeText) {
-        varLastChangeBadge.style.display = 'inline-block';
+        varLastChangeBadge.hidden = false;
         varLastChangeBadge.textContent = `Τελευταία αλλαγή: ${latestChangeText}`;
       } else {
-        varLastChangeBadge.style.display = 'none';
+        varLastChangeBadge.hidden = true;
       }
     }
 
@@ -897,14 +750,14 @@ document.addEventListener('DOMContentLoaded', () => {
   function resetTraceTable() {
     traceHistory = [];
     traceStepBadge.textContent = '0';
-    traceEmpty.style.display = 'flex';
-    traceTableContainer.style.display = 'none';
+    traceEmpty.hidden = false;
+    traceTableContainer.hidden = true;
     traceTableBody.innerHTML = '';
   }
 
   function addTraceTableRow(stepNum, lineNum, stmtText, varChanges, outputText) {
-    traceEmpty.style.display = 'none';
-    traceTableContainer.style.display = 'block';
+    traceEmpty.hidden = true;
+    traceTableContainer.hidden = false;
     traceStepBadge.textContent = stepNum;
 
     const row = document.createElement('tr');
@@ -944,7 +797,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   copyTraceBtn.addEventListener('click', () => {
     if (!traceHistory.length) {
-      alert('Δεν υπάρχουν ακόμη δεδομένα στον Πίνακα Τιμών.');
+      showToast('Δεν υπάρχουν ακόμη δεδομένα στον Πίνακα Τιμών.');
       return;
     }
 
@@ -955,15 +808,10 @@ document.addEventListener('DOMContentLoaded', () => {
       md += `| ${r.step} | ${r.line} | \`${r.stmt.replace(/\|/g, '\\|')}\` | ${r.vars.replace(/\|/g, '\\|')} | ${r.output.replace(/\|/g, '\\|')} |\n`;
     });
 
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(md).then(() => {
-        showToast('Ο Πίνακας Τιμών αντιγράφηκε σε Markdown!');
-      }).catch(() => {
-        prompt('Αντιγράψτε τον Πίνακα Τιμών (Markdown):', md);
+    Common.copyTextToClipboard(md, 'Ο Πίνακας Τιμών αντιγράφηκε σε Markdown!')
+      .then(ok => {
+        if (!ok) Common.showPrompt('Αντιγράψτε τον Πίνακα Τιμών (Markdown):', { defaultValue: md, readonly: true });
       });
-    } else {
-      prompt('Αντιγράψτε τον Πίνακα Τιμών (Markdown):', md);
-    }
   });
 
   // ---------------------------------------------------------------------------
@@ -1168,80 +1016,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const engMatch = code.match(/ALGORITHM\s+([A-Za-zΑ-Ωα-ω0-9_]+)/i);
     const progName = (greekMatch && greekMatch[1]) || (engMatch && engMatch[1]) || 'program';
 
-    const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${progName}.eap`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    Common.saveTextAsFile(code, `${progName}.eap`);
     showToast(`Το αρχείο αποθηκεύτηκε ως ${progName}.eap`);
   });
 
   clearButton.addEventListener('click', () => {
-    if (confirm('Καθαρισμός όλου του κώδικα στον συντάκτη;')) {
-      if (isExecuting) stopExecution();
-      editor.setValue('');
-      exampleSelector.value = '';
-      clearTerminal();
-      resetInspector();
-      resetTraceTable();
-      updateProgramName();
-    }
-  });
-
-  // Windows-1253 Map
-  const WINDOWS_1253_MAP = {
-    0x80: '\u20AC', 0x82: '\u201A', 0x83: '\u0192', 0x84: '\u201E', 0x85: '\u2026',
-    0x86: '\u2020', 0x87: '\u2021', 0x89: '\u2030', 0x8B: '\u2039', 0x8C: '\u0152',
-    0x91: '\u2018', 0x92: '\u2019', 0x93: '\u201C', 0x94: '\u201D', 0x95: '\u2022',
-    0x96: '\u2013', 0x97: '\u2014', 0x99: '\u2122', 0x9B: '\u203A', 0x9C: '\u0153',
-    0xA0: '\u00A0', 0xA1: '\u0385', 0xA2: '\u0386', 0xA3: '\u00A3', 0xA4: '\u00A4',
-    0xA5: '\u00A5', 0xA6: '\u00A6', 0xA7: '\u00A7', 0xA8: '\u00A8', 0xA9: '\u00A9',
-    0xAA: '\u037A', 0xAB: '\u00AB', 0xAC: '\u00AC', 0xAD: '\u00AD', 0xAE: '\u00AE',
-    0xAF: '\u2015', 0xB0: '\u00B0', 0xB1: '\u00B1', 0xB2: '\u00B2', 0xB3: '\u00B3',
-    0xB4: '\u0384', 0xB5: '\u00B5', 0xB6: '\u00B6', 0xB7: '\u00B7', 0xB8: '\u0388',
-    0xB9: '\u0389', 0xBA: '\u038A', 0xBB: '\u00BB', 0xBC: '\u038C', 0xBD: '\u00BD',
-    0xBE: '\u038E', 0xBF: '\u038F', 0xC0: '\u0390', 0xC1: '\u0391', 0xC2: '\u0392',
-    0xC3: '\u0393', 0xC4: '\u0394', 0xC5: '\u0395', 0xC6: '\u0396', 0xC7: '\u0397',
-    0xC8: '\u0398', 0xC9: '\u0399', 0xCA: '\u039A', 0xCB: '\u039B', 0xCC: '\u039C',
-    0xCD: '\u039D', 0xCE: '\u039E', 0xCF: '\u039F', 0xD0: '\u03A0', 0xD1: '\u03A1',
-    0xD3: '\u03A3', 0xD4: '\u03A4', 0xD5: '\u03A5', 0xD6: '\u03A6', 0xD7: '\u03A7',
-    0xD8: '\u03A8', 0xD9: '\u03A9', 0xDA: '\u03AA', 0xDB: '\u03AB', 0xDC: '\u03AC',
-    0xDD: '\u03AD', 0xDE: '\u03AE', 0xDF: '\u03AF', 0xE0: '\u03B0', 0xE1: '\u03B1',
-    0xE2: '\u03B2', 0xE3: '\u03B3', 0xE4: '\u03B4', 0xE5: '\u03B5', 0xE6: '\u03B6',
-    0xE7: '\u03B7', 0xE8: '\u03B8', 0xE9: '\u03B9', 0xEA: '\u03BA', 0xEB: '\u03BB',
-    0xEC: '\u03BC', 0xED: '\u03BD', 0xEE: '\u03BE', 0xEF: '\u03BF', 0xF0: '\u03C0',
-    0xF1: '\u03C1', 0xF2: '\u03C2', 0xF3: '\u03C3', 0xF4: '\u03C4', 0xF5: '\u03C5',
-    0xF6: '\u03C6', 0xF7: '\u03C7', 0xF8: '\u03C8', 0xF9: '\u03C9', 0xFA: '\u03CA',
-    0xFB: '\u03CB', 0xFC: '\u03CC', 0xFD: '\u03CD', 0xFE: '\u03CE'
-  };
-
-  function decodeWindows1253(bytes) {
-    let result = '';
-    for (let i = 0; i < bytes.length; i++) {
-      const byte = bytes[i];
-      if (byte < 0x80) {
-        result += String.fromCharCode(byte);
-      } else if (WINDOWS_1253_MAP[byte]) {
-        result += WINDOWS_1253_MAP[byte];
-      } else {
-        result += String.fromCharCode(byte);
+    Common.showConfirm('Καθαρισμός όλου του κώδικα στον συντάκτη;', {
+      danger: true,
+      yesText: 'Καθαρισμός',
+      onYes: () => {
+        if (isExecuting) stopExecution();
+        editor.setValue('');
+        exampleSelector.value = '';
+        clearTerminal();
+        resetInspector();
+        resetTraceTable();
+        updateProgramName();
       }
-    }
-    return result;
-  }
-
-  function tryDecodeUTF8(buffer) {
-    try {
-      const decoder = new TextDecoder('utf-8', { fatal: true });
-      return decoder.decode(buffer);
-    } catch (e) {
-      return null;
-    }
-  }
+    });
+  });
 
   function containsGreekKeywords(text) {
     const upper = text.toUpperCase();
@@ -1249,113 +1042,48 @@ document.addEventListener('DOMContentLoaded', () => {
            (upper.includes('ΑΡΧΗ') || upper.includes('BEGIN'));
   }
 
-  loadButton.addEventListener('click', () => {
-    fileInput.value = '';
-    fileInput.click();
-  });
-
-  fileInput.addEventListener('change', () => {
-    const file = fileInput.files?.[0];
+  loadButton.addEventListener('click', async () => {
+    const file = await Common.pickFile('.eap,.txt');
     if (!file) return;
-
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      const buffer = e.target.result;
-      const bytes = new Uint8Array(buffer);
-
-      // Try UTF-8 first
-      let decoded = tryDecodeUTF8(buffer);
-      if (decoded && containsGreekKeywords(decoded)) {
-        editor.setValue(decoded);
-        exampleSelector.value = '';
-        showToast(`Φορτώθηκε (UTF-8): ${file.name}`);
+    try {
+      const text = await Common.readTextFile(file);
+      if (!containsGreekKeywords(text)) {
+        Common.showToast('Το αρχείο δεν περιέχει έγκυρο κώδικα ψευδογλώσσας.');
         return;
       }
-
-      // Try Windows-1253
-      decoded = decodeWindows1253(bytes);
-      if (decoded && containsGreekKeywords(decoded)) {
-        editor.setValue(decoded);
-        exampleSelector.value = '';
-        showToast(`Φορτώθηκε (Windows-1253): ${file.name}`);
-        return;
-      }
-
-      // Fallback
-      if (decoded) {
-        editor.setValue(decoded);
-        exampleSelector.value = '';
-        showToast(`Φορτώθηκε: ${file.name}`);
-      } else {
-        alert('Το αρχείο δεν περιέχει έγκυρο κώδικα ψευδογλώσσας.');
-      }
-    };
-
-    reader.onerror = () => alert('Αποτυχία ανάγνωσης αρχείου.');
-    reader.readAsArrayBuffer(file);
+      editor.setValue(text);
+      exampleSelector.value = '';
+      showToast(`Φορτώθηκε: ${file.name}`);
+    } catch (e) {
+      Common.showToast('Αποτυχία ανάγνωσης αρχείου.');
+    }
   });
 
   // ---------------------------------------------------------------------------
   // RESIZER & CONTAINER HEIGHT
   // ---------------------------------------------------------------------------
   const DEFAULT_EXPANDED_HEIGHT = '38vh';
-  let preferredHeight = SettingsManager.get('terminalExpandedHeight', DEFAULT_EXPANDED_HEIGHT);
-  outputContainer.style.height = preferredHeight;
+  outputContainer.style.height = SettingsManager.get('terminalExpandedHeight', DEFAULT_EXPANDED_HEIGHT);
 
-  let isResizing = false;
-
-  dragHandle.addEventListener('mousedown', () => {
-    isResizing = true;
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-  });
-
-  document.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
-    const containerRect = document.querySelector('.container').getBoundingClientRect();
-    const newHeight = containerRect.bottom - e.clientY;
-    const maxHeight = containerRect.height * 0.85;
-    if (newHeight > 120 && newHeight < maxHeight) {
-      outputContainer.style.height = newHeight + 'px';
-    }
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (isResizing) {
-      isResizing = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      preferredHeight = outputContainer.style.height;
-      SettingsManager.set('terminalExpandedHeight', preferredHeight);
+  Viewport.attachDrag(dragHandle, {
+    getCursor: () => 'row-resize',
+    onMove: (e) => {
+      const containerRect = document.querySelector('.container').getBoundingClientRect();
+      const newHeight = containerRect.bottom - e.clientY;
+      const maxHeight = containerRect.height * 0.85;
+      if (newHeight > 120 && newHeight < maxHeight) {
+        outputContainer.style.height = newHeight + 'px';
+      }
+    },
+    onEnd: () => {
+      SettingsManager.set('terminalExpandedHeight', outputContainer.style.height);
     }
   });
 
   // ---------------------------------------------------------------------------
   // SYNTAX HELP MODAL
   // ---------------------------------------------------------------------------
-  function createSyntaxModal() {
-    const modalId = 'syntax-help-modal';
-    let modal = document.getElementById(modalId);
-    if (modal) return modal;
-
-    modal = document.createElement('div');
-    modal.id = modalId;
-    modal.className = 'modal-overlay';
-
-    const modalContent = document.createElement('div');
-    modalContent.className = 'modal-content';
-
-    const closeBtn = document.createElement('span');
-    closeBtn.className = 'modal-close';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.onclick = () => { modal.style.display = 'none'; };
-
-    const title = document.createElement('h2');
-    title.textContent = 'Συνοπτική Βοήθεια Σύνταξης Ψευδογλώσσας (ΠΛΗ10)';
-
-    const body = document.createElement('div');
-    body.innerHTML = `
+  const SYNTAX_HELP_BODY = `
       <h4>1. Δηλώσεις (ΔΕΔΟΜΕΝΑ / ΣΤΑΘΕΡΕΣ)</h4>
       <ul>
         <li><strong>Μεταβλητές:</strong> <code>&lt;λίστα&gt; : &lt;τύπος&gt; ;</code><br>Π.χ. <code>I, J: INTEGER;</code>, <code>X: REAL;</code></li>
@@ -1412,41 +1140,13 @@ document.addEventListener('DOMContentLoaded', () => {
         <li><strong>Κλήση Διαδικασίας:</strong> <code>ΥΠΟΛΟΓΙΣΕ swap(%a, %b)</code></li>
         <li><strong>Πέρασμα με Αναφορά:</strong> Χρήση συμβόλου <code>%</code> (π.χ. <code>%PIN</code>, <code>%X</code>)</li>
       </ul>
-    `;
+  `;
 
-    modalContent.appendChild(closeBtn);
-    modalContent.appendChild(title);
-    modalContent.appendChild(body);
-    modal.appendChild(modalContent);
-    document.body.appendChild(modal);
-
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.style.display = 'none';
-    });
-
-    return modal;
-  }
-
-  const syntaxModal = createSyntaxModal();
-
-  syntaxHelpButton.addEventListener('click', () => {
-    syntaxModal.style.display = 'flex';
+  const syntaxModal = Common.createModal({
+    id: 'syntax-help-modal',
+    title: 'Συνοπτική Βοήθεια Σύνταξης Ψευδογλώσσας (ΠΛΗ10)',
+    bodyHTML: SYNTAX_HELP_BODY
   });
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && syntaxModal.style.display === 'flex') {
-      syntaxModal.style.display = 'none';
-    }
-  });
-
-  // Utility to escape HTML
-  function escapeHTML(str) {
-    if (str === null || str === undefined) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  syntaxHelpButton.addEventListener('click', () => syntaxModal.open());
 });

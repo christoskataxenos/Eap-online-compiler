@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EAP ΠΛΗ11 Pseudocode → ΔΔΠ &amp; ΔΡΔ Compiler</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+  <!-- CodeMirror & Addons Stylesheets -->
+  <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
+  <link rel="stylesheet" href="vendor/codemirror/dracula.min.css">
+  <link rel="stylesheet" href="vendor/codemirror/show-hint.min.css">
+
+  <!-- Shared Theme & Layout + ΠΛΗ11 Scoped Styles -->
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="pli11.css">
+
+  <!-- Shared utilities: applies saved theme immediately (FOUC prevention) -->
+  <script src="common.js"></script>
+</head>
+<body class="pli11-page">
+  <a href="#main-content" class="skip-link">Μετάβαση στο περιεχόμενο</a>
+  <header>
+    <div class="header-left">
+      <a href="index.html" class="home-link" data-base="index.html" title="Επιστροφή στην Αρχική">&larr; Home</a>
+      <h1>EAP Online Compiler</h1>
+      <span class="version-tag">ΠΛΗ11</span>
+      <nav class="pli11-subnav" aria-label="Εργαλεία ΠΛΗ11">
+        <a href="pli11.html" id="nav-pli11-ddp" class="pli11-subnav-link active" data-base="pli11.html">ΔΔΠ &amp; ΔΡΔ</a>
+        <a href="pli11-classes.html" id="nav-pli11-classes" class="pli11-subnav-link" data-base="pli11-classes.html">Διαγράμματα Κλάσεων</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <button id="layout-toggle" class="layout-toggle-btn" type="button" title="Εναλλαγή διάταξης: Left/Right ή Up/Down">
+        <span class="layout-icon">◫</span> <span class="layout-text">Side-by-Side</span>
+      </button>
+      <a href="editor.html" id="switch-course-link" class="course-switch-link" data-base="editor.html" title="Μετάβαση στον Interpreter Ψευδογλώσσας ΠΛΗ10">ΠΛΗ10 (Ψευδογλώσσα) &rarr;</a>
+      <button id="theme-toggle" type="button" aria-label="Εναλλαγή θέματος (φωτεινό / σκοτεινό)" aria-pressed="false">Dark Mode</button>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <div class="container">
+      <!-- Left Pane: Editor & Trace Controls -->
+      <div class="pane-left" id="pane-left">
+        <div class="editor-container">
+          <div class="panel-header">
+            <div>
+              <span id="editor-title">Ψευδοκώδικας ΠΛΗ11</span>
+              <span id="arch-badge" class="arch-badge" role="status" title="Ανιχνευμένη αρχιτεκτονική δομή (ενημερώνεται αυτόματα από τον κώδικα)">Αναμονή</span>
+            </div>
+            <div class="panel-header-actions">
+              <select id="example-selector" title="Παραδείγματα ύλης ΠΛΗ11">
+                <option value="" disabled selected>Παραδείγματα (ΠΛΗ11)...</option>
+              </select>
+              <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
+              <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με τον κώδικα">Share</button>
+            </div>
+          </div>
+
+          <!-- Quick Snippets Bar for DDP -->
+          <div class="editor-quick-snippets" aria-label="Γρήγορη Εισαγωγή Διαδικασιών">
+            <span class="snippet-title">Εισαγωγη:</span>
+            <button type="button" class="snippet-chip" data-snippet="main" title="Πρότυπο Κύριας Διαδικασίας">+ Κύρια</button>
+            <button type="button" class="snippet-chip" data-snippet="control" title="Διαδικασία Ελέγχου (ΚΑΛΕΣΕ)">+ Έλεγχος</button>
+            <button type="button" class="snippet-chip" data-snippet="calc" title="Διαδικασία Υπολογισμού (αριθμητικές πράξεις)">+ Υπολογισμός</button>
+            <button type="button" class="snippet-chip" data-snippet="io-in" title="Διαδικασία Διαχείρισης Δεδομένων (ΔΙΑΒΑΣΕ)">+ Είσοδος (ΔΙΑΒΑΣΕ)</button>
+            <button type="button" class="snippet-chip" data-snippet="io-out" title="Διαδικασία Παρουσίασης (ΓΡΑΨΕ)">+ Έξοδος (ΓΡΑΨΕ)</button>
+          </div>
+
+          <div class="editor-wrapper">
+            <div id="code-editor-mount"></div>
+          </div>
+
+          <!-- Compiler & Trace Controls Docked at Bottom of Editor -->
+          <div class="controls editor-bottom-controls">
+            <div class="primary-controls">
+              <button id="compile-button" class="btn-run" title="Μεταγλώττιση και έλεγχος ΕΑΠ (F5)">
+                <svg class="btn-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                ΜΕΤΑΓΛΩΤΤΙΣΗ
+              </button>
+              <button id="step-button" class="btn-step" title="Βήμα-βήμα ιχνηλάτηση ροής κλήσεων (F10)">ΒΗΜΑ</button>
+              <button id="auto-step-button" class="btn-continue" title="Αυτόματη ιχνηλάτηση πάνω στο ΔΔΠ">ΑΥΤΟΜΑΤΟ</button>
+              <button id="stop-step-button" class="btn-stop" title="Διακοπή ιχνηλάτησης" disabled>ΔΙΑΚΟΠΗ</button>
+
+              <div class="speed-control-wrapper">
+                <label for="speed-select" title="Καθυστέρηση ανά βήμα ιχνηλάτησης">Ταχύτητα:</label>
+                <select id="speed-select" title="Ταχύτητα ιχνηλάτησης">
+                  <option value="350">Γρήγορη (350ms)</option>
+                  <option value="750" selected>Κανονική (750ms)</option>
+                  <option value="1300">Αργή (1.3s)</option>
+                </select>
+              </div>
+
+              <label class="live-toggle-label" title="Αυτόματη μεταγλώττιση κατά την πληκτρολόγηση">
+                <input type="checkbox" id="live-compile-toggle" checked>
+                Live
+              </label>
+            </div>
+
+            <div class="secondary-controls">
+              <button id="load-button" title="Φόρτωση αρχείου .txt ή .eap (UTF-8 & Windows-1253)">ΦΟΡΤΩΣΗ</button>
+              <button id="save-button" title="Αποθήκευση αρχείου ψευδοκώδικα">ΑΠΟΘΗΚΕΥΣΗ</button>
+              <button id="clear-button" title="Καθαρισμός κώδικα">ΚΑΘΑΡΙΣΜΟΣ</button>
+              <button id="syntax-help-button" title="Οδηγός Σύνταξης &amp; Κανόνες ΕΑΠ ΠΛΗ11">ΒΟΗΘΕΙΑ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resizer Handle (Column Splitter) -->
+      <div class="resizer resizer-col" id="drag-handle" title="Σύρετε για αλλαγή πλάτους • Διπλό κλικ για επαναφορά (50/50)"></div>
+
+      <!-- Right Pane: Output & Diagrams Container -->
+      <div class="pane-right" id="pane-right">
+        <div class="output-container">
+        <div class="panel-header tab-header">
+          <div class="tabs-list">
+            <button class="tab-btn active" data-tab="tab-ddp">ΔΔΠ</button>
+            <button class="tab-btn" data-tab="tab-dfd">ΔΡΔ</button>
+            <button class="tab-btn" data-tab="tab-validator">Έλεγχος ΕΑΠ <span id="val-badge" class="tab-badge">0</span></button>
+            <button class="tab-btn" data-tab="tab-mermaid">Mermaid</button>
+            <button class="tab-btn" data-tab="tab-builder">ΔΡΔ Builder</button>
+          </div>
+          <div class="tab-actions"></div>
+        </div>
+
+        <!-- Tab 1: ΔΔΠ (Structure Chart) -->
+        <div class="tab-pane active" id="tab-ddp">
+          <div class="pli11-stats-bar" id="ddp-stats-bar">
+            <div class="pli11-stat-pills" id="ddp-stat-pills">
+              <span class="pli11-stat-pill">Ελέγχου: <strong id="cnt-control">0</strong></span>
+              <span class="pli11-stat-pill">Υπολογισμού: <strong id="cnt-calc">0</strong></span>
+              <span class="pli11-stat-pill">Παρουσίασης: <strong id="cnt-pres">0</strong></span>
+              <span class="pli11-stat-pill">Διαχ. Δεδ.: <strong id="cnt-data">0</strong></span>
+              <span class="pli11-stat-pill" id="cnt-io-generic-wrap" hidden>Ε/Ε (Γεν.): <strong id="cnt-io-generic">0</strong></span>
+              <span class="pli11-stat-pill" id="cnt-stubs-wrap" hidden>Stubs: <strong id="cnt-stubs">0</strong></span>
+            </div>
+          </div>
+
+          <div class="diagram-toolbar">
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="ddp-zoom-out" title="Σμίκρυνση">-</button>
+              <span class="zoom-readout" id="ddp-zoom-label">100%</span>
+              <button class="tool-mini-btn" id="ddp-zoom-in" title="Μεγέθυνση">+</button>
+              <button class="tool-mini-btn" id="ddp-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="ddp-print-btn" title="Ασπρόμαυρη μορφή ΕΑΠ έτοιμη για επικόλληση σε MS Word">Ασπρόμαυρο (Word)</button>
+              <button class="tool-mini-btn" id="ddp-export-svg" title="Λήψη διαγράμματος ως αρχείο SVG">Export SVG</button>
+              <button class="tool-mini-btn" id="ddp-export-png" title="Λήψη διαγράμματος υψηλής ανάλυσης PNG για MS Word">Export PNG</button>
+            </div>
+          </div>
+
+          <div class="diagram-viewport" id="ddp-viewport">
+            <div class="diagram-canvas" id="ddp-canvas"></div>
+            <div class="diagram-hint">Σύρετε για μετακίνηση &bull; Ροδέλα για zoom &bull; Κλικ σε μονάδα για μετάβαση</div>
+          </div>
+
+          <div class="trace-status-bar" id="trace-status-bar" hidden>
+            <div class="trace-status-main">
+              <div>
+                <span class="trace-step-pill" id="trace-step-pill">Βήμα 1</span>
+                <strong id="trace-summary-text">...</strong>
+              </div>
+              <div class="trace-stack-line" id="trace-stack-text">Στοίβα: -</div>
+            </div>
+            <div class="trace-vars-strip" id="trace-vars-strip"></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: ΔΡΔ (Data Flow Diagram) -->
+        <div class="tab-pane" id="tab-dfd">
+          <div class="dfd-info-banner" id="dfd-info-bar" hidden>
+            Ορισμένες μονάδες <code>Get_*</code>/<code>Put_*</code> δεν προσδιορίζουν ρητά Πηγή ή Αποθήκη (π.χ. στα σχόλια) και απεικονίζονται ως «Πηγή / Αποθήκη» με διακεκομμένο πλαίσιο.
+          </div>
+
+          <div class="diagram-toolbar">
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="dfd-zoom-out" title="Σμίκρυνση">-</button>
+              <span class="zoom-readout" id="dfd-zoom-label">100%</span>
+              <button class="tool-mini-btn" id="dfd-zoom-in" title="Μεγέθυνση">+</button>
+              <button class="tool-mini-btn" id="dfd-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="dfd-print-btn" title="Ασπρόμαυρη μορφή ΕΑΠ έτοιμη για επικόλληση σε MS Word">Ασπρόμαυρο (Word)</button>
+              <button class="tool-mini-btn" id="dfd-export-svg" title="Λήψη ΔΡΔ ως αρχείο SVG">Export SVG</button>
+              <button class="tool-mini-btn" id="dfd-export-png" title="Λήψη ΔΡΔ υψηλής ανάλυσης PNG για MS Word">Export PNG</button>
+            </div>
+          </div>
+
+          <div class="diagram-viewport" id="dfd-viewport">
+            <div class="diagram-canvas" id="dfd-canvas"></div>
+            <div class="diagram-hint">Σύρετε για μετακίνηση &bull; Ροδέλα για zoom</div>
+          </div>
+        </div>
+
+        <!-- Tab 3: EAP Validator -->
+        <div class="tab-pane" id="tab-validator">
+          <div class="validator-scroll">
+            <div class="val-summary-card" id="val-summary-card">
+              <div>
+                <strong id="val-summary-title">Έλεγχος Κανόνων ΕΑΠ (ΠΛΗ11)</strong>
+                <div id="val-summary-sub" style="font-size:0.78rem; margin-top:0.2rem;"></div>
+              </div>
+              <div id="val-summary-counts" style="font-family:var(--font-mono); font-size:0.78rem;"></div>
+            </div>
+
+            <div>
+              <div style="font-size:0.78rem; font-weight:700; margin-bottom:0.45rem; color:var(--header-text);">Λίστα Ελέγχου Μεθοδολογίας ΕΑΠ (6 Κανόνες)</div>
+              <div class="val-checklist-grid" id="val-checklist"></div>
+            </div>
+
+            <div>
+              <div style="font-size:0.78rem; font-weight:700; margin-bottom:0.45rem; color:var(--header-text);">Αναλυτικές Παρατηρήσεις (κλικ για μετάβαση στη γραμμή)</div>
+              <div class="val-diag-list" id="val-diagnostics-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Mermaid Code & Preview (Editable & Exportable) -->
+        <div class="tab-pane" id="tab-mermaid">
+          <div class="diagram-toolbar">
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn active" id="mermaid-mode-ddp">ΔΔΠ (flowchart TD)</button>
+              <button class="tool-mini-btn" id="mermaid-mode-dfd">ΔΡΔ (flowchart LR)</button>
+              <span id="mermaid-edit-status" class="pli11-stat-pill" style="font-size:0.7rem; padding:0.15rem 0.45rem;">Αυτόματο</span>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="mermaid-rerender-btn" title="Ανανέωση προεπισκόπησης από τον κώδικα Mermaid">Ανανέωση Preview</button>
+              <button class="tool-mini-btn" id="mermaid-reset-btn" title="Επαναφορά Mermaid από τον κύριο Ψευδοκώδικα">Επαναφορά από Κώδικα</button>
+              <button class="tool-mini-btn" id="mermaid-export-svg" title="Λήψη του Mermaid διαγράμματος ως αρχείο SVG">Export SVG</button>
+              <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης για Word">Export PNG</button>
+              <button class="tool-mini-btn" id="mermaid-copy-code-btn" title="Αντιγραφή κώδικα Mermaid στο πρόχειρο">Αντιγραφή Κώδικα</button>
+            </div>
+          </div>
+
+          <div class="mermaid-split">
+            <div class="mermaid-editor-wrap">
+              <textarea id="mermaid-code-view" class="mermaid-code-editor" spellcheck="false" placeholder="Κώδικας Mermaid flowchart... Μπορείτε να τον επεξεργαστείτε απευθείας!"></textarea>
+            </div>
+            <div class="mermaid-preview-box" id="mermaid-preview-host"></div>
+          </div>
+        </div>
+
+        <!-- Tab 5: Reverse DFD Builder -->
+        <div class="tab-pane" id="tab-builder">
+          <div class="builder-scroll">
+            <div class="builder-row">
+              <div class="builder-field">
+                <label for="dfd-preset-select">Έτοιμο Πρότυπο ΔΡΔ (ΓΕ1 / ΟΣΣ2):</label>
+                <select id="dfd-preset-select" class="builder-select" aria-label="Έτοιμο πρότυπο ΔΡΔ">
+                  <option value="" disabled selected>Επιλέξτε έτοιμο ΔΡΔ...</option>
+                </select>
+              </div>
+              <div class="builder-field" style="max-width: 210px;">
+                <label for="dfd-mode-select">Τύπος Κέντρου:</label>
+                <select id="dfd-mode-select" class="builder-select" aria-label="Τύπος κέντρου (ΚΜ ή ΚΔ)">
+                  <option value="KM">Κεντρικός Μετασχηματισμός (ΚΜ)</option>
+                  <option value="KD">Κέντρο Δοσοληψιών (ΚΔ)</option>
+                </select>
+              </div>
+              <div class="builder-field" style="max-width: 220px;">
+                <label for="dfd-central-input">Κεντρικός/οί Μετασχηματισμός/οί:</label>
+                <input type="text" id="dfd-central-input" class="builder-input" value="M3, M4, M5" placeholder="π.χ. M3, M4, M5">
+              </div>
+            </div>
+
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+                <span style="font-size:0.78rem; font-weight:700; color:var(--header-text);">Ροές Δεδομένων ΔΡΔ</span>
+                <button type="button" class="tool-mini-btn" id="dfd-add-flow-btn">+ Προσθήκη Ροής</button>
+              </div>
+              <table class="builder-flows-table">
+                <thead>
+                  <tr>
+                    <th style="width:18%;">Τύπος Πηγής</th>
+                    <th style="width:20%;">Από</th>
+                    <th style="width:18%;">Τύπος Στόχου</th>
+                    <th style="width:20%;">Προς</th>
+                    <th style="width:18%;">Δεδομένα</th>
+                    <th style="width:6%;"></th>
+                  </tr>
+                </thead>
+                <tbody id="dfd-flows-tbody"></tbody>
+              </table>
+            </div>
+
+            <div class="builder-field">
+              <label for="dfd-dsl-input">Κειμενική Περιγραφή ΔΡΔ (αμφίδρομος συγχρονισμός):</label>
+              <textarea id="dfd-dsl-input" class="builder-textarea" spellcheck="false"></textarea>
+            </div>
+
+            <div class="builder-row" style="justify-content:flex-end;">
+              <button type="button" class="builder-primary-btn" id="dfd-build-btn">Παραγωγή ΔΔΠ &amp; Ψευδοκώδικα</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>EAP Online Compiler &bull; Ελληνικό Ανοικτό Πανεπιστήμιο (ΠΛΗ11 - Τεχνολογία Λογισμικού)</p>
+  </footer>
+
+  <!-- CodeMirror Vendor Scripts -->
+  <script src="vendor/codemirror/codemirror.min.js"></script>
+  <script src="vendor/codemirror/closebrackets.min.js"></script>
+  <script src="vendor/codemirror/matchbrackets.min.js"></script>
+  <script src="vendor/codemirror/show-hint.min.js"></script>
+  <script src="vendor/codemirror/active-line.min.js"></script>
+
+  <!-- Permalink LZ-String Compression -->
+  <script src="vendor/lz-string.min.js"></script>
+
+  <!-- Mermaid Live Preview (progressive enhancement; core and SVG renderer work offline) -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js" defer></script>
+
+  <!-- ΠΛΗ11 Grammar, Examples, Core Compiler, SVG Renderer & UI Controller -->
+  <script src="pli11-mode.js"></script>
+  <script src="pli11-examples.js"></script>
+  <script src="pli11-core.js"></script>
+  <script src="pli11-renderer.js"></script>
+  <script src="diagram-viewport.js"></script>
+  <script src="pli11-app.js"></script>
+</body>
+</html>

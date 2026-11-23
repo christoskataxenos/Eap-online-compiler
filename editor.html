@@ -13,51 +13,32 @@
     
     <!-- App Stylesheet -->
     <link rel="stylesheet" href="style.css">
-    
-    <script>
-        // Inline script to prevent FOUC (Flash of Unstyled Content) / wrong theme
-        (function() {
-            let savedTheme = 'light';
-            try {
-                const params = new URLSearchParams(window.location.search);
-                savedTheme = params.get('theme') || localStorage.getItem('theme') || 'light';
-            } catch (e) {
-                console.warn('Theme access error:', e);
-            }
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        })();
 
-        // Handle BFCache
-        window.addEventListener('pageshow', (event) => {
-             try {
-                 const theme = localStorage.getItem('theme') || 'light';
-                 document.documentElement.setAttribute('data-theme', theme);
-             } catch (e) {
-                 console.warn('Theme access error:', e);
-             }
-        });
-    </script>
+    <!-- Shared utilities: applies saved theme immediately (FOUC prevention) -->
+    <script src="common.js"></script>
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Μετάβαση στο περιεχόμενο</a>
     <header>
         <div class="header-left">
-            <a href="index.html" class="home-link" title="Επιστροφή στην Αρχική">&larr; Home</a>
+            <a href="index.html" class="home-link" data-base="index.html" title="Επιστροφή στην Αρχική">&larr; Home</a>
             <h1>EAP Online Interpreter</h1>
             <span class="version-tag">ΠΛΗ10</span>
         </div>
         <div class="header-right">
-            <button id="theme-toggle">Dark Mode</button>
+            <a href="pli11.html" id="switch-course-link" class="course-switch-link" data-base="pli11.html" title="Μετάβαση στον ΠΛΗ11 ΔΔΠ / ΔΡΔ Compiler">ΠΛΗ11 (ΔΔΠ/ΔΡΔ) &rarr;</a>
+            <button id="theme-toggle" type="button" aria-label="Εναλλαγή θέματος (φωτεινό / σκοτεινό)" aria-pressed="false">Dark Mode</button>
         </div>
     </header>
 
-    <main>
+    <main id="main-content">
         <div class="container">
             <!-- Code Editor Section -->
             <div class="editor-container">
                 <div class="panel-header">
                     <span id="editor-title">Κώδικας Ψευδογλώσσας</span>
                     <div class="panel-header-actions">
-                        <select id="example-selector">
+                        <select id="example-selector" aria-label="Επιλογή παραδείγματος κώδικα">
                             <option value="" disabled selected>Παραδείγματα (ΠΛΗ10)...</option>
                         </select>
                         <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
@@ -98,9 +79,6 @@
                 </div>
             </div>
 
-            <!-- File Input for Loading Files (Windows-1253 & UTF-8) -->
-            <input type="file" id="file-input" accept=".eap,.txt" style="display:none" />
-
             <!-- Resizer Handle -->
             <div class="resizer" id="drag-handle" title="Σύρετε για αλλαγή μεγέθους"></div>
 
@@ -114,8 +92,8 @@
                     </div>
                     <div class="tab-actions">
                         <button id="clear-terminal-btn" class="tab-action-btn" title="Καθαρισμός εξόδου τερματικού">Καθαρισμός</button>
-                        <button id="copy-trace-btn" class="tab-action-btn" style="display:none;" title="Αντιγραφή Πίνακα Τιμών σε μορφή Markdown">Αντιγραφή Markdown</button>
-                        <div id="var-view-toggle" class="var-toggle-group" style="display:none;">
+                        <button id="copy-trace-btn" class="tab-action-btn" hidden title="Αντιγραφή Πίνακα Τιμών σε μορφή Markdown">Αντιγραφή Markdown</button>
+                        <div id="var-view-toggle" class="var-toggle-group" hidden>
                             <button id="var-cards-btn" class="tab-action-btn active" title="Προβολή σε Κάρτες Μνήμης">Κάρτες</button>
                             <button id="var-table-btn" class="tab-action-btn" title="Προβολή σε Αναλυτικό Πίνακα">Πίνακας</button>
                         </div>
@@ -126,7 +104,7 @@
                 <div class="tab-pane active" id="tab-terminal">
                     <div id="terminal-window">
                         <div id="terminal-output"></div>
-                        <div id="terminal-input-line" style="display: none;">
+                        <div id="terminal-input-line" hidden>
                             <span id="terminal-prompt">&gt;</span>
                             <input type="text" id="terminal-input" autocomplete="off" spellcheck="false" placeholder="Δώστε είσοδο και πατήστε Enter...">
                         </div>
@@ -141,12 +119,12 @@
                             <div class="placeholder-sub">Ξεκινήστε την εκτέλεση ή πατήστε <strong>ΒΗΜΑ</strong> για παρακολούθηση της μνήμης.</div>
                         </div>
                         
-                        <div id="variables-content" style="display:none;">
+                        <div id="variables-content" hidden>
                             <!-- Variables Status Bar -->
                             <div class="var-status-bar" id="var-status-bar">
                                 <div class="var-status-summary" id="var-status-summary">
                                     <span id="var-status-text">Ενεργές Μεταβλητές</span>
-                                    <span id="var-last-change-badge" class="var-last-change-badge" style="display:none;"></span>
+                                    <span id="var-last-change-badge" class="var-last-change-badge" hidden></span>
                                 </div>
                                 <div class="var-search-wrapper">
                                     <input type="text" id="var-search-input" placeholder="Αναζήτηση μεταβλητής..." autocomplete="off">
@@ -163,14 +141,14 @@
                                     <div class="vars-section-title">Πίνακες στη Μνήμη (Array Memory Tapes)</div>
                                     <div id="arrays-container" class="arrays-list"></div>
                                 </div>
-                                <div class="vars-section" id="section-constants" style="display:none;">
+                                <div class="vars-section" id="section-constants" hidden>
                                     <div class="vars-section-title">Σταθερές (Constants)</div>
                                     <div id="constants-grid" class="vars-grid"></div>
                                 </div>
                             </div>
 
                             <!-- Table View -->
-                            <div id="variables-table-view" style="display:none;">
+                            <div id="variables-table-view" hidden>
                                 <table class="variables-table" id="variables-table">
                                     <thead>
                                         <tr>
@@ -195,7 +173,7 @@
                             <div class="placeholder-text">Ο Πίνακας Τιμών είναι κενός.</div>
                             <div class="placeholder-sub">Εκτελέστε το πρόγραμμα με το κουμπί <strong>ΒΗΜΑ</strong> για βήμα-προς-βήμα ανάλυση (tracing).</div>
                         </div>
-                        <div id="trace-table-container" style="display:none;">
+                        <div id="trace-table-container" hidden>
                             <table class="trace-table" id="trace-table">
                                 <thead>
                                     <tr>
@@ -235,6 +213,7 @@
     
     <!-- Compiler Core & UI Controller -->
     <script src="core.v6.js"></script>
+    <script src="diagram-viewport.js"></script>
     <script src="app.v6.js"></script>
 </body>
 </html>
