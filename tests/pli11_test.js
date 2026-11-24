@@ -684,6 +684,138 @@ function testDFDFlowLabelOffsetBesideArrows() {
   console.log('testDFDFlowLabelOffsetBesideArrows passed');
 }
 
+function testSequentialProvenanceAndVerticalEAPLayout() {
+  // 1. Verify KALLIPOS_SYSTEM_P1 has 0 errors, 4 processes (P1.1..P1.4), no phantom root bubble, and 0 IO->IO bypasses
+  const res = Core.compilePLI11(PLI11_EXAMPLES.KALLIPOS_SYSTEM_P1);
+  const errs = res.validation.diagnostics.filter((d) => d.severity === 'error');
+  assert.strictEqual(errs.length, 0, `Expected 0 errors in KALLIPOS_SYSTEM_P1, got: ${JSON.stringify(errs)}`);
+
+  const dfd = res.dfd;
+  assert.strictEqual(dfd.noKM, true, 'Multi-process system coordinator should default to noKM = true');
+  assert.strictEqual(dfd.processes.length, 4, `Expected exactly 4 processes (P1.1..P1.4), got: ${dfd.processes.map((p) => p.key).join(', ')}`);
+  assert.deepStrictEqual(
+    dfd.processes.map((p) => p.key),
+    ['P1.1', 'P1.2', 'P1.3', 'P1.4']
+  );
+  assert.ok(dfd.processes[0].label.includes('Υποβολή Πρότασης'), 'Process P1.1 should preserve its descriptive Greek title');
+
+  // Fundamental DFD invariant: every flow has at least one process endpoint
+  const nodeTypeById = new Map(dfd.nodes.map((n) => [n.id, n.type]));
+  for (const f of dfd.flows) {
+    const tFrom = nodeTypeById.get(f.from);
+    const tTo = nodeTypeById.get(f.to);
+    assert.ok(
+      tFrom === 'process' || tTo === 'process',
+      `Illegal direct IO-to-IO flow detected: ${f.from} (${tFrom}) -> ${f.to} (${tTo})`
+    );
+  }
+
+  // 2. Verify sequential overwrite prevents backward flows when a variable is reused across P1.1 -> P1.2 -> P1.4
+  const ermisCode = `
+PROCEDURE EXEC_ERMIS
+  LOCAL VAR Αίτηση, Κατάσταση;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ Αίτηση, Κατάσταση;
+  CALL GET_Αίτηση(Αίτηση);
+  CALL CALC_P1_1(Αίτηση, Κατάσταση);
+  CALL PUT_Αρχείο_Αιτήσεων(Αίτηση, Κατάσταση);
+  CALL CALC_P1_2(Αίτηση, Κατάσταση);
+  CALL CALC_P1_4(Κατάσταση, Αίτηση);
+  CALL PUT_Τράπεζα(Κατάσταση);
+END_PROCEDURE;
+PROCEDURE GET_Αίτηση(x: IN/OUT) Διάβασε από τον Αιτούντα; END_PROCEDURE;
+PROCEDURE CALC_P1_1(a: IN, k: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE CALC_P1_2(a: IN, k: IN/OUT) Έλεγξε; END_PROCEDURE;
+PROCEDURE CALC_P1_4(k: IN, a: IN/OUT) Έκδοση; END_PROCEDURE;
+PROCEDURE PUT_Αρχείο_Αιτήσεων(a, k: IN) Αποθήκευσε στην αποθήκη «Αρχείο Αιτήσεων»; END_PROCEDURE;
+PROCEDURE PUT_Τράπεζα(k: IN) ΕΜΦΑΝΙΣΕ στην «Τράπεζα»; END_PROCEDURE;`;
+
+  const ermis = Core.compilePLI11(ermisCode);
+  const ermisNodeMap = new Map(ermis.dfd.nodes.map((n) => [n.id, n]));
+  // Ensure no doubled "Αρχείο Αρχείο Αιτήσεων"
+  assert.ok(ermis.dfd.stores.some((s) => s.label === 'Αρχείο Αιτήσεων'), 'Store label should not double Αρχείο prefix');
+  // Ensure Αιτών normalized from accusative Αιτούντα
+  assert.ok(ermis.dfd.entities.some((e) => e.label === 'Αιτών'), 'Accusative Αιτούντα should normalize to Αιτών');
+  // Ensure zero IO->IO flows and zero backward P1.4 -> P1.2 flows
+  for (const f of ermis.dfd.flows) {
+    const u = ermisNodeMap.get(f.from);
+    const v = ermisNodeMap.get(f.to);
+    assert.ok(u.type === 'process' || v.type === 'process', 'Zero IO->IO flows in EXEC_ERMIS');
+    assert.ok(!(u.key === 'P1.4' && v.key === 'P1.2'), 'Must not emit backward P1.4 -> P1.2 flow');
+    assert.ok(!(u.key === 'P1.1' && v.label === 'Τράπεζα'), 'P1.1 must not connect to PUT_Τράπεζα after P1.4 overwrote Κατάσταση');
+  }
+
+  // 3. Verify Vertical EAP Layout & Local Cloning + Word Tight-Crop SVG
+  const verticalSvg = Renderer.renderDFDSVG(dfd, { printMode: true, tightCrop: true });
+  assert.ok(!verticalSvg.includes('rotate('), 'All DFD flow labels must be horizontal (0 deg rotation)');
+
+  // Extract process circle Y positions and check strict top-to-bottom spine order
+  const procRe = /<g class="dfd-node" data-node-id="([^"]+)" data-x="([0-9.-]+)" data-y="([0-9.-]+)"/g;
+  const procCoords = [];
+  let pm;
+  while ((pm = procRe.exec(verticalSvg)) !== null) {
+    procCoords.push({ id: pm[1], x: parseFloat(pm[2]), y: parseFloat(pm[3]) });
+  }
+  assert.strictEqual(procCoords.length, 4, 'Should render 4 process circles');
+  for (let i = 0; i < procCoords.length - 1; i++) {
+    assert.strictEqual(procCoords[i].x, procCoords[i + 1].x, 'Processes should align on central vertical spine');
+    assert.ok(procCoords[i].y < procCoords[i + 1].y, 'Processes should be ordered strictly top-to-bottom');
+  }
+
+  // Shared peripherals (e.g. Υποψήφιος, Αρχείο Υποβολών) should be cloned per band (__B)
+  assert.ok(verticalSvg.includes('__B'), 'Shared stores/entities should have local band clones to prevent spiderweb crossings');
+
+  // 4. Verify @KM with all processes central + preceding banner comments triggers vertical EAP layout cleanly
+  const allKmCode = `/* @KM: P1_1, P1_2 */
+PROCEDURE EXEC_ERMIS
+  LOCAL VAR Δ1, Δ2;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ Δ1, Δ2;
+  CALL EXEC_P1_1(Δ1);
+  CALL EXEC_P1_2(Δ2);
+END_PROCEDURE;
+/* 1. ΥΠΟΒΟΛΗ ΑΙΤΗΣΗΣ (P1.1) */
+PROCEDURE EXEC_P1_1(Δ1: IN/OUT)
+  LOCAL VAR Α, Β;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ Α, Β;
+  CALL GET_Α(Α);
+  CALL CALC_P1_1(Α, Β);
+  CALL PUT_Β(Β);
+END_PROCEDURE;
+/* 2. ΕΛΕΓΧΟΣ ΠΡΟΫΠΟΘΕΣΕΩΝ (P1.2) */
+PROCEDURE EXEC_P1_2(Δ2: IN/OUT)
+  LOCAL VAR Γ, Ε;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ Γ, Ε;
+  CALL GET_Γ(Γ);
+  CALL CALC_P1_2(Γ, Ε);
+  CALL PUT_Ε(Ε);
+END_PROCEDURE;
+PROCEDURE GET_Α(Α: IN/OUT) Διάβασε το Α από την εξωτερική οντότητα «Αιτών»; END_PROCEDURE;
+PROCEDURE CALC_P1_1(Α: IN, Β: IN/OUT) Υπολόγισε Β; END_PROCEDURE;
+PROCEDURE PUT_Β(Β: IN) Αποθήκευσε το Β στο αρχείο «Αιτήσεων»; END_PROCEDURE;
+PROCEDURE GET_Γ(Γ: IN/OUT) Διάβασε το Γ από το αρχείο «Αιτήσεων»; END_PROCEDURE;
+PROCEDURE CALC_P1_2(Γ: IN, Ε: IN/OUT) Υπολόγισε Ε; END_PROCEDURE;
+PROCEDURE PUT_Ε(Ε: IN) ΕΜΦΑΝΙΣΕ το Ε στην εξωτερική οντότητα «Αιτών»; END_PROCEDURE;`;
+
+  const allKmRes = Core.compilePLI11(allKmCode);
+  assert.ok(allKmRes.dfd.processes[0].label.includes('ΥΠΟΒΟΛΗ ΑΙΤΗΣΗΣ'), 'Banner comment above EXEC_P1_1 should enrich P1.1 label');
+  const allKmSvg = Renderer.renderDFDSVG(allKmRes.dfd, { layoutMode: 'auto', showKMFrame: true, clonePeripherals: true });
+  assert.ok(allKmSvg.includes('__B1'), 'Auto layout must still use vertical spine + local cloning when @KM includes all processes');
+
+  // 5. Verify PNG pHYs 300+ DPI metadata chunk injection
+  const dummyPng = new Uint8Array([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x06, 0x00,
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
+  ]);
+  const withDpi = Renderer.injectPngPhysDpi(dummyPng, 350);
+  assert.strictEqual(withDpi.length, dummyPng.length + 21, 'pHYs chunk should add 21 bytes');
+  const chunkTag = String.fromCharCode(withDpi[37], withDpi[38], withDpi[39], withDpi[40]);
+  assert.strictEqual(chunkTag, 'pHYs', 'pHYs chunk should sit immediately after IHDR');
+
+  console.log('testSequentialProvenanceAndVerticalEAPLayout passed');
+}
+
 testOfficialExamplesZeroErrors();
 testHomoglyphNormalization();
 testValidatorRules();
@@ -700,4 +832,5 @@ testDFDBuilderNoKMAndLevel0();
 testTextWrappingAndNoOverflow();
 testCanvasDimensionsOptions();
 testDFDFlowLabelOffsetBesideArrows();
+testSequentialProvenanceAndVerticalEAPLayout();
 console.log('All ΠΛΗ11 tests passed!');

@@ -320,59 +320,148 @@
   // ---------------------------------------------------------------------------
   // 3. PARSER
   // ---------------------------------------------------------------------------
+  const GREEK_ACCUSATIVE_ENTITIES = new Map([
+    ['υποψηφιο', 'Υποψήφιος'],
+    ['διαχειριστη', 'Διαχειριστής'],
+    ['αξιολογητη', 'Αξιολογητής'],
+    ['αιτουντα', 'Αιτών'],
+    ['χρηστη', 'Χρήστης'],
+    ['πελατη', 'Πελάτης'],
+    ['πολιτη', 'Πολίτης'],
+    ['φοιτητη', 'Φοιτητής'],
+    ['καθηγητη', 'Καθηγητής'],
+    ['υπαλληλο', 'Υπάλληλος'],
+    ['δικαιουχο', 'Δικαιούχος'],
+    ['προμηθευτη', 'Προμηθευτής'],
+    ['εκτυπωτη', 'Εκτυπωτής'],
+    ['αποδεκτη', 'Αποδέκτης'],
+    ['γραμματεια', 'Γραμματεία'],
+    ['τραπεζα', 'Τράπεζα'],
+    ['οθονη', 'Οθόνη']
+  ]);
+
+  function normalizeGreekEntityLabel(rawName) {
+    let clean = String(rawName || '').replace(/^[«"'\s]+|[»"'\s.,;:]+$/g, '').trim();
+    clean = clean.replace(/\s+(?:το|τα|τη|την|τον|του|της|με|από|στην|στον|στο|για|ώστε|βάσει)$/i, '').trim();
+    if (!clean) return clean;
+    const words = clean.split(/\s+/);
+    const firstPlain = stripAccents(words[0]).toLowerCase();
+    if (GREEK_ACCUSATIVE_ENTITIES.has(firstPlain)) {
+      words[0] = GREEK_ACCUSATIVE_ENTITIES.get(firstPlain);
+      return words.join(' ');
+    }
+    return clean;
+  }
+
+  function formatStoreLabel(rawName, matchedKeyword) {
+    let clean = String(rawName || '').replace(/^[«"'\s]+|[»"'\s.,;:]+$/g, '').trim();
+    clean = clean.replace(/\s+(?:το|τα|τη|την|τον|του|της|με|από|στην|στον|στο|για|βάσει)$/i, '').trim();
+    if (!clean) return 'Αποθήκη Δεδομένων';
+    if (/^(?:ΑΔ|AD|DB)\s*[0-9]+$/i.test(clean)) {
+      return clean.replace(/\s+/g, '');
+    }
+    const plainStart = stripAccents(clean).toLowerCase();
+    if (/^(?:αρχει|αποθηκ|βασ|προτυπ|μητρω|καταλογ|πινακ)/.test(plainStart)) {
+      return clean;
+    }
+    const prefix = /αρχε/i.test(stripAccents(matchedKeyword || '')) ? 'Αρχείο ' : 'Αποθήκη ';
+    return (prefix + clean).trim();
+  }
+
   function extractIOMetaFromTexts(texts) {
     const joined = texts.filter(Boolean).join(' \n ');
     if (!joined.trim()) return { ioKind: 'UNKNOWN', ioTarget: null, directionHint: null };
 
     const plainLower = stripAccents(joined).toLowerCase();
     let directionHint = null;
-    if (/(?:διαβασε|αναγνωσε|ληψη|read\b|get\b|ανακτησε)/.test(plainLower)) {
+    if (/(?:διαβασε|αναγνωσε|ληψη|read\b|get\b|ανακτησε|παρε)/.test(plainLower)) {
       directionHint = 'read';
-    } else if (/(?:γραψε|εμφανισε|τυπωσε|αποθηκευσε|καταχωρισε|καταχωρησε|εκτυπωσε|write|print|display|store|put)/.test(plainLower)) {
+    } else if (/(?:γραψε|εμφανισε|τυπωσε|αποθηκευσε|καταχωρισε|καταχωρησε|εκτυπωσε|ενημερωσε|στειλε|αποστολη|write|print|display|store|put|save)/.test(plainLower)) {
       directionHint = 'write';
     }
 
-    // Check Data Store keywords first
+    // 1. Explicit quoted Data Store: αποθήκη «...» / αρχείο «...» / βάση «...»
+    const quotedStoreMatch = joined.match(/(αποθ[ηή]κη(?:\s+δεδομ[εέ]νων)?|αρχε[ιί]ο|β[αά]ση(?:\s+δεδομ[εέ]νων)?)\s*[:]?\s*[«"]([^»"\n]+)[»"]/i);
+    if (quotedStoreMatch && quotedStoreMatch[2]) {
+      return {
+        ioKind: 'DATA_STORE',
+        ioTarget: formatStoreLabel(quotedStoreMatch[2], quotedStoreMatch[1]),
+        directionHint
+      };
+    }
+
+    // 2. Explicit quoted External Entity: εξωτερική οντότητα «...» / πηγή «...» / αποδέκτης «...»
+    const quotedExtMatch = joined.match(/(?:εξωτερικ[ηή]\s+οντ[οό]τητα(?:\s*\([^)]*\))?|πηγ[ηή](?:\s+δεδομ[εέ]νων)?|αποδ[εέ]κτ[ηή]ς?(?:\s+δεδομ[εέ]νων)?)\s*[:]?\s*[«"]([^»"\n]+)[»"]/i);
+    if (quotedExtMatch && quotedExtMatch[1]) {
+      return {
+        ioKind: 'EXTERNAL_ENTITY',
+        ioTarget: normalizeGreekEntityLabel(quotedExtMatch[1]),
+        directionHint
+      };
+    }
+
+    // 3. Unquoted Data Store patterns
     const storePatterns = [
-      /(?:αποθ[ηή]κη\s*(?:δεδομ[εέ]νων)?\s*[:«"]?\s*([A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_\-]+(?:\s+[A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_\-]+){0,2}))/i,
-      /(?:αρχε[ιί]ο\s*[:«"]?\s*([A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_\-]+(?:\s+[A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_\-]+){0,2}))/i,
+      /(αποθ[ηή]κη(?:\s+δεδομ[εέ]νων)?)\s*[:]?\s*([A-Za-zΑ-ΩΪΫα-ωάέήίόύώϊϋΐΰ0-9_&\-\/]+(?:\s+[A-Za-zΑ-ΩΪΫα-ωάέήίόύώϊϋΐΰ0-9_&\-\/]+){0,2})/i,
+      /(αρχε[ιί]ο)\s*[:]?\s*([A-Za-zΑ-ΩΪΫα-ωάέήίόύώϊϋΐΰ0-9_&\-\/]+(?:\s+[A-Za-zΑ-ΩΪΫα-ωάέήίόύώϊϋΐΰ0-9_&\-\/]+){0,2})/i,
       /\b((?:ΑΔ|AD|DB)\s*[0-9]+)\b/i
     ];
     for (const pat of storePatterns) {
       const m = joined.match(pat);
-      if (m && m[1]) {
-        const cleanName = m[1].replace(/[»".,;:\s]+$/, '').trim();
-        // Rebuild clean label
-        if (/^(?:ΑΔ|AD|DB)/i.test(cleanName)) {
-          return { ioKind: 'DATA_STORE', ioTarget: cleanName.replace(/\s+/g, ''), directionHint };
+      if (m) {
+        if (m[2]) {
+          // Strip trailing clause words (e.g. "Αρχείο Αιτούντων το ΚωδικόςΥ")
+          const rawTarget = m[2].replace(/\s+(?:το|τα|τη|την|τον|του|της|με|από|στην|στον|στο)\b.*$/i, '').trim();
+          if (rawTarget) {
+            return {
+              ioKind: 'DATA_STORE',
+              ioTarget: formatStoreLabel(rawTarget, m[1]),
+              directionHint
+            };
+          }
+        } else if (m[1]) {
+          return { ioKind: 'DATA_STORE', ioTarget: m[1].replace(/\s+/g, ''), directionHint };
         }
-        const prefix = /αρχε/i.test(m[0]) ? 'Αρχείο ' : 'Αποθήκη ';
-        // Remove trailing clause words like "το A"
-        const trimmedTarget = cleanName.replace(/\s+(?:το|τα|τη|την|τον|του|της|με|από|στην|στο)$/i, '').trim();
-        return {
-          ioKind: 'DATA_STORE',
-          ioTarget: (prefix + trimmedTarget).trim(),
-          directionHint
-        };
       }
     }
 
-    // Check External Entity / Source / Sink keywords
+    // 4. Quoted target after preposition: στον/στην/στο/από «...»
+    const prepQuotedMatch = joined.match(/(?:στον|στην|στο|προς(?:\s+τ(?:ον|ην|ο))?|απ[οό](?:\s+τ(?:ον|ην|ο))?)\s+[«"]([^»"\n]+)[»"]/i);
+    if (prepQuotedMatch && prepQuotedMatch[1]) {
+      const qVal = prepQuotedMatch[1].trim();
+      if (/^(?:αρχει|αποθηκ|βασ|αδ[0-9]|ad[0-9]|db[0-9])/i.test(stripAccents(qVal))) {
+        return { ioKind: 'DATA_STORE', ioTarget: formatStoreLabel(qVal, qVal), directionHint };
+      }
+      return { ioKind: 'EXTERNAL_ENTITY', ioTarget: normalizeGreekEntityLabel(qVal), directionHint };
+    }
+
+    // 5. Unquoted External Entity / Source / Sink patterns
     const extPatterns = [
-      /εξωτερικ[ηή]\s+οντ[οό]τητα\s*(?:\((?:πηγ[ηή]|αποδ[εέ]κτης)\))?\s*[«"]?([^»"\n.;]+)/i,
-      /(?:πηγ[ηή]|αποδ[εέ]κτ[ηή]ς?)\s*(?:δεδομ[εέ]νων)?\s*[«":]?\s*([A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_\-]+(?:\s+[A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_\-]+){0,2})/i,
-      /(?:στον|στο|απ[οό]\s+τ(?:ον|ο))\s+(χρ[ηή]στη(?:\s+[A-Za-zΑ-Ωα-ω0-9_\-]+)?|οθ[οό]νη|εκτυπωτ[ηή]|τερματικ[οό])/i
+      /εξωτερικ[ηή]\s+οντ[οό]τητα\s*(?:\((?:πηγ[ηή]|αποδ[εέ]κτης)\))?\s*[:]?\s*([^.;\n]+)/i,
+      /((?:πηγ[ηή]|αποδ[εέ]κτ[ηή]ς?)(?:\s+δεδομ[εέ]νων)?)\s*[:]?\s*([A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_\-]+(?:\s+[A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_\-]+){0,2})/i,
+      /(?:στον|στην|στο|προς\s+τ(?:ον|ην|ο)|απ[οό]\s+τ(?:ον|ην|ο))\s+(χρ[ηή]στη(?:\s+[A-Za-zΑ-Ωα-ω0-9_\-]+)?|οθ[οό]νη|εκτυπωτ[ηή]|τερματικ[οό])/i,
+      /(?:στον|στην|στο|προς\s+τ(?:ον|ην|ο)|απ[οό]\s+τ(?:ον|ην|ο))\s+([Α-ΩA-Z][A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_&/\-]*(?:\s+[Α-ΩA-Z][A-Za-zΑ-Ωα-ωάέήίόύώΐΰ0-9_&/\-]*){0,3})/
     ];
-    for (const pat of extPatterns) {
+    for (let pIdx = 0; pIdx < extPatterns.length; pIdx++) {
+      const pat = extPatterns[pIdx];
       const m = joined.match(pat);
-      if (m && m[1]) {
-        let name = m[1].replace(/[»".,;:\s]+$/, '').trim();
-        name = name.replace(/\s+(?:το|τα|τη|την|τον|του|της)$/i, '').trim();
-        if (/^(?:πηγ|αποδ)/i.test(stripAccents(m[0])) && !/πηγ|αποδ/i.test(stripAccents(name))) {
-          const isSrc = /^πηγ/i.test(stripAccents(m[0]));
+      if (!m) continue;
+      if (pIdx === 1 && m[2]) {
+        let name = m[2].replace(/\s+(?:το|τα|τη|την|τον|του|της|με|από)\b.*$/i, '').trim();
+        name = normalizeGreekEntityLabel(name);
+        if (!/^(?:πηγ|αποδ)/i.test(stripAccents(name))) {
+          const isSrc = /^πηγ/i.test(stripAccents(m[1]));
           name = (isSrc ? 'Πηγή ' : 'Αποδέκτης ') + name;
         }
         return { ioKind: 'EXTERNAL_ENTITY', ioTarget: name, directionHint };
+      }
+      const captured = m[1];
+      if (captured) {
+        let name = captured.replace(/\s+(?:το|τα|τη|την|τον|του|της|με|από)\b.*$/i, '').trim();
+        name = normalizeGreekEntityLabel(name);
+        if (name && !/^(?:αρχει|αποθηκ|βασ)/i.test(stripAccents(name))) {
+          return { ioKind: 'EXTERNAL_ENTITY', ioTarget: name, directionHint };
+        }
       }
     }
 
@@ -1047,7 +1136,11 @@
           });
         }
 
-        // Gather comments located inside [startLine, endLine] and verbal lines
+        // Gather comments located inside [startLine, endLine] and banner comments right above PROCEDURE
+        const prevEndLine = procedures.length > 0 ? procedures[procedures.length - 1].endLine : 0;
+        const headerComments = comments
+          .filter((c) => c.endLine < startLine && c.startLine > prevEndLine && (startLine - c.endLine) <= 5)
+          .map((c) => c.text);
         const innerComments = comments
           .filter((c) => c.startLine >= startLine && c.endLine <= endLine)
           .map((c) => c.text);
@@ -1075,6 +1168,7 @@
           body,
           startLine,
           endLine,
+          headerComments,
           comments: innerComments,
           verbalTexts,
           ioMeta
@@ -1946,25 +2040,101 @@
   // 6. AUTOMATIC ΔΡΔ (DATA FLOW DIAGRAM) REVERSE SYNTHESIS
   // ---------------------------------------------------------------------------
   function extractProcessTag(canonicalName) {
-    // Converts EXEC_M3 / CALC_M3 / EXEC_M3_M4 / EXEC111 -> M3, M3_M4, 111
-    let stripped = canonicalName
-      .replace(/^(EXEC|CALC|PREPARE|DO|PROCESS)_?/, '');
+    // Converts EXEC_M3 / CALC_M3 / CALCULATE_M1 / EXEC_P1_4 -> M3, M1, P1.4
+    let stripped = String(canonicalName || '')
+      .replace(/^(EXEC|CALCULATE|COMPUTE|CALC|PREPARE|DO|PROCESS)_?/, '');
     if (!stripped) stripped = canonicalName;
-    // Handle single process tags like M1, P1, 1_1, etc.
+    // Sub-numbered single process like P1_1, P1_4, M1_2, 1_1 -> P1.1, P1.4, M1.2, 1.1
+    if (/^[A-Z]{0,2}[0-9]+(?:_[0-9]+)+$/.test(stripped)) {
+      return stripped.replace(/_/g, '.');
+    }
     return stripped;
   }
 
   function splitCompositeTags(tag) {
-    // Splits M3_M4_M5 -> ['M3','M4','M5'], P2_P3 -> ['P2','P3'], M2_5 -> ['M2','M5']
-    const parts = tag.split('_').filter(Boolean);
-    if (parts.length <= 1) return parts;
-    // Handle shorthand like M2_5 -> M2, M5
-    const prefixMatch = parts[0].match(/^([A-Z]+)[0-9]+$/);
-    if (prefixMatch) {
-      const letter = prefixMatch[1];
-      return parts.map((p) => (/^[0-9]+$/.test(p) ? letter + p : p));
+    // Splits composite roots like M3_M4_M5 -> ['M3','M4','M5'], P2_P3 -> ['P2','P3']
+    // Preserves dotted/sub-numbered single processes like P1.4 or P1_4 -> ['P1.4']
+    const clean = String(tag || '').trim();
+    if (!clean) return [];
+    if (/^[A-Z]{0,2}[0-9]+(?:[._][0-9]+)+$/.test(clean)) {
+      return [clean.replace(/_/g, '.')];
     }
-    return parts;
+    const parts = clean.split('_').filter(Boolean);
+    if (parts.length <= 1) return parts;
+    // Composite KM tags repeat a code pattern on every segment (e.g. M3_M4_M5, P2_P3)
+    if (parts.every((p) => /^[A-Z]+[0-9]+(?:\.[0-9]+)*$/.test(p))) {
+      return parts;
+    }
+    return [clean];
+  }
+
+  function extractProcessDescriptor(node) {
+    if (!node) return { key: 'MAIN', label: 'MAIN' };
+    const rawStripped = String(node.name || '')
+      .replace(/^(?:exec|calculate|compute|calc|prepare|do|process)_?/i, '')
+      .trim();
+    const canonStripped = extractProcessTag(node.canonicalName);
+
+    // If composite (e.g. M3_M4_M5), keep canonical
+    if (splitCompositeTags(canonStripped).length > 1) {
+      return { key: canonStripped, label: canonStripped };
+    }
+
+    // Check if procedure name has code + descriptive title, e.g. P1_1_Υποβολή_Πρότασης
+    const codeTitleMatch = rawStripped.match(/^([A-Za-z\u0391-\u03A9]{0,2}[0-9]+(?:[._][0-9]+)*)(?:_(.+))?$/);
+    let codeKey = canonStripped;
+    let humanTitle = '';
+
+    if (codeTitleMatch) {
+      codeKey = normalizeId(codeTitleMatch[1]).replace(/_/g, '.');
+      if (codeTitleMatch[2]) {
+        humanTitle = codeTitleMatch[2].replace(/_/g, ' ').trim();
+      }
+    } else if (rawStripped) {
+      codeKey = normalizeId(rawStripped);
+    }
+
+    // Check procedure header/inner comments for @TITLE, "P1.1 <Title>", or "1. <Title> (P1.1)"
+    if (!humanTitle && node.proc) {
+      const candidateComments = [
+        ...(Array.isArray(node.proc.headerComments) ? node.proc.headerComments : []),
+        ...(Array.isArray(node.proc.comments) ? node.proc.comments : [])
+      ];
+      const escapedCode = codeKey.replace(/\./g, '[._]');
+      const codePrefixRe = new RegExp(`^(?:Διεργασία\\s+)?${escapedCode}\\s*[:\\-–]?\\s+([Α-ΩΪΫα-ωάέήίόύώϊϋΐΰA-Za-z0-9\\s&/\\-]{3,56})$`, 'i');
+      const codeSuffixRe = new RegExp(`^(?:[0-9]+\\s*[.)\\-]\\s*)?([Α-ΩΪΫα-ωάέήίόύώϊϋΐΰA-Za-z0-9\\s&/\\-]{3,56}?)\\s*\\(\\s*${escapedCode}\\s*\\)\\s*$`, 'i');
+
+      for (const cText of candidateComments) {
+        const cleanC = String(cText || '').trim();
+        if (!cleanC || /^[-=*_]{3,}$/.test(cleanC)) continue;
+        const titleDir = cleanC.match(/@(?:TITLE|TITLOS|ΟΝΟΜΑ)\s*:\s*([^\n*]+)/i);
+        if (titleDir && titleDir[1]) {
+          humanTitle = titleDir[1].replace(/^["'«]|["'»]$/g, '').trim();
+          break;
+        }
+        const cm1 = cleanC.match(codePrefixRe);
+        if (cm1 && cm1[1]) {
+          humanTitle = cm1[1].trim();
+          break;
+        }
+        const cm2 = cleanC.match(codeSuffixRe);
+        if (cm2 && cm2[1]) {
+          humanTitle = cm2[1].trim();
+          break;
+        }
+      }
+    }
+
+    if (humanTitle) {
+      return { key: codeKey, label: `${codeKey}\n${humanTitle}` };
+    }
+
+    // Preserve natural Greek/Latin case when purely descriptive (e.g. Υποβολή_Πρότασης)
+    if (!codeTitleMatch && rawStripped && /[α-ωάέήίόύώΐΰ]/.test(rawStripped)) {
+      return { key: codeKey, label: rawStripped.replace(/_/g, ' ').trim() };
+    }
+
+    return { key: codeKey, label: codeKey };
   }
 
   // ---------------------------------------------------------------------------
@@ -2059,35 +2229,50 @@
   function synthesizeDFD(model, opts = {}) {
     const directives = opts.directives || parseDirectives(model.comments || []);
     const reqLevel = typeof opts.level === 'number' ? opts.level : (typeof directives.level === 'number' ? directives.level : 1);
-    const noKM = Boolean(opts.noKM || directives.noKM || (directives.central && directives.central.size === 0));
-    const processes = new Map(); // procKey -> { id, key, label, isCentral, isTransactionCenter }
-    const endpoints = new Map(); // endpointKey -> { id, label, type: 'process'|'store'|'entity'|'unknown_io', isCentral }
-    const rawFlows = [];         // { fromKey, toKey, dataSet: Set, dataList: [] }
+    let noKM = Boolean(opts.noKM || directives.noKM || (directives.central && directives.central.size === 0));
+    const processes = new Map(); // canonProcKey -> { id, key, label, isCentral, isTransactionCenter, orderIndex }
+    const endpoints = new Map(); // endpointId -> { id, key, label, type: 'process'|'store'|'entity'|'unknown_io', isCentral }
 
     const isTC = directives.mode ? (directives.mode === 'KD') : (model.architecture === 'TRANSACTION_CENTER');
+    let procOrderCounter = 0;
+
+    function matchesDirectiveCentral(canonKey) {
+      if (!directives.central) return false;
+      if (directives.central.has(canonKey)) return true;
+      const underscored = canonKey.replace(/\./g, '_');
+      const dotted = canonKey.replace(/_/g, '.');
+      return directives.central.has(underscored) || directives.central.has(dotted);
+    }
 
     function ensureProcess(key, displayLabel, isCentral = false, isProcTC = false) {
-      const canonKey = normalizeId(key);
-      const effectiveCentral = !noKM && (directives.central ? directives.central.has(canonKey) : isCentral);
-      const effectiveLabel = directives.aliases.get(canonKey) || displayLabel || key;
-      if (!processes.has(key)) {
+      const cleanKey = String(key || 'MAIN').trim();
+      const canonKey = normalizeId(cleanKey).replace(/_/g, /^[A-Z]{0,2}[0-9]+(?:_[0-9]+)+$/.test(normalizeId(cleanKey)) ? '.' : '_');
+      const effectiveCentral = !noKM && (directives.central ? matchesDirectiveCentral(canonKey) : isCentral);
+      const aliasHit = directives.aliases.get(canonKey) || directives.aliases.get(canonKey.replace(/\./g, '_'));
+      const effectiveLabel = aliasHit || displayLabel || canonKey;
+      if (!processes.has(canonKey)) {
         const ep = {
-          id: sanitizeMermaidId(key, 'P'),
-          key,
+          id: sanitizeMermaidId(canonKey, 'P'),
+          key: canonKey,
           label: effectiveLabel,
           type: 'process',
           isCentral: effectiveCentral,
-          isTransactionCenter: isProcTC
+          isTransactionCenter: isProcTC,
+          orderIndex: procOrderCounter++
         };
-        processes.set(key, ep);
+        processes.set(canonKey, ep);
         endpoints.set(ep.id, ep);
       } else {
-        const existing = processes.get(key);
+        const existing = processes.get(canonKey);
         if (effectiveCentral) existing.isCentral = true;
         if (isProcTC) existing.isTransactionCenter = true;
-        if (directives.aliases.has(canonKey)) existing.label = effectiveLabel;
+        if (aliasHit) {
+          existing.label = aliasHit;
+        } else if (displayLabel && displayLabel.length > existing.label.length && existing.label === existing.key) {
+          existing.label = displayLabel;
+        }
       }
-      return processes.get(key);
+      return processes.get(canonKey);
     }
 
     function ensureIOEndpoint(ioKind, ioTarget, fallbackHint, varName) {
@@ -2117,8 +2302,9 @@
         type = 'entity';
         label = mergedLabel;
       } else if (directives.aliases.has(canonVar)) {
-        type = 'entity';
-        label = directives.aliases.get(canonVar);
+        const aliased = directives.aliases.get(canonVar);
+        type = /^(?:αρχει|αποθηκ|βασ|προτυπ|αδ[0-9]|ad[0-9]|db[0-9])/i.test(stripAccents(aliased)) ? 'store' : 'entity';
+        label = aliased;
       } else if (ioKind === 'DATA_STORE') {
         type = 'store';
         label = ioTarget || 'Αποθήκη Δεδομένων';
@@ -2143,219 +2329,59 @@
       // KM frame disabled: no central processes
     } else if (directives.central) {
       for (const k of directives.central) {
-        centralKeys.add(k);
-        ensureProcess(k, k, true, isTC);
+        const cleanK = /^[A-Z]{0,2}[0-9]+(?:_[0-9]+)+$/.test(k) ? k.replace(/_/g, '.') : k;
+        centralKeys.add(cleanK);
+        ensureProcess(cleanK, cleanK, true, isTC);
       }
     } else if (model.rootNode) {
-      // Any Calc_* directly called by root corresponds to central transformation(s)
       const rootEdges = model.edges.filter((e) => e.from === model.rootNode.id);
       const directCalcs = rootEdges.filter((e) => {
         const t = model.nodeMap.get(e.toName);
         return t && t.role === 'CALC';
       });
+      const directExecs = rootEdges.filter((e) => {
+        const t = model.nodeMap.get(e.toName);
+        return t && (t.role === 'CONTROL' || t.role === 'ROOT_CONTROL');
+      });
+      const rootTag = extractProcessTag(model.rootNode.canonicalName);
+      const rootParts = splitCompositeTags(rootTag);
+
       if (directCalcs.length > 0) {
-        for (const e of directCalcs) {
-          const pTag = extractProcessTag(e.toName);
-          centralKeys.add(pTag);
-          ensureProcess(pTag, pTag, true, isTC);
+        const calcDescs = directCalcs.map((e) => extractProcessDescriptor(model.nodeMap.get(e.toName)));
+        const uniqueCalcKeys = Array.from(new Set(calcDescs.map((d) => d.key)));
+        const rootNamesCentral = rootParts.some((rp) => uniqueCalcKeys.includes(rp));
+        // If root is a generic system coordinator (e.g. EXEC_ERMIS) calling 3+ peer CALCs directly
+        // with zero upstream/downstream EXEC units and not naming a KM, treat as multi-process DFD (noKM)
+        if (!isTC && directExecs.length === 0 && uniqueCalcKeys.length >= 3 && rootParts.length === 1 && !rootNamesCentral) {
+          noKM = true;
+        } else {
+          for (const d of calcDescs) {
+            centralKeys.add(d.key);
+            ensureProcess(d.key, d.label, true, isTC);
+          }
         }
+      } else if (!isTC && directExecs.length >= 2 && rootParts.length === 1) {
+        // System coordinator (e.g. PROCEDURE EXEC_ERMIS calling EXEC_P1_1..EXEC_P1_4):
+        // Do NOT create a phantom empty 'ERMIS' bubble; let peer processes render cleanly without KM box.
+        noKM = true;
       } else {
-        const rootTag = extractProcessTag(model.rootNode.canonicalName);
-        for (const part of splitCompositeTags(rootTag)) {
+        for (const part of rootParts) {
           centralKeys.add(part);
           ensureProcess(part, part, true, isTC);
         }
       }
     }
 
-    // Variable provenance across the whole system: varCanon -> { producers: Set<endpointId>, consumers: Set<endpointId>, display }
-    // For hierarchical calls, map each caller variable to canonical root/local trace keys.
-    const varFlows = new Map(); // uniqueKey -> { display, producers: Set<epId>, consumers: Set<epId> }
-
-    function ensureVarSlot(slotKey, display) {
-      if (!varFlows.has(slotKey)) {
-        varFlows.set(slotKey, { display, producers: new Set(), consumers: new Set() });
-      }
-      return varFlows.get(slotKey);
-    }
-
-    // Build bindings per procedure invocation starting from root, or standalone defined procs
-    function traceSubtree(node, argBindings, scopeId, activeStack = new Set()) {
-      if (!node || activeStack.has(node.id)) return;
-      activeStack.add(node.id);
-      try {
-      const localSlotMap = new Map(); // varCanonical in this proc -> global flow slotKey
-      for (const p of node.params) {
-        if (argBindings.has(p.canonical)) {
-          localSlotMap.set(p.canonical, argBindings.get(p.canonical));
-        } else {
-          const slotKey = `${scopeId}::${p.canonical}`;
-          ensureVarSlot(slotKey, p.name);
-          localSlotMap.set(p.canonical, slotKey);
-        }
-      }
-
-      if (node.isStub || !node.proc) return;
-
-      // Also track local variables in this proc
-      function registerVars(stmts) {
-        for (const s of stmts) {
-          if (s.type === 'LocalVar') {
-            for (const v of s.vars) {
-              if (!localSlotMap.has(v.canonical)) {
-                const slotKey = `${scopeId}::${v.canonical}`;
-                ensureVarSlot(slotKey, v.name);
-                localSlotMap.set(v.canonical, slotKey);
-              }
-            }
-          } else if (s.type === 'If') { registerVars(s.thenBody); registerVars(s.elseBody); }
-          else if (s.type === 'Case') {
-            for (const b of s.branches) registerVars(b.body);
-            registerVars(s.otherwiseBody);
-          } else if (s.type === 'While' || s.type === 'Repeat' || s.type === 'For') {
-            registerVars(s.body);
-          }
-        }
-      }
-      registerVars(node.proc.body);
-
-      function getSlot(canon, displayName) {
-        if (localSlotMap.has(canon)) return localSlotMap.get(canon);
-        const slotKey = `${scopeId}::${canon}`;
-        ensureVarSlot(slotKey, displayName || canon);
-        localSlotMap.set(canon, slotKey);
-        return slotKey;
-      }
-
-      const outgoingEdges = model.edges.filter((e) => e.from === node.id);
-
-      // Process this node's own role if it is a leaf (CALC / IO)
-      if (outgoingEdges.length === 0) {
-        if (node.role === 'CALC') {
-          const pTag = extractProcessTag(node.canonicalName);
-          const procEp = ensureProcess(pTag, pTag, centralKeys.has(pTag), isTC && centralKeys.has(pTag));
-          for (const p of node.params) {
-            const slotKey = getSlot(p.canonical, p.name);
-            const slot = varFlows.get(slotKey);
-            if (p.direction === 'IN') slot.consumers.add(procEp.id);
-            else slot.producers.add(procEp.id);
-          }
-        } else if (node.role === 'DATA_MGMT' || node.role === 'PRESENTATION' || node.role === 'IO_GENERIC') {
-          const isRead = /^(GET|READ|FETCH)/.test(node.canonicalName) || node.ioMeta.directionHint === 'read';
-          for (const p of node.params) {
-            const slotKey = getSlot(p.canonical, p.name);
-            const slot = varFlows.get(slotKey);
-            const ioEp = ensureIOEndpoint(node.ioMeta.ioKind, node.ioMeta.ioTarget, isRead ? 'read' : 'write', slot.display);
-            if (isRead) slot.producers.add(ioEp.id);
-            else slot.consumers.add(ioEp.id);
-          }
-        }
-        return;
-      }
-
-      // Control module: iterate outgoing calls
-      const ownProcessTag = extractProcessTag(node.canonicalName);
-      for (const edge of outgoingEdges) {
-        const child = model.nodeMap.get(edge.toName);
-        if (!child) continue;
-
-        if (!child.isStub) {
-          const childBindings = new Map();
-          for (let i = 0; i < edge.args.length && i < child.params.length; i++) {
-            const arg = edge.args[i];
-            const fp = child.params[i];
-            childBindings.set(fp.canonical, getSlot(arg.canonical, arg.name));
-          }
-          // Avoid infinite loop on self-call or multi-hop cycles
-          if (!activeStack.has(child.id)) {
-            traceSubtree(child, childBindings, `${scopeId}/${child.canonicalName}`, activeStack);
-          }
-        } else {
-          // Handle stub child directly
-          if (child.role === 'CALC') {
-            const pTag = extractProcessTag(child.canonicalName);
-            const procEp = ensureProcess(pTag, pTag, centralKeys.has(pTag), isTC && centralKeys.has(pTag));
-            for (const inp of edge.inputs) {
-              const slot = varFlows.get(getSlot(inp.canonical, inp.name));
-              slot.consumers.add(procEp.id);
-            }
-            for (const outp of edge.allOutputs) {
-              const slot = varFlows.get(getSlot(outp.canonical, outp.name));
-              slot.producers.add(procEp.id);
-            }
-          } else if (child.role === 'IO_GENERIC' || child.role === 'DATA_MGMT' || child.role === 'PRESENTATION') {
-            const isRead = child.ioDirection === 'read' || /^(GET|READ|FETCH)/.test(child.canonicalName);
-            for (const inp of edge.inputs) {
-              const slot = varFlows.get(getSlot(inp.canonical, inp.name));
-              const ioEp = ensureIOEndpoint('UNKNOWN', null, 'write', slot.display);
-              slot.consumers.add(ioEp.id);
-            }
-            for (const outp of edge.allOutputs) {
-              const slot = varFlows.get(getSlot(outp.canonical, outp.name));
-              const ioEp = ensureIOEndpoint('UNKNOWN', null, isRead ? 'read' : 'write', slot.display);
-              if (isRead) slot.producers.add(ioEp.id);
-              else slot.consumers.add(ioEp.id);
-            }
-          } else {
-            // Stub Exec_* (e.g. EXEC_M1, EXEC_M2, EXEC_M4): treat as DFD Process
-            const pTag = extractProcessTag(child.canonicalName);
-            const procEp = ensureProcess(pTag, pTag, centralKeys.has(pTag), false);
-            for (const inp of edge.inputs) {
-              const slot = varFlows.get(getSlot(inp.canonical, inp.name));
-              slot.consumers.add(procEp.id);
-            }
-            for (const outp of edge.allOutputs) {
-              const slot = varFlows.get(getSlot(outp.canonical, outp.name));
-              slot.producers.add(procEp.id);
-            }
-          }
-        }
-
-        // If edge comes from CASE branch (Transaction Center), attach the branch flow from KD to target child process
-        if (edge.conditional && edge.conditional.type === 'CASE' && edge.conditional.label !== 'OTHERWISE') {
-          const kdKey = splitCompositeTags(ownProcessTag)[0];
-          const kdEp = processes.get(kdKey);
-          const targetTag = splitCompositeTags(extractProcessTag(child.canonicalName))[0];
-          const targetEp = processes.get(targetTag);
-          if (kdEp) {
-            for (const item of [...edge.args, ...edge.inputs]) {
-              const slot = varFlows.get(getSlot(item.canonical, item.name));
-              if (slot) slot.producers.add(kdEp.id);
-            }
-          }
-          if (kdEp && targetEp) {
-            const flowLabels = edge.inputs.length > 0 ? edge.inputs.map((x) => x.name) : [edge.conditional.label];
-            for (const lbl of flowLabels) {
-              const slotKey = `${scopeId}::CASE_${normalizeId(lbl)}`;
-              const slot = ensureVarSlot(slotKey, lbl);
-              slot.producers.add(kdEp.id);
-              slot.consumers.add(targetEp.id);
-            }
-          }
-        }
-      }
-      } finally {
-        activeStack.delete(node.id);
-      }
-    }
-
-    if (model.rootNode) {
-      traceSubtree(model.rootNode, new Map(), 'ROOT');
-    }
-
-    // Also inspect any orphan defined Calc_* / Get_* / Put_* procedures (useful for partial GE1 solutions!)
-    for (const n of model.nodes) {
-      if (!n.isStub && n.inDegree === 0 && n !== model.rootNode) {
-        traceSubtree(n, new Map(), `ORPHAN_${n.canonicalName}`);
-      }
-    }
-
-    // Reconcile variables across separate orphan/root scopes when a CALC_M1 matches a stub EXEC_M1 process
-    // Specifically: if a var slot has ONLY producers and no consumers (or vice versa), link by matching process key if same name exists
     const flowEdgeMap = new Map(); // "fromId->toId" -> { from, to, data: [] }
 
     function addFlowEdge(fromId, toId, dataLabel) {
-      if (fromId === toId) return;
+      if (!fromId || !toId || fromId === toId) return;
+      const fromEp = endpoints.get(fromId);
+      const toEp = endpoints.get(toId);
+      // Fundamental DFD invariant: at least one endpoint of every flow MUST be a Process
+      if (fromEp && toEp && fromEp.type !== 'process' && toEp.type !== 'process') {
+        return;
+      }
       if (directives.hiddenFlows.has(normalizeId(dataLabel))) return;
       const key = `${fromId}->${toId}`;
       if (!flowEdgeMap.has(key)) {
@@ -2368,23 +2394,478 @@
       }
     }
 
-    // Group unlinked consumer/producer slots by canonical variable name to bridge partial definitions (e.g. EXEC_M1 stub + CALC_M1 orphan)
+    // Sequential Flow-Sensitive Variable Provenance
+    // Prevents illegal Entity->Store bypasses, backward P1.4->P1.2 edges, and Cartesian spiderwebs.
+    const slotState = new Map(); // slotKey -> { display, sources: Set<epId>, lastProc: epId|null, consumed: boolean }
     const orphanProducersByVar = new Map();
     const orphanConsumersByVar = new Map();
-    for (const [, slot] of varFlows.entries()) {
-      const vNorm = normalizeId(slot.display);
-      if (slot.producers.size > 0 && slot.consumers.size > 0) {
-        for (const pId of slot.producers) {
-          for (const cId of slot.consumers) {
-            addFlowEdge(pId, cId, slot.display);
+
+    function addOrphanProducer(display, epId) {
+      const vNorm = normalizeId(display);
+      if (!orphanProducersByVar.has(vNorm)) orphanProducersByVar.set(vNorm, { display, eps: new Set() });
+      orphanProducersByVar.get(vNorm).eps.add(epId);
+    }
+
+    function addOrphanConsumer(display, epId) {
+      const vNorm = normalizeId(display);
+      if (!orphanConsumersByVar.has(vNorm)) orphanConsumersByVar.set(vNorm, { display, eps: new Set() });
+      orphanConsumersByVar.get(vNorm).eps.add(epId);
+    }
+
+    function ensureVarSlot(slotKey, display) {
+      if (!slotState.has(slotKey)) {
+        slotState.set(slotKey, {
+          display,
+          sources: new Set(),
+          lastProc: null,
+          consumed: false
+        });
+      }
+      return slotState.get(slotKey);
+    }
+
+    function snapshotSlots() {
+      const snap = new Map();
+      for (const [k, st] of slotState.entries()) {
+        snap.set(k, {
+          sources: new Set(st.sources),
+          lastProc: st.lastProc,
+          consumed: st.consumed
+        });
+      }
+      return snap;
+    }
+
+    function restoreSlots(snap) {
+      for (const [k, saved] of snap.entries()) {
+        const st = slotState.get(k);
+        if (st) {
+          st.sources = new Set(saved.sources);
+          st.lastProc = saved.lastProc;
+          st.consumed = saved.consumed;
+        }
+      }
+    }
+
+    function mergeSlotSnapshots(snaps) {
+      if (snaps.length === 0) return;
+      const allKeys = new Set();
+      for (const s of snaps) for (const k of s.keys()) allKeys.add(k);
+      for (const k of allKeys) {
+        const st = slotState.get(k);
+        if (!st) continue;
+        const unionSources = new Set();
+        let allConsumed = true;
+        let lastProc = st.lastProc;
+        for (const s of snaps) {
+          const item = s.get(k);
+          if (!item) continue;
+          item.sources.forEach((id) => unionSources.add(id));
+          if (!item.consumed) allConsumed = false;
+          if (item.lastProc) lastProc = item.lastProc;
+        }
+        st.sources = unionSources;
+        st.consumed = unionSources.size > 0 ? allConsumed : st.consumed;
+        st.lastProc = lastProc;
+      }
+    }
+
+    // Determine if a CONTROL procedure owns a single DFD process (e.g. EXEC_P1_1 -> P1.1, EXEC_M6 -> M6)
+    function resolveOwnProcessForControl(ctrlNode) {
+      if (!ctrlNode || ctrlNode.isStub) return null;
+      const outEdges = model.edges.filter((e) => e.from === ctrlNode.id);
+      const calcEdges = outEdges.filter((e) => {
+        const t = model.nodeMap.get(e.toName);
+        return t && t.role === 'CALC';
+      });
+      const subCtrlEdges = outEdges.filter((e) => {
+        const t = model.nodeMap.get(e.toName);
+        return t && (t.role === 'CONTROL' || t.role === 'ROOT_CONTROL');
+      });
+
+      if (calcEdges.length === 1 && (ctrlNode !== model.rootNode || subCtrlEdges.length === 0)) {
+        const calcNode = model.nodeMap.get(calcEdges[0].toName);
+        const ctrlDesc = extractProcessDescriptor(ctrlNode);
+        const calcDesc = extractProcessDescriptor(calcNode);
+        const label = ctrlDesc.label.length > calcDesc.label.length && ctrlDesc.key === calcDesc.key
+          ? ctrlDesc.label
+          : calcDesc.label;
+        return ensureProcess(calcDesc.key, label, centralKeys.has(calcDesc.key), isTC && centralKeys.has(calcDesc.key));
+      }
+
+      if (calcEdges.length === 0 && subCtrlEdges.length === 0 && ctrlNode !== model.rootNode) {
+        const desc = extractProcessDescriptor(ctrlNode);
+        return ensureProcess(desc.key, desc.label, centralKeys.has(desc.key), false);
+      }
+
+      return null;
+    }
+
+    function emitWriteSlotToIO(slot, ioEp, ownProcEp) {
+      if (slot.sources.size > 0) {
+        for (const srcId of slot.sources) {
+          const srcEp = endpoints.get(srcId);
+          if (!srcEp) continue;
+          if (srcEp.type === 'process') {
+            if (ownProcEp && srcId !== ownProcEp.id) {
+              // Passed from upstream process into ownProcEp's EXEC unit, then written by ownProcEp
+              addFlowEdge(srcId, ownProcEp.id, slot.display);
+              addFlowEdge(ownProcEp.id, ioEp.id, slot.display);
+            } else {
+              addFlowEdge(srcId, ioEp.id, slot.display);
+            }
+          } else {
+            // Source is an IO endpoint (e.g. GET followed by PUT): mediate via active process
+            const fallbackProc = ownProcEp
+              || (slot.lastProc ? endpoints.get(slot.lastProc) : null)
+              || (processes.size === 1 ? Array.from(processes.values())[0] : null);
+            if (fallbackProc) {
+              addFlowEdge(srcId, fallbackProc.id, slot.display);
+              addFlowEdge(fallbackProc.id, ioEp.id, slot.display);
+            }
           }
         }
-      } else if (slot.producers.size > 0 && slot.consumers.size === 0) {
-        if (!orphanProducersByVar.has(vNorm)) orphanProducersByVar.set(vNorm, { display: slot.display, eps: new Set() });
-        slot.producers.forEach((id) => orphanProducersByVar.get(vNorm).eps.add(id));
-      } else if (slot.consumers.size > 0 && slot.producers.size === 0) {
-        if (!orphanConsumersByVar.has(vNorm)) orphanConsumersByVar.set(vNorm, { display: slot.display, eps: new Set() });
-        slot.consumers.forEach((id) => orphanConsumersByVar.get(vNorm).eps.add(id));
+        slot.consumed = true;
+      } else if (ownProcEp) {
+        addFlowEdge(ownProcEp.id, ioEp.id, slot.display);
+        slot.consumed = true;
+      } else {
+        addOrphanConsumer(slot.display, ioEp.id);
+      }
+    }
+
+    function traceSubtree(node, argBindings, scopeId, activeStack = new Set()) {
+      if (!node || activeStack.has(node.id)) return;
+      activeStack.add(node.id);
+      try {
+        const localSlotMap = new Map(); // varCanonical in this proc -> slotKey
+        for (const p of node.params) {
+          if (argBindings.has(p.canonical)) {
+            localSlotMap.set(p.canonical, argBindings.get(p.canonical));
+          } else {
+            const slotKey = `${scopeId}::${p.canonical}`;
+            ensureVarSlot(slotKey, p.name);
+            localSlotMap.set(p.canonical, slotKey);
+          }
+        }
+
+        if (node.isStub || !node.proc) return;
+
+        function registerVars(stmts) {
+          for (const s of stmts) {
+            if (s.type === 'LocalVar') {
+              for (const v of s.vars) {
+                if (!localSlotMap.has(v.canonical)) {
+                  const slotKey = `${scopeId}::${v.canonical}`;
+                  ensureVarSlot(slotKey, v.name);
+                  localSlotMap.set(v.canonical, slotKey);
+                }
+              }
+            } else if (s.type === 'If') {
+              registerVars(s.thenBody);
+              registerVars(s.elseBody);
+            } else if (s.type === 'Case') {
+              for (const b of s.branches) registerVars(b.body);
+              registerVars(s.otherwiseBody);
+            } else if (s.type === 'While' || s.type === 'Repeat' || s.type === 'For') {
+              registerVars(s.body);
+            }
+          }
+        }
+        registerVars(node.proc.body);
+
+        function getSlotKey(canon, displayName) {
+          if (localSlotMap.has(canon)) return localSlotMap.get(canon);
+          const slotKey = `${scopeId}::${canon}`;
+          ensureVarSlot(slotKey, displayName || canon);
+          localSlotMap.set(canon, slotKey);
+          return slotKey;
+        }
+
+        const outgoingEdges = model.edges.filter((e) => e.from === node.id);
+
+        // Standalone leaf procedure (e.g. orphan CALC_M1 / GET_Δ / Put_Λ in partial GE1 solutions)
+        if (outgoingEdges.length === 0 && node !== model.rootNode && argBindings.size === 0) {
+          if (node.role === 'CALC') {
+            const desc = extractProcessDescriptor(node);
+            const procEp = ensureProcess(desc.key, desc.label, centralKeys.has(desc.key), isTC && centralKeys.has(desc.key));
+            for (const p of node.params) {
+              if (p.direction === 'IN') addOrphanConsumer(p.name, procEp.id);
+              else addOrphanProducer(p.name, procEp.id);
+            }
+          } else if (node.role === 'DATA_MGMT' || node.role === 'PRESENTATION' || node.role === 'IO_GENERIC') {
+            const isRead = /^(GET|READ|FETCH|DIABASE|ΑΝΑΓΝΩΣΕ)/.test(node.canonicalName) || node.ioMeta.directionHint === 'read';
+            for (const p of node.params) {
+              const ioEp = ensureIOEndpoint(node.ioMeta.ioKind, node.ioMeta.ioTarget, isRead ? 'read' : 'write', p.name);
+              if (isRead) addOrphanProducer(p.name, ioEp.id);
+              else addOrphanConsumer(p.name, ioEp.id);
+            }
+          }
+          return;
+        }
+
+        const ownProcEp = resolveOwnProcessForControl(node);
+        const ownProcessTag = extractProcessTag(node.canonicalName);
+        const usedEdgeIds = new Set();
+
+        function findCallEdge(callStmt) {
+          for (const e of outgoingEdges) {
+            if (!usedEdgeIds.has(e.id) && e.line === callStmt.line && e.toName === callStmt.canonicalTarget) {
+              usedEdgeIds.add(e.id);
+              return e;
+            }
+          }
+          return outgoingEdges.find((e) => e.line === callStmt.line && e.toName === callStmt.canonicalTarget) || null;
+        }
+
+        function handleCallStmt(callStmt, activeCaseBranch = null) {
+          const edge = findCallEdge(callStmt);
+          const child = model.nodeMap.get(callStmt.canonicalTarget);
+          if (!edge || !child) return;
+
+          // Transaction Center CASE dispatch: seed branch payload from KD process
+          let kdEp = null;
+          if (activeCaseBranch && activeCaseBranch !== 'OTHERWISE') {
+            const kdKey = splitCompositeTags(ownProcessTag)[0];
+            kdEp = processes.get(kdKey) || ownProcEp;
+            if (kdEp) {
+              for (const item of [...edge.args, ...edge.inputs]) {
+                const sk = getSlotKey(item.canonical, item.name);
+                const sl = slotState.get(sk);
+                if (sl && sl.sources.size === 0) {
+                  sl.sources = new Set([kdEp.id]);
+                  sl.lastProc = kdEp.id;
+                  sl.consumed = false;
+                }
+              }
+            }
+          }
+
+          if (!child.isStub) {
+            if (child.role === 'CALC') {
+              const desc = extractProcessDescriptor(child);
+              const label = ownProcEp && ownProcEp.key === desc.key && ownProcEp.label.length > desc.label.length
+                ? ownProcEp.label
+                : desc.label;
+              const procEp = ensureProcess(desc.key, label, centralKeys.has(desc.key), isTC && centralKeys.has(desc.key));
+
+              // 1. Consume IN params (plus IN/OUT params that hold a fresh unconsumed value from GET/upstream)
+              for (let i = 0; i < edge.args.length && i < child.params.length; i++) {
+                const arg = edge.args[i];
+                const fp = child.params[i];
+                const sk = getSlotKey(arg.canonical, arg.name);
+                const slot = slotState.get(sk);
+                if (fp.direction === 'IN' || (fp.direction === 'IN/OUT' && slot.sources.size > 0 && !slot.consumed)) {
+                  if (slot.sources.size > 0) {
+                    for (const srcId of slot.sources) {
+                      addFlowEdge(srcId, procEp.id, slot.display);
+                    }
+                    slot.consumed = true;
+                    slot.lastProc = procEp.id;
+                  } else if (fp.direction === 'IN') {
+                    addOrphanConsumer(slot.display, procEp.id);
+                  }
+                }
+              }
+
+              // 2. Overwrite sources for OUT / IN/OUT params with this process
+              for (let i = 0; i < edge.args.length && i < child.params.length; i++) {
+                const arg = edge.args[i];
+                const fp = child.params[i];
+                if (fp.direction === 'OUT' || fp.direction === 'IN/OUT') {
+                  const sk = getSlotKey(arg.canonical, arg.name);
+                  const slot = slotState.get(sk);
+                  slot.sources = new Set([procEp.id]);
+                  slot.lastProc = procEp.id;
+                  slot.consumed = false;
+                }
+              }
+            } else if (child.role === 'DATA_MGMT' || child.role === 'PRESENTATION' || child.role === 'IO_GENERIC') {
+              const isRead = /^(GET|READ|FETCH|DIABASE|ΑΝΑΓΝΩΣΕ)/.test(child.canonicalName) || child.ioMeta.directionHint === 'read';
+              for (let i = 0; i < edge.args.length; i++) {
+                const arg = edge.args[i];
+                const sk = getSlotKey(arg.canonical, arg.name);
+                const slot = slotState.get(sk);
+                const ioEp = ensureIOEndpoint(child.ioMeta.ioKind, child.ioMeta.ioTarget, isRead ? 'read' : 'write', slot.display);
+                if (isRead) {
+                  slot.sources = new Set([ioEp.id]);
+                  slot.consumed = false;
+                } else {
+                  emitWriteSlotToIO(slot, ioEp, ownProcEp);
+                }
+              }
+            } else {
+              // Defined sub-controller (EXEC_*)
+              // Snapshot IN-only bound slots so internal overwrites don't leak out of IN parameters
+              const childBindings = new Map();
+              const inOnlyRestore = [];
+              for (let i = 0; i < edge.args.length && i < child.params.length; i++) {
+                const arg = edge.args[i];
+                const fp = child.params[i];
+                const callerSk = getSlotKey(arg.canonical, arg.name);
+                if (fp.direction === 'IN') {
+                  const innerSk = `${scopeId}/${child.canonicalName}::IN_${fp.canonical}_${edge.id}`;
+                  const callerSlot = slotState.get(callerSk);
+                  const innerSlot = ensureVarSlot(innerSk, callerSlot ? callerSlot.display : arg.name);
+                  if (callerSlot) {
+                    innerSlot.sources = new Set(callerSlot.sources);
+                    innerSlot.lastProc = callerSlot.lastProc;
+                    innerSlot.consumed = false;
+                  }
+                  childBindings.set(fp.canonical, innerSk);
+                  inOnlyRestore.push({ callerSlot, innerSlot });
+                } else {
+                  childBindings.set(fp.canonical, callerSk);
+                }
+              }
+
+              if (!activeStack.has(child.id)) {
+                traceSubtree(child, childBindings, `${scopeId}/${child.canonicalName}`, activeStack);
+              }
+
+              for (const pair of inOnlyRestore) {
+                if (pair.callerSlot && pair.innerSlot.consumed) {
+                  pair.callerSlot.consumed = true;
+                }
+              }
+            }
+          } else {
+            // Stub callee handling
+            if (child.role === 'CALC' || (child.role !== 'IO_GENERIC' && child.role !== 'DATA_MGMT' && child.role !== 'PRESENTATION')) {
+              const desc = extractProcessDescriptor(child);
+              const procEp = ensureProcess(desc.key, desc.label, centralKeys.has(desc.key), child.role === 'CALC' && isTC && centralKeys.has(desc.key));
+              for (const inp of edge.inputs) {
+                const sk = getSlotKey(inp.canonical, inp.name);
+                const slot = slotState.get(sk);
+                if (slot.sources.size > 0) {
+                  for (const srcId of slot.sources) addFlowEdge(srcId, procEp.id, slot.display);
+                  slot.consumed = true;
+                  slot.lastProc = procEp.id;
+                } else {
+                  addOrphanConsumer(slot.display, procEp.id);
+                }
+              }
+              for (const outp of edge.allOutputs) {
+                const sk = getSlotKey(outp.canonical, outp.name);
+                const slot = slotState.get(sk);
+                slot.sources = new Set([procEp.id]);
+                slot.lastProc = procEp.id;
+                slot.consumed = false;
+              }
+            } else {
+              const isRead = child.ioDirection === 'read' || /^(GET|READ|FETCH|DIABASE|ΑΝΑΓΝΩΣΕ)/.test(child.canonicalName);
+              for (const inp of edge.inputs) {
+                const sk = getSlotKey(inp.canonical, inp.name);
+                const slot = slotState.get(sk);
+                const ioEp = ensureIOEndpoint('UNKNOWN', null, 'write', slot.display);
+                emitWriteSlotToIO(slot, ioEp, ownProcEp);
+              }
+              for (const outp of edge.allOutputs) {
+                const sk = getSlotKey(outp.canonical, outp.name);
+                const slot = slotState.get(sk);
+                const ioEp = ensureIOEndpoint('UNKNOWN', null, isRead ? 'read' : 'write', slot.display);
+                if (isRead) {
+                  slot.sources = new Set([ioEp.id]);
+                  slot.consumed = false;
+                } else {
+                  emitWriteSlotToIO(slot, ioEp, ownProcEp);
+                }
+              }
+            }
+          }
+
+          // Explicit KD -> target branch flow when CASE branch has no explicit input vars
+          if (kdEp && activeCaseBranch && activeCaseBranch !== 'OTHERWISE') {
+            const targetTag = splitCompositeTags(extractProcessTag(child.canonicalName))[0];
+            const targetEp = processes.get(targetTag);
+            if (targetEp && kdEp.id !== targetEp.id) {
+              const flowLabels = edge.inputs.length > 0 ? edge.inputs.map((x) => x.name) : [activeCaseBranch];
+              for (const lbl of flowLabels) {
+                addFlowEdge(kdEp.id, targetEp.id, lbl);
+              }
+            }
+          }
+        }
+
+        function walkStatements(stmts, activeCaseBranch = null) {
+          for (const s of stmts || []) {
+            if (s.type === 'Call') {
+              handleCallStmt(s, activeCaseBranch);
+            } else if (s.type === 'Assign') {
+              const targetSk = getSlotKey(s.canonicalTarget, s.target);
+              const targetSlot = slotState.get(targetSk);
+              const combined = new Set();
+              for (const rv of s.rhsVars || []) {
+                const rSk = getSlotKey(rv.canonical, rv.name);
+                const rSlot = slotState.get(rSk);
+                if (rSlot) {
+                  rSlot.sources.forEach((id) => combined.add(id));
+                  rSlot.consumed = true;
+                }
+              }
+              if (combined.size > 0) {
+                targetSlot.sources = combined;
+                targetSlot.consumed = false;
+              }
+            } else if (s.type === 'If') {
+              const baseSnap = snapshotSlots();
+              walkStatements(s.thenBody, activeCaseBranch);
+              const thenSnap = snapshotSlots();
+              restoreSlots(baseSnap);
+              if (s.elseBody && s.elseBody.length > 0) {
+                walkStatements(s.elseBody, activeCaseBranch);
+                const elseSnap = snapshotSlots();
+                mergeSlotSnapshots([thenSnap, elseSnap]);
+              } else {
+                mergeSlotSnapshots([baseSnap, thenSnap]);
+              }
+            } else if (s.type === 'Case') {
+              const baseSnap = snapshotSlots();
+              const branchSnaps = [];
+              for (const b of s.branches || []) {
+                restoreSlots(baseSnap);
+                walkStatements(b.body, b.label);
+                branchSnaps.push(snapshotSlots());
+              }
+              if (s.otherwiseBody && s.otherwiseBody.length > 0) {
+                restoreSlots(baseSnap);
+                walkStatements(s.otherwiseBody, 'OTHERWISE');
+                branchSnaps.push(snapshotSlots());
+              }
+              if (branchSnaps.length > 0) {
+                mergeSlotSnapshots(branchSnaps);
+              } else {
+                restoreSlots(baseSnap);
+              }
+            } else if (s.type === 'While' || s.type === 'Repeat' || s.type === 'For') {
+              walkStatements(s.body, activeCaseBranch);
+            }
+          }
+        }
+
+        walkStatements(node.proc.body, null);
+      } finally {
+        activeStack.delete(node.id);
+      }
+    }
+
+    if (model.rootNode) {
+      traceSubtree(model.rootNode, new Map(), 'ROOT');
+    }
+
+    // Inspect any orphan defined procedures (for partial GE1 solutions)
+    for (const n of model.nodes) {
+      if (!n.isStub && n.inDegree === 0 && n !== model.rootNode) {
+        traceSubtree(n, new Map(), `ORPHAN_${n.canonicalName}`);
+      }
+    }
+
+    // Collect any unconsumed slot outputs (e.g. EXEC_M1 orphan producing Γ, or stub EXEC outputs)
+    for (const [, slot] of slotState.entries()) {
+      if (slot.sources.size > 0 && !slot.consumed) {
+        for (const srcId of slot.sources) {
+          addOrphanProducer(slot.display, srcId);
+        }
       }
     }
 
@@ -2393,7 +2874,15 @@
       for (const cf of e.controlFlags) controlFlagSet.add(cf.canonical);
     }
 
-    // Bridge matching orphan producer/consumer pairs unless they belong to the exact same process
+    function hasExistingFlowForVar(epId, vNorm, dir) {
+      for (const f of flowEdgeMap.values()) {
+        if (dir === 'out' && f.from === epId && f.data.some((d) => normalizeId(d) === vNorm)) return true;
+        if (dir === 'in' && f.to === epId && f.data.some((d) => normalizeId(d) === vNorm)) return true;
+      }
+      return false;
+    }
+
+    // Bridge matching orphan producer/consumer pairs across scopes (e.g. EXEC_M1 stub + CALC_M1 orphan)
     for (const [vNorm, prodInfo] of orphanProducersByVar.entries()) {
       const consInfo = orphanConsumersByVar.get(vNorm);
       if (consInfo) {
@@ -2406,10 +2895,9 @@
         }
         orphanConsumersByVar.delete(vNorm);
       } else if (!controlFlagSet.has(vNorm)) {
-        // Still dangling output (not a CASE control flag) -> synthesize external
         for (const pId of prodInfo.eps) {
           const srcEp = endpoints.get(pId);
-          if (srcEp && srcEp.type === 'process') {
+          if (srcEp && srcEp.type === 'process' && !hasExistingFlowForVar(pId, vNorm, 'out')) {
             const sink = ensureIOEndpoint('UNKNOWN', null, 'write', prodInfo.display);
             addFlowEdge(pId, sink.id, prodInfo.display);
           }
@@ -2417,17 +2905,17 @@
       }
     }
 
-    for (const [, consInfo] of orphanConsumersByVar.entries()) {
+    for (const [vNorm, consInfo] of orphanConsumersByVar.entries()) {
       for (const cId of consInfo.eps) {
         const dstEp = endpoints.get(cId);
-        if (dstEp && dstEp.type === 'process') {
+        if (dstEp && dstEp.type === 'process' && !hasExistingFlowForVar(cId, vNorm, 'in')) {
           const src = ensureIOEndpoint('UNKNOWN', null, 'read', consInfo.display);
           addFlowEdge(src.id, cId, consInfo.display);
         }
       }
     }
 
-    // Filter out any endpoints that have 0 incident edges
+    // Filter out any endpoints that have 0 incident edges (except when the entire DFD has <=1 process)
     const usedEndpointIds = new Set();
     const flows = Array.from(flowEdgeMap.values());
     for (const f of flows) {
@@ -2435,7 +2923,9 @@
       usedEndpointIds.add(f.to);
     }
 
-    const activeEndpoints = Array.from(endpoints.values()).filter((ep) => usedEndpointIds.has(ep.id) || ep.type === 'process');
+    const activeEndpoints = Array.from(endpoints.values()).filter(
+      (ep) => usedEndpointIds.has(ep.id) || (ep.type === 'process' && processes.size <= 1)
+    );
 
     const fullDFD = {
       nodes: activeEndpoints,

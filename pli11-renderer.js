@@ -1,7 +1,9 @@
 // -----------------------------------------------------------------------------
-// EAP ΠΛΗ11 SVG Renderer (ΔΔΠ & ΔΡΔ) + PNG/SVG Export
+// EAP ΠΛΗ11 SVG Renderer (ΔΔΠ & ΔΡΔ) + HiDPI Word-Ready PNG/SVG Export
 // Renders ○→ (Data Couples), ●→ (Control Flags), ◇ (Selection), ↻ (Loops),
 // and DFD Circles, Parallel-Line Data Stores, and External Entity Boxes.
+// Supports both Textbook Vertical-Spine EAP Layout (with local store/entity
+// cloning & horizontal halo labels) and Classic Horizontal KM/KD Layout.
 // UMD module: Browser window.PLI11Renderer / Node exports
 // -----------------------------------------------------------------------------
 
@@ -27,26 +29,26 @@
     if (options.printMode) {
       return {
         bg: '#ffffff',
-        ink: '#111827',
-        muted: '#4b5563',
-        edge: '#1f2937',
+        ink: '#0f172a',
+        muted: '#475569',
+        edge: '#2b4c7e',
         labelBg: '#ffffff',
-        labelBorder: '#d1d5db',
-        rootFill: '#f3f4f6',
-        rootStroke: '#111827',
+        labelBorder: '#cbd5e1',
+        rootFill: '#f8fafc',
+        rootStroke: '#1e3a5f',
         ctrlFill: '#ffffff',
-        ctrlStroke: '#111827',
+        ctrlStroke: '#2b4c7e',
         calcFill: '#ffffff',
-        calcStroke: '#111827',
-        ioFill: '#ffffff',
-        ioStroke: '#374151',
-        storeFill: '#f9fafb',
-        storeStroke: '#111827',
-        kmBg: 'rgba(17, 24, 39, 0.03)',
-        kmStroke: '#4b5563',
+        calcStroke: '#2b4c7e',
+        ioFill: '#f8fafc',
+        ioStroke: '#2b4c7e',
+        storeFill: '#ffffff',
+        storeStroke: '#2b4c7e',
+        kmBg: 'rgba(30, 58, 95, 0.03)',
+        kmStroke: '#334155',
         activeStroke: '#b45309',
         activeGlow: 'rgba(180, 83, 9, 0.25)',
-        font: 'Segoe UI, Roboto, Arial, sans-serif'
+        font: 'Calibri, "Segoe UI", Roboto, Arial, sans-serif'
       };
     }
 
@@ -56,7 +58,7 @@
         ink: '#e0e6ed',
         muted: '#94a3b8',
         edge: '#94a3b8',
-        labelBg: '#12141d',
+        labelBg: '#0b0c15',
         labelBorder: '#2d3148',
         rootFill: '#112a38',
         rootStroke: '#00f3ff',
@@ -76,46 +78,46 @@
       };
     }
 
-    // Light mode (Solarized-inspired palette matching style.css)
+    // Light mode (clean warm paper / EAP academic blue-teal accents)
     return {
       bg: '#fdf6e3',
       ink: '#073642',
       muted: '#586e75',
-      edge: '#586e75',
+      edge: '#3b5998',
       labelBg: '#fdf6e3',
       labelBorder: '#d3cbb7',
       rootFill: '#e6f4f1',
       rootStroke: '#166534',
-      ctrlFill: '#e8f1f8',
-      ctrlStroke: '#268bd2',
+      ctrlFill: '#eef4fb',
+      ctrlStroke: '#2b579a',
       calcFill: '#f3effb',
-      calcStroke: '#6c71c4',
-      ioFill: '#eef7ea',
-      ioStroke: '#2aa198',
-      storeFill: '#faf0db',
-      storeStroke: '#b58900',
-      kmBg: 'rgba(38, 139, 210, 0.06)',
-      kmStroke: '#268bd2',
+      calcStroke: '#5b5fc7',
+      ioFill: '#eef7f2',
+      ioStroke: '#2b579a',
+      storeFill: '#faf3e3',
+      storeStroke: '#2b579a',
+      kmBg: 'rgba(43, 87, 154, 0.05)',
+      kmStroke: '#2b579a',
       activeStroke: '#dc322f',
       activeGlow: 'rgba(220, 50, 47, 0.25)',
-      font: '"Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+      font: 'Calibri, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
     };
   }
 
   function roleStyle(role, pal) {
     switch (role) {
       case 'ROOT_CONTROL':
-        return { fill: pal.rootFill, stroke: pal.rootStroke, tag: 'Ρίζα / Έλεγχος', sw: 2.2 };
+        return { fill: pal.rootFill, stroke: pal.rootStroke, tag: 'Ρίζα / Έλεγχος', sw: 2.3 };
       case 'CONTROL':
-        return { fill: pal.ctrlFill, stroke: pal.ctrlStroke, tag: 'Έλεγχος', sw: 1.7 };
+        return { fill: pal.ctrlFill, stroke: pal.ctrlStroke, tag: 'Έλεγχος', sw: 1.8 };
       case 'CALC':
-        return { fill: pal.calcFill, stroke: pal.calcStroke, tag: 'Υπολογισμός', sw: 1.7 };
+        return { fill: pal.calcFill, stroke: pal.calcStroke, tag: 'Υπολογισμός', sw: 1.8 };
       case 'DATA_MGMT':
-        return { fill: pal.storeFill, stroke: pal.storeStroke, tag: 'Διαχ. Δεδομένων', sw: 1.7 };
+        return { fill: pal.storeFill, stroke: pal.storeStroke, tag: 'Διαχ. Δεδομένων', sw: 1.8 };
       case 'PRESENTATION':
-        return { fill: pal.ioFill, stroke: pal.ioStroke, tag: 'Παρουσίαση', sw: 1.7 };
+        return { fill: pal.ioFill, stroke: pal.ioStroke, tag: 'Παρουσίαση', sw: 1.8 };
       default:
-        return { fill: pal.ioFill, stroke: pal.ioStroke, tag: 'Είσοδος/Έξοδος', sw: 1.6 };
+        return { fill: pal.ioFill, stroke: pal.ioStroke, tag: 'Είσοδος/Έξοδος', sw: 1.7 };
     }
   }
 
@@ -125,13 +127,17 @@
   function splitTextIntoLines(text, maxCharsPerLine = 20) {
     if (!text) return [''];
     const str = String(text).trim();
-    if (str.length <= maxCharsPerLine) return [str];
+    if (!str) return [''];
 
     if (str.includes('\n')) {
       return str.split('\n').flatMap((line) => splitTextIntoLines(line, maxCharsPerLine));
     }
 
-    const words = str.split(/\s+/);
+    if (str.length <= maxCharsPerLine) return [str];
+
+    // Normalize spacing after commas so comma-separated lists wrap cleanly
+    const normalized = str.replace(/,\s*/g, ', ');
+    const words = normalized.split(/\s+/);
     if (words.length === 1) {
       if (str.length > maxCharsPerLine && str.includes('_')) {
         const parts = str.split('_');
@@ -154,6 +160,20 @@
     const lines = [];
     let currentLine = '';
     for (const word of words) {
+      const token = word.length > maxCharsPerLine && word.includes('_')
+        ? word.replace(/_/g, ' ')
+        : word;
+      if (token.includes(' ') && token !== word) {
+        for (const sub of token.split(/\s+/)) {
+          if (!currentLine) currentLine = sub;
+          else if ((currentLine + ' ' + sub).length <= maxCharsPerLine) currentLine += ' ' + sub;
+          else {
+            lines.push(currentLine);
+            currentLine = sub;
+          }
+        }
+        continue;
+      }
       if (!currentLine) {
         currentLine = word;
       } else if ((currentLine + ' ' + word).length <= maxCharsPerLine) {
@@ -168,22 +188,86 @@
   }
 
   function renderMultilineText(lines, cx, cy, options = {}) {
-    const fontSize = options.fontSize || 12;
+    const fontSize = options.fontSize || 13;
     const fontWeight = options.fontWeight || '700';
     const fill = options.fill || '#000';
+    const anchor = options.anchor || 'middle';
+    const haloStroke = options.haloStroke || '';
+    const haloAttr = haloStroke
+      ? ` stroke="${haloStroke}" stroke-width="${options.haloWidth || 4.5}" stroke-linejoin="round" paint-order="stroke"`
+      : '';
     const n = lines.length;
     if (n === 0) return '';
     if (n === 1) {
-      return `<text x="${cx.toFixed(1)}" y="${(cy + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${fill}" font-size="${fontSize}" font-weight="${fontWeight}">${escXml(lines[0])}</text>`;
+      return `<text x="${cx.toFixed(1)}" y="${(cy + 1).toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="${fill}" font-size="${fontSize}" font-weight="${fontWeight}"${haloAttr}>${escXml(lines[0])}</text>`;
     }
-    const lineHeight = options.lineHeight || (fontSize + 4);
+    const lineHeight = options.lineHeight || options.lineSpacing || (fontSize + 4.5);
     const startY = cy - ((n - 1) * lineHeight) / 2;
     const tspans = lines.map((line, idx) => {
       const y = startY + idx * lineHeight;
       return `<tspan x="${cx.toFixed(1)}" y="${y.toFixed(1)}">${escXml(line)}</tspan>`;
     }).join('');
 
-    return `<text text-anchor="middle" dominant-baseline="middle" fill="${fill}" font-size="${fontSize}" font-weight="${fontWeight}">${tspans}</text>`;
+    return `<text text-anchor="${anchor}" dominant-baseline="middle" fill="${fill}" font-size="${fontSize}" font-weight="${fontWeight}"${haloAttr}>${tspans}</text>`;
+  }
+
+  function formatDFDFlowItem(raw) {
+    return String(raw || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function computeCanvasViewport(minX, minY, maxX, maxY, padX, padY, extraBottom, options = {}) {
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || maxX <= minX) {
+      minX = 0;
+      maxX = 640;
+    }
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY) || maxY <= minY) {
+      minY = 0;
+      maxY = 240;
+    }
+
+    const tightMinX = Math.floor(minX - padX);
+    const tightMinY = Math.floor(minY - padY);
+    const tightW = Math.max(320, Math.ceil((maxX - minX) + padX * 2));
+    const tightH = Math.max(200, Math.ceil((maxY - minY) + extraBottom + padY * 2));
+
+    // Word / tight export: never add letterbox whitespace around the diagram
+    if (options.tightCrop || (!options.canvasWidth && !options.canvasHeight)) {
+      return {
+        viewMinX: tightMinX,
+        viewMinY: tightMinY,
+        viewW: tightW,
+        viewH: tightH,
+        svgW: tightW,
+        svgH: tightH
+      };
+    }
+
+    const targetW = options.canvasWidth || tightW;
+    const targetH = options.canvasHeight || tightH;
+    const targetAR = targetW / targetH;
+    const tightAR = tightW / tightH;
+
+    let viewW = tightW;
+    let viewH = tightH;
+    let viewMinX = tightMinX;
+    let viewMinY = tightMinY;
+
+    if (tightAR < targetAR) {
+      viewW = Math.round(tightH * targetAR);
+      viewMinX = Math.round(tightMinX - (viewW - tightW) / 2);
+    } else if (tightAR > targetAR) {
+      viewH = Math.round(tightW / targetAR);
+      viewMinY = Math.round(tightMinY - (viewH - tightH) / 2);
+    }
+
+    return {
+      viewMinX,
+      viewMinY,
+      viewW,
+      viewH,
+      svgW: targetW,
+      svgH: targetH
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -193,7 +277,7 @@
     const pal = getPalette(options);
     const activeNodeId = options.activeNodeId || null;
     const activeEdgeId = options.activeEdgeId || null;
-    const showLegend = options.showLegend !== false;
+    const showLegend = options.showLegend !== false && !options.tightCrop;
 
     if (!model || !model.nodes || model.nodes.length === 0) {
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240" width="680" height="240" style="font-family:${escXml(pal.font)}">
@@ -202,18 +286,19 @@
       </svg>`;
     }
 
-    const boxH = 46;
-    const hGap = 54;
-    const vGap = 128;
+    const boxH = 50;
+    const totalNodes = model.nodes.length;
+    const hGap = totalNodes >= 12 ? 34 : 46;
+    const vGap = 148;
 
     const nodeDims = new Map();
     const nodeLines = new Map();
     for (const n of model.nodes) {
-      const lines = splitTextIntoLines(n.name || '', 20);
+      const lines = splitTextIntoLines(n.name || '', 18);
       nodeLines.set(n.id, lines);
       const maxLen = Math.max(...lines.map((l) => l.length), 1);
-      const w = Math.max(122, maxLen * 8.6 + 28);
-      const h = Math.max(boxH, lines.length * 16 + (n.isStub ? 22 : 16));
+      const w = Math.max(128, maxLen * 8.6 + 26);
+      const h = Math.max(boxH, lines.length * 17 + (n.isStub ? 24 : 18));
       nodeDims.set(n.id, { w, h });
     }
 
@@ -252,12 +337,9 @@
       buildSpanningTree(model.rootNode.id);
     }
     for (const n of model.nodes) {
-      if (!placedInTree.has(n.id)) {
-        // Pick nodes with inDegree 0 first
-        if (n.inDegree === 0) {
-          componentRoots.push(n.id);
-          buildSpanningTree(n.id);
-        }
+      if (!placedInTree.has(n.id) && n.inDegree === 0) {
+        componentRoots.push(n.id);
+        buildSpanningTree(n.id);
       }
     }
     for (const n of model.nodes) {
@@ -267,35 +349,96 @@
       }
     }
 
-    // Compute subtree widths bottom-up
+    // Compute subtree widths bottom-up (interleaving 2-tier leaves & wrapping ultra-wide subtree rows)
     const subtreeWidths = new Map();
+    const subtreeHeights = new Map();
+    function isLeafTree(id) {
+      return (treeChildren.get(id) || []).length === 0;
+    }
+
+    const MAX_ROW_WIDTH = 1650;
+
+    function partitionChildRows(ch) {
+      const hasCompositeChildren = ch.some((cid) => !isLeafTree(cid));
+      if (!hasCompositeChildren || ch.length < 3) return [ch];
+      const totalSingleRow = ch.reduce((acc, cid, idx) => acc + subtreeWidths.get(cid) + (idx > 0 ? hGap : 0), 0);
+      if (totalSingleRow <= MAX_ROW_WIDTH) return [ch];
+
+      const rows = [];
+      let curRow = [];
+      let curW = 0;
+      for (const cid of ch) {
+        const cw = subtreeWidths.get(cid);
+        const added = curRow.length === 0 ? cw : cw + hGap + 64; // +64 central trunk alley
+        if (curRow.length > 0 && (curW + added > MAX_ROW_WIDTH || curRow.length >= 2)) {
+          rows.push(curRow);
+          curRow = [cid];
+          curW = cw;
+        } else {
+          curRow.push(cid);
+          curW += added;
+        }
+      }
+      if (curRow.length > 0) rows.push(curRow);
+      return rows;
+    }
+
     function calcWidth(id) {
       const ch = treeChildren.get(id) || [];
-      const selfW = nodeDims.get(id).w;
+      const selfDim = nodeDims.get(id);
       if (ch.length === 0) {
-        subtreeWidths.set(id, selfW);
-        return selfW;
+        subtreeWidths.set(id, selfDim.w);
+        subtreeHeights.set(id, selfDim.h);
+        return selfDim.w;
       }
-      let sum = 0;
-      for (let i = 0; i < ch.length; i++) {
-        sum += calcWidth(ch[i]);
-        if (i > 0) sum += hGap;
+
+      for (const cid of ch) calcWidth(cid);
+
+      const allLeaves = ch.every(isLeafTree);
+      if (allLeaves && ch.length >= 5) {
+        // Interleaved 2-tier zipper layout: guarantees >=28px horizontal gap on same tier & >=40px vertical gap
+        let span = subtreeWidths.get(ch[0]);
+        for (let i = 1; i < ch.length; i++) {
+          const prevW = subtreeWidths.get(ch[i - 1]);
+          const curW = subtreeWidths.get(ch[i]);
+          const step = Math.ceil((prevW + curW) / 4 + 18);
+          span += step - prevW / 2 + curW / 2;
+        }
+        const total = Math.max(selfDim.w, Math.ceil(span));
+        subtreeWidths.set(id, total);
+        subtreeHeights.set(id, selfDim.h + vGap + 98 + 68);
+        return total;
       }
-      const total = Math.max(selfW, sum);
-      subtreeWidths.set(id, total);
-      return total;
+
+      const rows = partitionChildRows(ch);
+      let maxRowW = selfDim.w;
+      let totalH = selfDim.h;
+      for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+        const row = rows[rIdx];
+        const alley = rows.length > 1 && row.length >= 2 ? 72 : 0;
+        let rw = alley;
+        let rh = 0;
+        for (let i = 0; i < row.length; i++) {
+          rw += subtreeWidths.get(row[i]);
+          if (i > 0) rw += hGap;
+          rh = Math.max(rh, subtreeHeights.get(row[i]) || boxH);
+        }
+        maxRowW = Math.max(maxRowW, rw);
+        totalH += (rIdx === 0 ? vGap : 110) + rh;
+      }
+      subtreeWidths.set(id, maxRowW);
+      subtreeHeights.set(id, totalH);
+      return maxRowW;
     }
     for (const r of componentRoots) calcWidth(r);
 
     // Assign coordinates
-    const coords = new Map(); // id -> { cx, cy, x, y, w, h, depth }
-    let maxDepth = 0;
-    function assignCoords(id, leftX, depth) {
-      maxDepth = Math.max(maxDepth, depth);
+    const coords = new Map();
+    function assignCoords(id, leftX, topY, depth) {
       const subW = subtreeWidths.get(id);
       const dim = nodeDims.get(id);
       const cx = leftX + subW / 2;
-      const cy = 48 + depth * vGap + dim.h / 2;
+      const cy = topY + dim.h / 2;
       coords.set(id, {
         cx,
         cy,
@@ -309,15 +452,49 @@
       const ch = treeChildren.get(id) || [];
       if (ch.length === 0) return;
 
-      let childrenTotalW = 0;
-      for (let i = 0; i < ch.length; i++) {
-        childrenTotalW += subtreeWidths.get(ch[i]);
-        if (i > 0) childrenTotalW += hGap;
+      const allLeaves = ch.every(isLeafTree);
+      if (allLeaves && ch.length >= 5) {
+        const w0 = subtreeWidths.get(ch[0]);
+        const relCenters = [w0 / 2];
+        for (let i = 1; i < ch.length; i++) {
+          const prevW = subtreeWidths.get(ch[i - 1]);
+          const curW = subtreeWidths.get(ch[i]);
+          const step = Math.ceil((prevW + curW) / 4 + 18);
+          relCenters.push(relCenters[i - 1] + step);
+        }
+        const totalSpan = relCenters[ch.length - 1] + subtreeWidths.get(ch[ch.length - 1]) / 2;
+        const startLeft = cx - totalSpan / 2;
+        const childBaseTopY = topY + vGap;
+        for (let i = 0; i < ch.length; i++) {
+          const tierOffset = (i % 2 === 1) ? 98 : 0;
+          const cw = subtreeWidths.get(ch[i]);
+          const childCx = startLeft + relCenters[i];
+          assignCoords(ch[i], childCx - cw / 2, childBaseTopY + tierOffset, depth + 1);
+        }
+        return;
       }
-      let curX = cx - childrenTotalW / 2;
-      for (const childId of ch) {
-        assignCoords(childId, curX, depth + 1);
-        curX += subtreeWidths.get(childId) + hGap;
+
+      const rows = partitionChildRows(ch);
+      let rowTopY = topY + vGap;
+      for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+        const row = rows[rIdx];
+        const alley = rows.length > 1 && row.length >= 2 ? 72 : 0;
+        let rowTotalW = alley;
+        let rowMaxH = 0;
+        for (let i = 0; i < row.length; i++) {
+          rowTotalW += subtreeWidths.get(row[i]);
+          if (i > 0) rowTotalW += hGap;
+          rowMaxH = Math.max(rowMaxH, subtreeHeights.get(row[i]) || boxH);
+        }
+        let curX = cx - rowTotalW / 2;
+        const midSplit = Math.ceil(row.length / 2);
+        for (let i = 0; i < row.length; i++) {
+          if (alley > 0 && i === midSplit) curX += alley;
+          const childId = row[i];
+          assignCoords(childId, curX, rowTopY, depth + 1 + rIdx);
+          curX += subtreeWidths.get(childId) + hGap;
+        }
+        rowTopY += rowMaxH + 110;
       }
     }
 
@@ -326,92 +503,47 @@
     for (let i = 0; i < componentRoots.length; i++) {
       const rId = componentRoots[i];
       const w = subtreeWidths.get(rId);
-      assignCoords(rId, cursorX, 0);
+      assignCoords(rId, cursorX, 48, 0);
       compRanges.push({ rootId: rId, startX: cursorX, width: w });
       cursorX += w + 84;
     }
 
-    let minX = Infinity;
-    let minY = 20;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const pos of coords.values()) {
-      minX = Math.min(minX, pos.x);
-      maxX = Math.max(maxX, pos.x + pos.w);
-      minY = Math.min(minY, pos.y);
-      maxY = Math.max(maxY, pos.y + pos.h);
-    }
-    if (!Number.isFinite(minX)) {
-      minX = 0;
-      maxX = 660;
-      minY = 0;
-      maxY = 240;
-    }
-
-    const padX = options.paddingX || options.padding || 36;
-    const padY = options.paddingY || options.padding || 28;
-    const legendH = showLegend ? 46 : 14;
-    const contentW = maxX - minX;
-    const contentH = maxY - minY + legendH;
-
-    let totalWidth = Math.max(660, Math.ceil(contentW + padX * 2));
-    let totalHeight = Math.max(240, Math.ceil(contentH + padY * 2));
-    let viewMinX = Math.floor(minX - padX);
-    let viewMinY = Math.floor(minY - padY);
-
-    if (options.canvasWidth && options.canvasWidth > totalWidth) {
-      const extraX = options.canvasWidth - totalWidth;
-      viewMinX -= extraX / 2;
-      totalWidth = options.canvasWidth;
-    }
-    if (options.canvasHeight && options.canvasHeight > totalHeight) {
-      const extraY = options.canvasHeight - totalHeight;
-      viewMinY -= extraY / 2;
-      totalHeight = options.canvasHeight;
-    }
-
-    const svgParts = [];
-    svgParts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewMinX} ${viewMinY} ${totalWidth} ${totalHeight}" width="${totalWidth}" height="${totalHeight}" style="font-family:${escXml(pal.font)}">`,
-      `<defs>`,
-      `  <marker id="eap-couple-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">`,
-      `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.ink}" />`,
-      `  </marker>`,
-      `  <marker id="eap-couple-arrow-active" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">`,
-      `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.activeStroke}" />`,
-      `  </marker>`,
-      `</defs>`,
-      `<rect x="${viewMinX}" y="${viewMinY}" width="${totalWidth}" height="${totalHeight}" fill="${pal.bg}" />`
-    );
-
-    // Divider if orphan components exist next to main root
-    if (compRanges.length > 1) {
-      for (let i = 1; i < compRanges.length; i++) {
-        const divX = compRanges[i].startX - 42;
-        svgParts.push(
-          `<line x1="${divX}" y1="24" x2="${divX}" y2="${totalHeight - legendH - 12}" stroke="${pal.labelBorder}" stroke-width="1.5" stroke-dasharray="6 5" />`,
-          `<text x="${divX + 10}" y="28" fill="${pal.muted}" font-size="11" font-weight="600">Ανεξάρτητη / Μερική Μονάδα</text>`
-        );
+    // Apply optional interactive custom positions on DDP nodes
+    const customPositions = options.positions || {};
+    for (const [id, c] of coords.entries()) {
+      const ov = customPositions[id];
+      if (ov && typeof ov.x === 'number' && typeof ov.y === 'number') {
+        c.cx = Math.round(ov.x);
+        c.cy = Math.round(ov.y);
+        c.x = c.cx - c.w / 2;
+        c.y = c.cy - c.h / 2;
       }
     }
 
-    // Draw Edges first (behind boxes, labels on top of edges)
+    const edgeParts = [];
     const edgeLabelLayers = [];
+    const pillBounds = [];
 
-    // Spread attachment points on parent bottom border cleanly
+    function trackPillLabel(x, y, text, anchor, fontSize) {
+      const lines = splitTextIntoLines(text, 18);
+      const res = renderPillLabelWithBounds(x, y, text, pal, anchor, fontSize, lines, 0, false);
+      edgeLabelLayers.push(res.svg);
+      pillBounds.push(res.bounds);
+    }
+
+    // Draw Edges & Staggered Couples
     for (const parentNode of model.nodes) {
       const edges = childrenByParent.get(parentNode.id) || [];
       if (edges.length === 0) continue;
       const pPos = coords.get(parentNode.id);
 
-      // Sort outgoing edges by child cx so lines don't cross unnecessarily
       const sortedEdges = [...edges].sort((a, b) => {
         const ca = coords.get(a.to);
         const cb = coords.get(b.to);
         return (ca ? ca.cx : 0) - (cb ? cb.cx : 0);
       });
 
-      const attachSpan = Math.min(pPos.w * 0.72, (sortedEdges.length - 1) * 18);
+      const attachSpan = Math.min(pPos.w * 0.76, (sortedEdges.length - 1) * 20);
       for (let idx = 0; idx < sortedEdges.length; idx++) {
         const e = sortedEdges[idx];
         const cPos = coords.get(e.to);
@@ -425,19 +557,21 @@
 
         const isEdgeActive = activeEdgeId === e.id;
         const strokeColor = isEdgeActive ? pal.activeStroke : pal.edge;
-        const strokeW = isEdgeActive ? 2.8 : 1.65;
+        const strokeW = isEdgeActive ? 2.8 : 1.75;
 
-        // If shared node with same depth or upward jump, draw clean bezier detour
         const isNormalDown = y2 > y1 + 12;
-        let midX = (x1 + x2) / 2;
-        let midY = (y1 + y2) / 2;
+        // Stagger couple attachment t along adjacent edges so wide parameter labels never collide
+        const tCouple = sortedEdges.length >= 3 ? (idx % 2 === 0 ? 0.42 : 0.62) : 0.50;
+        let midX = x1 + (x2 - x1) * tCouple;
+        let midY = y1 + (y2 - y1) * tCouple;
+
         if (isNormalDown) {
-          svgParts.push(
+          edgeParts.push(
             `<line class="ddp-edge" data-edge-id="${escXml(e.id)}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${strokeColor}" stroke-width="${strokeW}" />`
           );
         } else {
-          const detourX = Math.max(x1, x2) + 70;
-          svgParts.push(
+          const detourX = Math.max(x1, x2) + 74;
+          edgeParts.push(
             `<path class="ddp-edge" data-edge-id="${escXml(e.id)}" d="M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${detourX.toFixed(1)} ${(y1 + 40).toFixed(1)}, ${detourX.toFixed(1)} ${(y2 - 40).toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="5 3" />`
           );
           midX = detourX - 18;
@@ -449,45 +583,40 @@
         const len = Math.hypot(dx, dy) || 1;
         const ux = dx / len;
         const uy = dy / len;
-        // Normal pointing rightward (nx >= 0)
         let nx = -uy;
         let ny = ux;
         if (nx < 0) { nx = -nx; ny = -ny; }
 
-        // Conditional Diamond ◇ near parent attachment
         if (e.conditional && isNormalDown) {
           const dcx = x1 + ux * 9;
           const dcy = y1 + uy * 9;
-          const rD = 5.5;
+          const rD = 5.8;
           const pts = [
-            `${(dcx).toFixed(1)},${(dcy - rD).toFixed(1)}`,
-            `${(dcx + rD).toFixed(1)},${(dcy).toFixed(1)}`,
-            `${(dcx).toFixed(1)},${(dcy + rD).toFixed(1)}`,
-            `${(dcx - rD).toFixed(1)},${(dcy).toFixed(1)}`
+            `${dcx.toFixed(1)},${(dcy - rD).toFixed(1)}`,
+            `${(dcx + rD).toFixed(1)},${dcy.toFixed(1)}`,
+            `${dcx.toFixed(1)},${(dcy + rD).toFixed(1)}`,
+            `${(dcx - rD).toFixed(1)},${dcy.toFixed(1)}`
           ].join(' ');
-          svgParts.push(`<polygon points="${pts}" fill="${pal.bg}" stroke="${strokeColor}" stroke-width="1.5" />`);
+          edgeParts.push(`<polygon points="${pts}" fill="${pal.bg}" stroke="${strokeColor}" stroke-width="1.6" />`);
           if (e.conditional.type === 'CASE' && e.conditional.label) {
             const bx = x1 + ux * 22 + nx * 12;
             const by = y1 + uy * 22 + ny * 12;
-            edgeLabelLayers.push(renderPillLabel(bx, by, e.conditional.label, pal, 'start', 10));
+            trackPillLabel(bx, by, e.conditional.label, 'start', 11);
           }
         }
 
-        // Loop Arc ↻
         if (e.loop && isNormalDown) {
           const lcx = x1 + ux * 24;
           const lcy = y1 + uy * 24;
-          svgParts.push(
-            `<path d="M ${(lcx - 13).toFixed(1)} ${(lcy + 3).toFixed(1)} A 13 8 0 1 1 ${(lcx + 12).toFixed(1)} ${(lcy + 3).toFixed(1)}" fill="none" stroke="${strokeColor}" stroke-width="1.5" marker-end="url(#eap-couple-arrow)" />`
+          edgeParts.push(
+            `<path d="M ${(lcx - 13).toFixed(1)} ${(lcy + 3).toFixed(1)} A 13 8 0 1 1 ${(lcx + 12).toFixed(1)} ${(lcy + 3).toFixed(1)}" fill="none" stroke="${strokeColor}" stroke-width="1.6" marker-end="url(#eap-couple-arrow)" />`
           );
         }
 
-        // Data Couple ○→ and Control Couple ●→ arrows
         const coupleColor = isEdgeActive ? pal.activeStroke : pal.ink;
         const arrowMarker = isEdgeActive ? 'url(#eap-couple-arrow-active)' : 'url(#eap-couple-arrow)';
         const arrowHalf = 14;
 
-        // Downward IN data couple (offset left)
         if (e.inputs.length > 0 && isNormalDown) {
           const off = -11;
           const ax = midX + nx * off;
@@ -496,51 +625,96 @@
           const sy = ay - uy * arrowHalf;
           const ex = ax + ux * arrowHalf;
           const ey = ay + uy * arrowHalf;
-          svgParts.push(
-            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.4" marker-end="${arrowMarker}" />`,
-            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.4" fill="${pal.bg}" stroke="${coupleColor}" stroke-width="1.4" />`
+          edgeParts.push(
+            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.5" marker-end="${arrowMarker}" />`,
+            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.6" fill="${pal.bg}" stroke="${coupleColor}" stroke-width="1.5" />`
           );
-          const lblText = e.inputs.map((x) => x.name).join(',');
-          edgeLabelLayers.push(renderPillLabel(ax + nx * -10, ay + ny * -10, lblText, pal, 'end', 11));
+          const lblText = e.inputs.map((x) => x.name).join(', ');
+          trackPillLabel(ax + nx * -10, ay + ny * -10, lblText, 'end', 12);
         }
 
-        // Upward OUT data couple (offset right)
         if (e.outputs.length > 0 && isNormalDown) {
           const off = 11;
-          const ax = midX + nx * off;
-          const ay = midY + ny * off;
-          const sx = ax + ux * arrowHalf; // starts lower (closer to child)
-          const sy = ay + uy * arrowHalf;
-          const ex = ax - ux * arrowHalf; // points upward toward parent
-          const ey = ay - uy * arrowHalf;
-          svgParts.push(
-            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.4" marker-end="${arrowMarker}" />`,
-            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.4" fill="${pal.bg}" stroke="${coupleColor}" stroke-width="1.4" />`
-          );
-          const lblText = e.outputs.map((x) => x.name).join(',');
-          edgeLabelLayers.push(renderPillLabel(ax + nx * 10, ay + ny * 10, lblText, pal, 'start', 11));
-        }
-
-        // Control flag ●→ (filled circle, pointing upward toward parent)
-        if (e.controlFlags.length > 0 && isNormalDown) {
-          const off = e.outputs.length > 0 ? 24 : 11;
           const ax = midX + nx * off;
           const ay = midY + ny * off;
           const sx = ax + ux * arrowHalf;
           const sy = ay + uy * arrowHalf;
           const ex = ax - ux * arrowHalf;
           const ey = ay - uy * arrowHalf;
-          svgParts.push(
-            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.4" marker-end="${arrowMarker}" />`,
-            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.6" fill="${coupleColor}" stroke="${coupleColor}" stroke-width="1.2" />`
+          edgeParts.push(
+            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.5" marker-end="${arrowMarker}" />`,
+            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.6" fill="${pal.bg}" stroke="${coupleColor}" stroke-width="1.5" />`
           );
-          const lblText = e.controlFlags.map((x) => x.name).join(',');
-          edgeLabelLayers.push(renderPillLabel(ax + nx * 10, ay + ny * 10, lblText, pal, 'start', 11));
+          const lblText = e.outputs.map((x) => x.name).join(', ');
+          trackPillLabel(ax + nx * 10, ay + ny * 10, lblText, 'start', 12);
+        }
+
+        if (e.controlFlags.length > 0 && isNormalDown) {
+          const off = e.outputs.length > 0 ? 25 : 11;
+          const ax = midX + nx * off;
+          const ay = midY + ny * off;
+          const sx = ax + ux * arrowHalf;
+          const sy = ay + uy * arrowHalf;
+          const ex = ax - ux * arrowHalf;
+          const ey = ay - uy * arrowHalf;
+          edgeParts.push(
+            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.5" marker-end="${arrowMarker}" />`,
+            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.8" fill="${coupleColor}" stroke="${coupleColor}" stroke-width="1.2" />`
+          );
+          const lblText = e.controlFlags.map((x) => x.name).join(', ');
+          trackPillLabel(ax + nx * 10, ay + ny * 10, lblText, 'start', 12);
         }
       }
     }
 
-    // Draw Module Boxes
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const pos of coords.values()) {
+      minX = Math.min(minX, pos.x);
+      maxX = Math.max(maxX, pos.x + pos.w);
+      minY = Math.min(minY, pos.y);
+      maxY = Math.max(maxY, pos.y + pos.h);
+    }
+    for (const b of pillBounds) {
+      minX = Math.min(minX, b.left);
+      maxX = Math.max(maxX, b.right);
+      minY = Math.min(minY, b.top);
+      maxY = Math.max(maxY, b.bottom);
+    }
+
+    const padX = options.paddingX || options.padding || (options.tightCrop ? 20 : 32);
+    const padY = options.paddingY || options.padding || (options.tightCrop ? 18 : 26);
+    const legendH = showLegend ? 46 : 8;
+    const vp = computeCanvasViewport(minX, minY, maxX, maxY, padX, padY, legendH, options);
+
+    const svgParts = [];
+    svgParts.push(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vp.viewMinX} ${vp.viewMinY} ${vp.viewW} ${vp.viewH}" width="${vp.svgW}" height="${vp.svgH}" style="font-family:${escXml(pal.font)}">`,
+      `<defs>`,
+      `  <marker id="eap-couple-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.8" markerHeight="6.8" orient="auto-start-reverse">`,
+      `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.ink}" />`,
+      `  </marker>`,
+      `  <marker id="eap-couple-arrow-active" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.8" markerHeight="6.8" orient="auto-start-reverse">`,
+      `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.activeStroke}" />`,
+      `  </marker>`,
+      `</defs>`,
+      `<rect x="${vp.viewMinX}" y="${vp.viewMinY}" width="${vp.viewW}" height="${vp.viewH}" fill="${pal.bg}" />`
+    );
+
+    if (compRanges.length > 1) {
+      for (let i = 1; i < compRanges.length; i++) {
+        const divX = compRanges[i].startX - 42;
+        svgParts.push(
+          `<line x1="${divX}" y1="${minY}" x2="${divX}" y2="${maxY + 8}" stroke="${pal.labelBorder}" stroke-width="1.5" stroke-dasharray="6 5" />`,
+          `<text x="${divX + 10}" y="${minY + 10}" fill="${pal.muted}" font-size="11" font-weight="600">Ανεξάρτητη / Μερική Μονάδα</text>`
+        );
+      }
+    }
+
+    svgParts.push(...edgeParts);
+
     for (const n of model.nodes) {
       const pos = coords.get(n.id);
       if (!pos) continue;
@@ -553,39 +727,37 @@
 
       const lines = nodeLines.get(n.id) || [n.name];
       const textCy = n.isStub ? pos.cy - 5 : pos.cy;
-      const fSize = lines.length > 2 ? 11 : (lines.length === 2 ? 12 : 13);
+      const fSize = lines.length > 2 ? 12 : (lines.length === 2 ? 13 : 13.5);
 
       svgParts.push(
-        `<g class="ddp-node" data-node-id="${escXml(n.id)}" data-line="${n.startLine}" style="cursor:pointer">`,
+        `<g class="ddp-node" data-node-id="${escXml(n.id)}" data-line="${n.startLine}" data-x="${pos.cx.toFixed(1)}" data-y="${pos.cy.toFixed(1)}" style="cursor:pointer">`,
         activeOutline,
         `  <rect x="${pos.x.toFixed(1)}" y="${pos.y.toFixed(1)}" width="${pos.w.toFixed(1)}" height="${pos.h.toFixed(1)}" rx="4" fill="${st.fill}" stroke="${isActive ? pal.activeStroke : st.stroke}" stroke-width="${isActive ? 2.5 : st.sw}"${dash} />`,
         renderMultilineText(lines, pos.cx, textCy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
         n.isStub
-          ? `  <text x="${pos.cx.toFixed(1)}" y="${(pos.y + pos.h - 6).toFixed(1)}" text-anchor="middle" fill="${pal.muted}" font-size="9">stub</text>`
+          ? `  <text x="${pos.cx.toFixed(1)}" y="${(pos.y + pos.h - 6).toFixed(1)}" text-anchor="middle" fill="${pal.muted}" font-size="9.5">stub</text>`
           : '',
         `</g>`
       );
     }
 
-    // Draw Edge Couple Labels on top
     svgParts.push(...edgeLabelLayers);
 
-    // Legend
     if (showLegend) {
-      const ly = viewMinY + totalHeight - 20;
-      const lx = Math.max(20, viewMinX + 24);
+      const ly = maxY + 32;
+      const lx = minX;
       svgParts.push(
-        `<g class="ddp-legend" font-size="11" fill="${pal.muted}">`,
-        `  <line x1="${lx}" y1="${ly}" x2="${lx + 22}" y2="${ly}" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
-        `  <circle cx="${lx}" cy="${ly}" r="3" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.3" />`,
+        `<g class="ddp-legend" font-size="11.5" fill="${pal.muted}">`,
+        `  <line x1="${lx}" y1="${ly}" x2="${lx + 22}" y2="${ly}" stroke="${pal.ink}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
+        `  <circle cx="${lx}" cy="${ly}" r="3.2" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.4" />`,
         `  <text x="${lx + 30}" y="${ly + 4}">Ζεύγος δεδομένων (IN/OUT)</text>`,
-        `  <line x1="${lx + 200}" y1="${ly}" x2="${lx + 222}" y2="${ly}" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
-        `  <circle cx="${lx + 200}" cy="${ly}" r="3" fill="${pal.ink}" />`,
-        `  <text x="${lx + 230}" y="${ly + 4}">Σημαία ελέγχου (flag)</text>`,
-        `  <polygon points="${lx + 375},${ly - 5} ${lx + 380},${ly} ${lx + 375},${ly + 5} ${lx + 370},${ly}" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.3" />`,
-        `  <text x="${lx + 388}" y="${ly + 4}">Επιλογή (IF/CASE)</text>`,
-        `  <path d="M ${lx + 502} ${ly + 3} A 9 6 0 1 1 ${lx + 520} ${ly + 3}" fill="none" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
-        `  <text x="${lx + 528}" y="${ly + 4}">Επανάληψη (Loop)</text>`,
+        `  <line x1="${lx + 205}" y1="${ly}" x2="${lx + 227}" y2="${ly}" stroke="${pal.ink}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
+        `  <circle cx="${lx + 205}" cy="${ly}" r="3.2" fill="${pal.ink}" />`,
+        `  <text x="${lx + 235}" y="${ly + 4}">Σημαία ελέγχου (flag)</text>`,
+        `  <polygon points="${lx + 385},${ly - 5} ${lx + 390},${ly} ${lx + 385},${ly + 5} ${lx + 380},${ly}" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.4" />`,
+        `  <text x="${lx + 398}" y="${ly + 4}">Επιλογή (IF/CASE)</text>`,
+        `  <path d="M ${lx + 515} ${ly + 3} A 9 6 0 1 1 ${lx + 533} ${ly + 3}" fill="none" stroke="${pal.ink}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
+        `  <text x="${lx + 541}" y="${ly + 4}">Επανάληψη (Loop)</text>`,
         `</g>`
       );
     }
@@ -594,11 +766,11 @@
     return svgParts.join('\n');
   }
 
-  function renderPillLabel(x, y, text, pal, anchor = 'middle', fontSize = 11, linesOverride = null, rotationDeg = 0) {
+  function renderPillLabelWithBounds(x, y, text, pal, anchor = 'middle', fontSize = 12, linesOverride = null, rotationDeg = 0, borderless = false) {
     const clean = String(text || '');
     const lines = linesOverride || (Array.isArray(text) ? text : [clean]);
     const maxLen = Math.max(...lines.map((l) => l.length), 1);
-    const estW = Math.max(22, maxLen * (fontSize * 0.72) + 14);
+    const estW = Math.max(24, maxLen * (fontSize * 0.65) + 12);
     const lineSpacing = fontSize + 4;
     const estH = lines.length > 1 ? lines.length * lineSpacing + 6 : fontSize + 8;
 
@@ -609,34 +781,441 @@
     else if (anchor === 'end') rx = isRotated ? -estW + 4 : x - estW + 4;
     const ry = isRotated ? -estH / 2 : y - estH / 2;
 
-    const textBaseX = isRotated ? 0 : x;
+    const textBaseX = anchor === 'start'
+      ? (isRotated ? estW / 2 - 4 : x + estW / 2 - 4)
+      : anchor === 'end'
+        ? (isRotated ? -estW / 2 + 4 : x - estW / 2 + 4)
+        : (isRotated ? 0 : x);
     const textBaseY = isRotated ? 0 : y;
 
     const textSvg = lines.length === 1
-      ? `<text x="${textBaseX.toFixed(1)}" y="${(textBaseY + 1).toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="${pal.ink}" font-size="${fontSize}" font-weight="600">${escXml(lines[0])}</text>`
-      : renderMultilineText(lines, textBaseX, textBaseY, { fontSize, fontWeight: '600', fill: pal.ink, lineSpacing });
+      ? `<text x="${(isRotated ? 0 : x).toFixed(1)}" y="${(textBaseY + 1).toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="${pal.ink}" font-size="${fontSize}" font-weight="600" stroke="${pal.bg}" stroke-width="3.5" stroke-linejoin="round" paint-order="stroke">${escXml(lines[0])}</text>`
+      : renderMultilineText(lines, textBaseX, textBaseY, {
+          fontSize,
+          fontWeight: '600',
+          fill: pal.ink,
+          lineSpacing,
+          haloStroke: pal.bg,
+          haloWidth: 4
+        });
 
-    return `<g pointer-events="none" class="ddp-pill-label"${rotAttr}>
-      <rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${estW.toFixed(1)}" height="${estH.toFixed(1)}" rx="4" fill="${pal.labelBg}" fill-opacity="1" stroke="${pal.labelBorder}" stroke-width="0.8" />
+    const strokeAttr = borderless ? 'stroke="none"' : `stroke="${pal.labelBorder}" stroke-width="0.8"`;
+    const svg = `<g pointer-events="none" class="ddp-pill-label"${rotAttr}>
+      <rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${estW.toFixed(1)}" height="${estH.toFixed(1)}" rx="4" fill="${pal.labelBg}" fill-opacity="1" ${strokeAttr} />
       ${textSvg}
     </g>`;
+
+    const absLeft = isRotated ? x - estW / 2 : rx;
+    const absTop = isRotated ? y - estH / 2 : ry;
+    return {
+      svg,
+      bounds: {
+        left: absLeft,
+        right: absLeft + estW,
+        top: absTop,
+        bottom: absTop + estH,
+        w: estW,
+        h: estH
+      }
+    };
+  }
+
+  function renderPillLabel(x, y, text, pal, anchor = 'middle', fontSize = 12, linesOverride = null, rotationDeg = 0, borderless = false) {
+    return renderPillLabelWithBounds(x, y, text, pal, anchor, fontSize, linesOverride, rotationDeg, borderless).svg;
   }
 
   // ---------------------------------------------------------------------------
-  // 2. ΔΡΔ (DATA FLOW DIAGRAM) SVG RENDERER
+  // HELPER: NATURAL PROCESS ORDERING FOR VERTICAL EAP SPINE
   // ---------------------------------------------------------------------------
-  function renderDFDSVG(dfd, options = {}) {
-    const pal = getPalette(options);
-    const showLegend = options.showLegend !== false;
-    const showKM = options.showKMFrame !== false && !options.noKM && !dfd.noKM && dfd.showKMFrame !== false && dfd.level !== 0 && !dfd.isContextDiagram;
+  function extractNumericTuple(proc) {
+    const raw = String(proc.key || proc.label || '');
+    const m = raw.match(/([0-9]+(?:[._][0-9]+)*)/);
+    if (!m) return null;
+    return m[1].split(/[._]/).map((n) => parseInt(n, 10));
+  }
 
-    if (!dfd || !dfd.nodes || dfd.nodes.length === 0) {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240" width="680" height="240" style="font-family:${escXml(pal.font)}">
-        <rect width="680" height="240" fill="${pal.bg}" rx="8"/>
-        <text x="340" y="115" text-anchor="middle" fill="${pal.muted}" font-size="14" font-weight="600">Δεν εντοπίστηκαν ροές δεδομένων για δημιουργία ΔΡΔ.</text>
-      </svg>`;
+  function compareTuples(a, b) {
+    const len = Math.max(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+      const va = i < a.length ? a[i] : 0;
+      const vb = i < b.length ? b[i] : 0;
+      if (va !== vb) return va - vb;
+    }
+    return 0;
+  }
+
+  function sortProcessesForVerticalSpine(dfd) {
+    const procs = [...(dfd.processes || [])];
+    if (procs.length <= 1) return procs;
+
+    // Check if processes carry distinct numeric codes (e.g. P1.1, P1.2, P1.3, P1.4 or M1, M2, M3)
+    const tuples = new Map();
+    let numericCount = 0;
+    for (const p of procs) {
+      const t = extractNumericTuple(p);
+      if (t) {
+        tuples.set(p.id, t);
+        numericCount++;
+      }
     }
 
+    if (numericCount === procs.length) {
+      return procs.sort((a, b) => compareTuples(tuples.get(a.id), tuples.get(b.id)));
+    }
+
+    // Topological order considering direct P->P flows and store-mediated P->Store->P flows
+    const adj = new Map(procs.map((p) => [p.id, new Set()]));
+    const indeg = new Map(procs.map((p) => [p.id, 0]));
+    const procIds = new Set(procs.map((p) => p.id));
+
+    for (const f of dfd.flows || []) {
+      if (procIds.has(f.from) && procIds.has(f.to) && f.from !== f.to) {
+        if (!adj.get(f.from).has(f.to)) {
+          adj.get(f.from).add(f.to);
+          indeg.set(f.to, indeg.get(f.to) + 1);
+        }
+      }
+    }
+
+    // Store-mediated ordering hint (only if it doesn't introduce cycles)
+    for (const st of dfd.stores || []) {
+      const writers = (dfd.flows || []).filter((f) => f.to === st.id && procIds.has(f.from)).map((f) => f.from);
+      const readers = (dfd.flows || []).filter((f) => f.from === st.id && procIds.has(f.to)).map((f) => f.to);
+      for (const w of writers) {
+        for (const r of readers) {
+          if (w !== r && !adj.get(r).has(w) && !adj.get(w).has(r)) {
+            adj.get(w).add(r);
+            indeg.set(r, indeg.get(r) + 1);
+          }
+        }
+      }
+    }
+
+    const result = [];
+    const ready = procs.filter((p) => indeg.get(p.id) === 0);
+    const visited = new Set();
+    while (result.length < procs.length) {
+      const next = ready.shift() || procs.find((p) => !visited.has(p.id));
+      if (!next || visited.has(next.id)) continue;
+      visited.add(next.id);
+      result.push(next);
+      for (const v of adj.get(next.id) || []) {
+        indeg.set(v, indeg.get(v) - 1);
+        if (indeg.get(v) === 0 && !visited.has(v)) {
+          ready.push(procs.find((x) => x.id === v));
+        }
+      }
+    }
+    return result;
+  }
+
+  function measureDFDNode(node) {
+    if (node.type === 'process') {
+      const lines = splitTextIntoLines(node.label || '', 15);
+      const maxLen = Math.max(...lines.map((l) => l.length), 1);
+      const r = Math.max(48, Math.max(maxLen * 4.8 + 16, lines.length * 11.5 + 22));
+      return { shape: 'circle', r, w: r * 2, h: r * 2, lines };
+    }
+    if (node.type === 'store') {
+      const lines = splitTextIntoLines(node.label || '', 20);
+      const maxLen = Math.max(...lines.map((l) => l.length), 1);
+      const w = Math.max(148, maxLen * 8.5 + 32);
+      const h = Math.max(46, lines.length * 18 + 16);
+      return { shape: 'store', w, h, lines };
+    }
+    const lines = splitTextIntoLines(node.label || '', 18);
+    const maxLen = Math.max(...lines.map((l) => l.length), 1);
+    const w = Math.max(140, maxLen * 8.6 + 30);
+    const h = Math.max(52, lines.length * 18 + 18);
+    return { shape: 'rect', w, h, lines };
+  }
+
+  function boundaryPoint(c, targetX, targetY) {
+    const dx = targetX - c.cx;
+    const dy = targetY - c.cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    if (c.shape === 'circle') {
+      return { x: c.cx + (dx / dist) * (c.r + 2), y: c.cy + (dy / dist) * (c.r + 2) };
+    }
+    const hw = c.w / 2 + 2;
+    const hh = c.h / 2 + 2;
+    const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
+    const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
+    const s = Math.min(sx, sy);
+    return { x: c.cx + dx * s, y: c.cy + dy * s };
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2A. TEXTBOOK EAP VERTICAL-SPINE DFD LAYOUT (Screenshot 2 Style!)
+  // Processes flow top-to-bottom down the center spine; connected External
+  // Entities & Data Stores sit locally on Left/Right of each process band
+  // (with optional local cloning so shared stores/entities never create a web).
+  // ---------------------------------------------------------------------------
+  function buildVerticalSpineDFDLayout(dfd, options, showKM) {
+    const clonePeripherals = options.clonePeripherals !== false;
+    const orderedProcs = sortProcessesForVerticalSpine(dfd);
+    const origNodeById = new Map(dfd.nodes.map((n) => [n.id, n]));
+    const procIndexMap = new Map(orderedProcs.map((p, idx) => [p.id, idx]));
+
+    const renderNodes = [...orderedProcs];
+    const renderFlows = [];
+
+    // Count how many distinct process bands touch each peripheral node
+    const bandsByPeriph = new Map();
+    for (const f of dfd.flows || []) {
+      const fromNode = origNodeById.get(f.from);
+      const toNode = origNodeById.get(f.to);
+      if (!fromNode || !toNode) continue;
+      if (fromNode.type === 'process' && toNode.type !== 'process') {
+        if (!bandsByPeriph.has(toNode.id)) bandsByPeriph.set(toNode.id, new Set());
+        bandsByPeriph.get(toNode.id).add(procIndexMap.get(fromNode.id));
+      } else if (fromNode.type !== 'process' && toNode.type === 'process') {
+        if (!bandsByPeriph.has(fromNode.id)) bandsByPeriph.set(fromNode.id, new Set());
+        bandsByPeriph.get(fromNode.id).add(procIndexMap.get(toNode.id));
+      }
+    }
+
+    // Track per-band peripheral entries: bandIdx -> Map<instId, { node, inFlows:[], outFlows:[] }>
+    const bandPeriphs = orderedProcs.map(() => new Map());
+    const firstSeenBandForPeriph = new Map();
+
+    if (clonePeripherals) {
+      for (let bIdx = 0; bIdx < orderedProcs.length; bIdx++) {
+        const proc = orderedProcs[bIdx];
+        for (const f of dfd.flows || []) {
+          const isFromProc = f.from === proc.id;
+          const isToProc = f.to === proc.id;
+          if (!isFromProc && !isToProc) continue;
+          const otherId = isFromProc ? f.to : f.from;
+          const other = origNodeById.get(otherId);
+          if (!other || other.type === 'process') continue;
+
+          const totalBands = (bandsByPeriph.get(otherId) || new Set()).size;
+          let instId = otherId;
+          if (totalBands > 1) {
+            if (!firstSeenBandForPeriph.has(otherId)) {
+              firstSeenBandForPeriph.set(otherId, bIdx);
+              instId = otherId;
+            } else if (firstSeenBandForPeriph.get(otherId) !== bIdx) {
+              instId = `${otherId}__B${bIdx}`;
+            }
+          }
+
+          if (!bandPeriphs[bIdx].has(instId)) {
+            const cloneNode = instId === otherId ? other : { ...other, id: instId, cloneOf: otherId };
+            if (instId !== otherId || !renderNodes.some((rn) => rn.id === instId)) {
+              renderNodes.push(cloneNode);
+            }
+            bandPeriphs[bIdx].set(instId, { node: cloneNode, inFlows: [], outFlows: [] });
+          }
+
+          const entry = bandPeriphs[bIdx].get(instId);
+          const mappedFlow = {
+            from: isFromProc ? proc.id : instId,
+            to: isToProc ? proc.id : instId,
+            data: f.data
+          };
+          renderFlows.push(mappedFlow);
+          if (isToProc) entry.inFlows.push(mappedFlow);
+          else entry.outFlows.push(mappedFlow);
+        }
+      }
+    } else {
+      // Single-instance mode: assign each peripheral to its average connected band
+      const periphAssignedBand = new Map();
+      for (const n of dfd.nodes) {
+        if (n.type === 'process') continue;
+        const bSet = Array.from(bandsByPeriph.get(n.id) || [0]);
+        const avgBand = Math.min(
+          orderedProcs.length - 1,
+          Math.max(0, Math.round(bSet.reduce((a, b) => a + b, 0) / (bSet.length || 1)))
+        );
+        periphAssignedBand.set(n.id, avgBand);
+        renderNodes.push(n);
+        bandPeriphs[avgBand].set(n.id, { node: n, inFlows: [], outFlows: [] });
+      }
+      for (const f of dfd.flows || []) {
+        const fromNode = origNodeById.get(f.from);
+        const toNode = origNodeById.get(f.to);
+        if (!fromNode || !toNode) continue;
+        if (fromNode.type === 'process' && toNode.type === 'process') continue;
+        renderFlows.push(f);
+        const pId = fromNode.type === 'process' ? toNode.id : fromNode.id;
+        const bIdx = periphAssignedBand.get(pId) || 0;
+        const entry = bandPeriphs[bIdx].get(pId);
+        if (entry) {
+          if (toNode.type === 'process') entry.inFlows.push(f);
+          else entry.outFlows.push(f);
+        }
+      }
+    }
+
+    // Add all process-to-process flows
+    for (const f of dfd.flows || []) {
+      const u = origNodeById.get(f.from);
+      const v = origNodeById.get(f.to);
+      if (u && v && u.type === 'process' && v.type === 'process') {
+        renderFlows.push(f);
+      }
+    }
+
+    // Measure all renderNodes
+    const dimsMap = new Map();
+    let maxLeftHalfW = 85;
+    let maxRightHalfW = 85;
+    let maxProcR = 52;
+    for (const rn of renderNodes) {
+      const m = measureDFDNode(rn);
+      dimsMap.set(rn.id, m);
+      if (rn.type === 'process') maxProcR = Math.max(maxProcR, m.r);
+    }
+
+    // Split each band's peripherals cleanly into Left vs Right columns
+    const bandSides = orderedProcs.map((_, bIdx) => {
+      const entries = Array.from(bandPeriphs[bIdx].values());
+      // Score: pure source (-2), entity bidir (-1), store bidir (0), pure sink (+2)
+      entries.sort((a, b) => {
+        const scoreOf = (e) => {
+          const hasIn = e.inFlows.length > 0;
+          const hasOut = e.outFlows.length > 0;
+          if (hasIn && !hasOut) return -2;
+          if (hasIn && hasOut) return e.node.type === 'entity' ? -1 : 0;
+          return 2;
+        };
+        return scoreOf(a) - scoreOf(b);
+      });
+
+      const left = [];
+      const right = [];
+      if (entries.length === 1) {
+        const only = entries[0];
+        if (only.inFlows.length >= only.outFlows.length) left.push(only);
+        else right.push(only);
+      } else {
+        const leftTarget = Math.ceil(entries.length / 2);
+        for (let i = 0; i < entries.length; i++) {
+          if (i < leftTarget) left.push(entries[i]);
+          else right.push(entries[i]);
+        }
+      }
+
+      for (const item of left) maxLeftHalfW = Math.max(maxLeftHalfW, dimsMap.get(item.node.id).w / 2);
+      for (const item of right) maxRightHalfW = Math.max(maxRightHalfW, dimsMap.get(item.node.id).w / 2);
+      return { left, right };
+    });
+
+    const centerHalfReach = showKM ? Math.max(maxProcR + 28, 128) : maxProcR;
+    const channelSpan = 285; // generous clear air for wrapped horizontal flow labels
+    const xLeft = Math.ceil(maxLeftHalfW + 32);
+    const xCenter = Math.ceil(xLeft + maxLeftHalfW + channelSpan + centerHalfReach);
+    const xRight = Math.ceil(xCenter + centerHalfReach + channelSpan + maxRightHalfW);
+
+    function estimateSlotHeight(entry) {
+      const dim = dimsMap.get(entry.node.id);
+      const inLines = entry.inFlows.reduce(
+        (acc, f) => acc + splitTextIntoLines(f.data.map(formatDFDFlowItem).join(', '), 25).length,
+        0
+      );
+      const outLines = entry.outFlows.reduce(
+        (acc, f) => acc + splitTextIntoLines(f.data.map(formatDFDFlowItem).join(', '), 25).length,
+        0
+      );
+      if (entry.inFlows.length > 0 && entry.outFlows.length > 0) {
+        return Math.max(204, dim.h + 84 + (inLines + outLines) * 18);
+      }
+      return Math.max(122, dim.h + 48 + Math.max(inLines, outLines) * 18);
+    }
+
+    const coords = new Map();
+    let cursorY = 56;
+
+    for (let bIdx = 0; bIdx < orderedProcs.length; bIdx++) {
+      const proc = orderedProcs[bIdx];
+      const pDim = dimsMap.get(proc.id);
+      const { left, right } = bandSides[bIdx];
+
+      const leftHeights = left.map(estimateSlotHeight);
+      const rightHeights = right.map(estimateSlotHeight);
+      const leftTotalH = leftHeights.reduce((a, b) => a + b, 0);
+      const rightTotalH = rightHeights.reduce((a, b) => a + b, 0);
+      const bandH = Math.max(pDim.h + 44, leftTotalH, rightTotalH);
+      const bandCenterY = cursorY + bandH / 2;
+
+      coords.set(proc.id, {
+        ...pDim,
+        cx: xCenter,
+        cy: bandCenterY
+      });
+
+      let curLeftY = bandCenterY - leftTotalH / 2;
+      for (let i = 0; i < left.length; i++) {
+        const entry = left[i];
+        const hSlot = leftHeights[i];
+        const d = dimsMap.get(entry.node.id);
+        coords.set(entry.node.id, {
+          ...d,
+          cx: xLeft,
+          cy: curLeftY + hSlot / 2
+        });
+        curLeftY += hSlot;
+      }
+
+      let curRightY = bandCenterY - rightTotalH / 2;
+      for (let i = 0; i < right.length; i++) {
+        const entry = right[i];
+        const hSlot = rightHeights[i];
+        const d = dimsMap.get(entry.node.id);
+        coords.set(entry.node.id, {
+          ...d,
+          cx: xRight,
+          cy: curRightY + hSlot / 2
+        });
+        curRightY += hSlot;
+      }
+
+      // Compute inter-band gap to next process (extra vertical space if P_i <-> P_{i+1} flow exists)
+      if (bIdx < orderedProcs.length - 1) {
+        const nextProc = orderedProcs[bIdx + 1];
+        const directBetween = renderFlows.filter(
+          (f) => (f.from === proc.id && f.to === nextProc.id) || (f.from === nextProc.id && f.to === proc.id)
+        );
+        if (directBetween.length > 0) {
+          const linesCnt = directBetween.reduce(
+            (acc, f) => acc + splitTextIntoLines(f.data.map(formatDFDFlowItem).join(', '), 24).length,
+            0
+          );
+          cursorY += bandH + Math.max(96, 48 + linesCnt * 18);
+        } else {
+          cursorY += bandH + 42;
+        }
+      } else {
+        cursorY += bandH;
+      }
+    }
+
+    // Apply user interactive custom drag positions if provided
+    const customPositions = options.positions || {};
+    for (const [id, c] of coords.entries()) {
+      const ov = customPositions[id];
+      if (ov && typeof ov.x === 'number' && typeof ov.y === 'number') {
+        c.cx = Math.round(ov.x);
+        c.cy = Math.round(ov.y);
+      }
+    }
+
+    return {
+      renderNodes,
+      renderFlows,
+      coords,
+      isVerticalSpine: true,
+      showKM
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2B. CLASSIC HORIZONTAL 3-STAGE DFD LAYOUT (KM / KD & Level 0 Context)
+  // ---------------------------------------------------------------------------
+  function buildHorizontalDFDLayout(dfd, options, showKM) {
     const nodeById = new Map(dfd.nodes.map((n) => [n.id, n]));
     const inFlows = new Map();
     const outFlows = new Map();
@@ -649,13 +1228,9 @@
       if (inFlows.has(f.to)) inFlows.get(f.to).push(f);
     }
 
-    // -------------------------------------------------------------------------
-    // Universal 3-Stage Process Partitioning (ΠΛΗ11 / Structured Analysis)
-    // 1. Upstream processes (feed into KM directly or indirectly)
-    // 2. Central Transformation (KM) processes (isCentral = true)
-    // 3. Downstream processes (receive from KM or output to sinks/stores)
-    // -------------------------------------------------------------------------
-    const centralIds = new Set(dfd.processes.filter((p) => p.isCentral).map((p) => p.id));
+    const centralIds = showKM
+      ? new Set(dfd.processes.filter((p) => p.isCentral).map((p) => p.id))
+      : new Set();
     const isUpstream = new Set();
 
     if (centralIds.size > 0) {
@@ -677,9 +1252,7 @@
     }
 
     const procCol = new Map();
-
     if (centralIds.size === 0) {
-      // Standard topological sort when no central processes exist
       for (const p of dfd.processes) procCol.set(p.id, 1);
       for (let iter = 0; iter < dfd.processes.length; iter++) {
         let changed = false;
@@ -697,12 +1270,10 @@
         if (!changed) break;
       }
     } else {
-      // 3-Stage Partitioning: Upstream -> Central -> Downstream
       const upstreamProcs = dfd.processes.filter((p) => isUpstream.has(p.id));
       const centralProcs = dfd.processes.filter((p) => centralIds.has(p.id));
       const downstreamProcs = dfd.processes.filter((p) => !centralIds.has(p.id) && !isUpstream.has(p.id));
 
-      // Stage 1: Upstream processes
       for (const p of upstreamProcs) procCol.set(p.id, 1);
       for (let iter = 0; iter < upstreamProcs.length; iter++) {
         let changed = false;
@@ -719,7 +1290,6 @@
       }
       const maxUpstreamCol = upstreamProcs.reduce((m, p) => Math.max(m, procCol.get(p.id) || 1), 0);
 
-      // Stage 2: Central Transformation (KM) processes
       const centralStartCol = maxUpstreamCol + 1;
       for (const p of centralProcs) procCol.set(p.id, centralStartCol);
       for (let iter = 0; iter < centralProcs.length; iter++) {
@@ -740,7 +1310,6 @@
         centralStartCol
       );
 
-      // Stage 3: Downstream processes (strictly after Central Transformation)
       const downstreamStartCol = maxCentralCol + 1;
       for (const p of downstreamProcs) procCol.set(p.id, downstreamStartCol);
       for (let iter = 0; iter < downstreamProcs.length; iter++) {
@@ -765,16 +1334,33 @@
 
     const maxProcCol = dfd.processes.reduce((m, p) => Math.max(m, procCol.get(p.id) || 1), 1);
 
-    // Classify Entities into Source (col 0) vs Sink (col maxProcCol + 1)
+    // Balance bidirectional entities between Left and Right so col 0 never gets overcrowded
     const entityCol = new Map();
+    const bidirEntities = [];
     for (const ent of dfd.entities) {
       const outs = outFlows.get(ent.id).length;
       const ins = inFlows.get(ent.id).length;
-      entityCol.set(ent.id, outs >= ins ? 0 : maxProcCol + 1);
+      if (outs > 0 && ins > 0) {
+        bidirEntities.push(ent);
+      } else {
+        entityCol.set(ent.id, outs >= ins ? 0 : maxProcCol + 1);
+      }
+    }
+    if (bidirEntities.length > 0) {
+      let leftCnt = Array.from(entityCol.values()).filter((c) => c === 0).length;
+      let rightCnt = Array.from(entityCol.values()).filter((c) => c === maxProcCol + 1).length;
+      for (const ent of bidirEntities) {
+        if (leftCnt <= rightCnt) {
+          entityCol.set(ent.id, 0);
+          leftCnt++;
+        } else {
+          entityCol.set(ent.id, maxProcCol + 1);
+          rightCnt++;
+        }
+      }
     }
 
-    // Group column nodes
-    const colBuckets = new Map(); // colIdx -> nodes[]
+    const colBuckets = new Map();
     const pushBucket = (col, node) => {
       if (!colBuckets.has(col)) colBuckets.set(col, []);
       colBuckets.get(col).push(node);
@@ -783,49 +1369,39 @@
     for (const p of dfd.processes) pushBucket(procCol.get(p.id), p);
 
     const colKeys = Array.from(colBuckets.keys()).sort((a, b) => a - b);
+    const dimsMap = new Map();
+    for (const n of dfd.nodes) dimsMap.set(n.id, measureDFDNode(n));
 
-    // Calculate maximum half-width for nodes in each column
     const colHalfW = new Map();
     for (const col of colKeys) {
       const list = colBuckets.get(col) || [];
-      let maxHw = 32;
+      let maxHw = 48;
       for (const n of list) {
-        if (n.type === 'process') {
-          const lines = splitTextIntoLines(n.label || '', 16);
-          const maxLen = Math.max(...lines.map((l) => l.length), 1);
-          const r = Math.max(34, Math.max(maxLen * 4.8 + 14, lines.length * 12 + 16));
-          maxHw = Math.max(maxHw, r);
-        } else {
-          const lines = splitTextIntoLines(n.label || '', 20);
-          const maxLen = Math.max(...lines.map((l) => l.length), 1);
-          const w = Math.max(120, maxLen * 8.6 + 28);
-          maxHw = Math.max(maxHw, w / 2);
-        }
+        const d = dimsMap.get(n.id);
+        maxHw = Math.max(maxHw, d.shape === 'circle' ? d.r : d.w / 2);
       }
       colHalfW.set(col, maxHw);
     }
 
-    // Central Transformation (KM) width requirements
-    const kmTitle = 'Κεντρικός Μετασχηματισμός (ΚΜ)';
-    const kmTitleW = kmTitle.length * 7.2 + 20;
-    const kmTitleH = 20;
-    const minKMW = kmTitleW + 36; // ~258px
+    const kmTitle = dfd.architecture === 'TRANSACTION_CENTER'
+      ? 'Κέντρο Δοσοληψιών (ΚΔ)'
+      : 'Κεντρικός Μετασχηματισμός (ΚΜ)';
+    const kmTitleW = kmTitle.length * 7.4 + 22;
+    const minKMW = kmTitleW + 40;
 
     const centralCols = centralIds.size > 0
-      ? dfd.processes.filter((p) => p.isCentral).map((p) => procCol.get(p.id))
+      ? dfd.processes.filter((p) => centralIds.has(p.id)).map((p) => procCol.get(p.id))
       : [];
     const minCentralCol = centralCols.length > 0 ? Math.min(...centralCols) : -1;
     const maxCentralCol = centralCols.length > 0 ? Math.max(...centralCols) : -1;
     const isSingleColKM = minCentralCol === maxCentralCol && minCentralCol !== -1;
 
-    const kmReachLeft = isSingleColKM ? minKMW / 2 : (colHalfW.get(minCentralCol) || 32) + 32;
-    const kmReachRight = isSingleColKM ? minKMW / 2 : (colHalfW.get(maxCentralCol) || 32) + 32;
+    const kmReachLeft = isSingleColKM ? minKMW / 2 : (colHalfW.get(minCentralCol) || 48) + 34;
+    const kmReachRight = isSingleColKM ? minKMW / 2 : (colHalfW.get(maxCentralCol) || 48) + 34;
 
-    // Calculate column X positions dynamically with guaranteed safe clearance around KM
     const colToX = new Map();
-    const col0Hw = colHalfW.get(colKeys[0]) || 60;
-    const startColX = Math.max(124, Math.ceil(col0Hw + 36));
-    colToX.set(colKeys[0], startColX);
+    const col0Hw = colHalfW.get(colKeys[0]) || 70;
+    colToX.set(colKeys[0], Math.max(128, Math.ceil(col0Hw + 36)));
 
     for (let i = 0; i < colKeys.length - 1; i++) {
       const c1 = colKeys[i];
@@ -833,44 +1409,29 @@
       const hw1 = colHalfW.get(c1);
       const hw2 = colHalfW.get(c2);
 
-      let gap = hw1 + hw2 + 80;
-      if (gap < 225) gap = 225;
-
-      // Ensure at least 32px clearance between left neighbor and KM frame
-      if (c2 === minCentralCol) {
-        const needed = hw1 + 32 + kmReachLeft;
-        if (gap < needed) gap = needed;
-      }
-      // Ensure at least 32px clearance between KM frame and right neighbor
-      if (c1 === maxCentralCol) {
-        const needed = kmReachRight + 32 + hw2;
-        if (gap < needed) gap = needed;
-      }
-
+      let gap = hw1 + hw2 + 135;
+      if (gap < 265) gap = 265;
+      if (c2 === minCentralCol) gap = Math.max(gap, hw1 + 36 + kmReachLeft);
+      if (c1 === maxCentralCol) gap = Math.max(gap, kmReachRight + 36 + hw2);
       colToX.set(c2, colToX.get(c1) + gap);
     }
 
-    const rowSpacing = 125;
+    const rowSpacing = 152;
     const hasTopStores = dfd.stores.length > 0;
     const hasCentral = centralIds.size > 0;
-    // Extra headroom when the store lane shares the top with the ΚΜ frame,
-    // so the dashed container never touches stores or their flow lines.
-    const topMargin = hasTopStores ? (hasCentral ? 172 : 128) : 56;
+    const topMargin = hasTopStores ? (hasCentral ? 190 : 146) : 64;
 
-    // Determine max rows in process/entity columns
     let maxRows = 1;
     for (const [, list] of colBuckets.entries()) {
       maxRows = Math.max(maxRows, list.length);
     }
     const centerY = topMargin + ((maxRows - 1) * rowSpacing) / 2;
 
-    const coords = new Map(); // id -> { cx, cy, w, h, shape }
-
+    const coords = new Map();
     for (const col of colKeys) {
       const list = colBuckets.get(col);
-      // Group central processes at the primary row to maintain horizontal alignment
-      const centrals = list.filter((n) => n.isCentral);
-      const others = list.filter((n) => !n.isCentral);
+      const centrals = list.filter((n) => centralIds.has(n.id));
+      const others = list.filter((n) => !centralIds.has(n.id));
       if (centrals.length > 0 && others.length > 0) {
         list.length = 0;
         list.push(...centrals, ...others);
@@ -879,22 +1440,11 @@
       const startY = centerY - ((list.length - 1) * rowSpacing) / 2;
       list.forEach((node, idx) => {
         const y = startY + idx * rowSpacing;
-        if (node.type === 'process') {
-          const lines = splitTextIntoLines(node.label || '', 16);
-          const maxLen = Math.max(...lines.map((l) => l.length), 1);
-          const r = Math.max(34, Math.max(maxLen * 4.8 + 14, lines.length * 12 + 16));
-          coords.set(node.id, { cx: x, cy: y, r, w: r * 2, h: r * 2, shape: 'circle', lines });
-        } else {
-          const lines = splitTextIntoLines(node.label || '', 20);
-          const maxLen = Math.max(...lines.map((l) => l.length), 1);
-          const w = Math.max(120, maxLen * 8.6 + 28);
-          const h = Math.max(46, lines.length * 17 + 14);
-          coords.set(node.id, { cx: x, cy: y, w, h, shape: 'rect', lines });
-        }
+        const d = dimsMap.get(node.id);
+        coords.set(node.id, { ...d, cx: x, cy: y });
       });
     }
 
-    // Place Data Stores along top lane aligned over average X of connected processes
     if (dfd.stores.length > 0) {
       const storeInfos = dfd.stores.map((s) => {
         const connected = [
@@ -904,23 +1454,18 @@
         const avgX = connected.length > 0
           ? connected.reduce((acc, p) => acc + p.cx, 0) / connected.length
           : 260;
-        const lines = splitTextIntoLines(s.label || '', 22);
-        const maxLen = Math.max(...lines.map((l) => l.length), 1);
-        const w = Math.max(125, maxLen * 8.6 + 32);
-        const h = Math.max(38, lines.length * 16 + 14);
-        return { store: s, desiredX: avgX, w, h, lines };
+        return { store: s, desiredX: avgX, dim: dimsMap.get(s.id) };
       });
       storeInfos.sort((a, b) => a.desiredX - b.desiredX);
 
       let prevRight = 36;
       for (const info of storeInfos) {
-        const cx = Math.max(prevRight + info.w / 2 + 30, info.desiredX);
-        coords.set(info.store.id, { cx, cy: 52, w: info.w, h: info.h, shape: 'store', lines: info.lines });
-        prevRight = cx + info.w / 2;
+        const cx = Math.max(prevRight + info.dim.w / 2 + 32, info.desiredX);
+        coords.set(info.store.id, { ...info.dim, cx, cy: 52 });
+        prevRight = cx + info.dim.w / 2;
       }
     }
 
-    // Apply user custom drag positions if provided (interactive repositioning)
     const customPositions = options.positions || {};
     for (const [id, c] of coords.entries()) {
       const ov = customPositions[id];
@@ -930,11 +1475,53 @@
       }
     }
 
-    // Central Transformation (ΚΜ) container box and header.
-    // Bounding box wraps ONLY the central processes with generous padding and sits
-    // safely below the store lane with ample headroom above the central circle(s).
+    return {
+      renderNodes: dfd.nodes,
+      renderFlows: dfd.flows,
+      coords,
+      isVerticalSpine: false,
+      showKM
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. ΔΡΔ (DATA FLOW DIAGRAM) SVG RENDERER
+  // ---------------------------------------------------------------------------
+  function renderDFDSVG(dfd, options = {}) {
+    const pal = getPalette(options);
+    const showLegend = options.showLegend !== false && !options.tightCrop;
+    const showKM = options.showKMFrame !== false && !options.noKM && !dfd.noKM && dfd.showKMFrame !== false && dfd.level !== 0 && !dfd.isContextDiagram;
+
+    if (!dfd || !dfd.nodes || dfd.nodes.length === 0) {
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240" width="680" height="240" style="font-family:${escXml(pal.font)}">
+        <rect width="680" height="240" fill="${pal.bg}" rx="8"/>
+        <text x="340" y="115" text-anchor="middle" fill="${pal.muted}" font-size="14" font-weight="600">Δεν εντοπίστηκαν ροές δεδομένων για δημιουργία ΔΡΔ.</text>
+      </svg>`;
+    }
+
+    const layoutMode = options.layoutMode || 'auto';
+    const procsList = dfd.processes || [];
+    const allProcsCentral = procsList.length >= 2 && procsList.every((p) => p.isCentral);
+    const useVertical = layoutMode === 'vertical'
+      || (layoutMode === 'auto' && !dfd.isContextDiagram && dfd.level !== 0 && procsList.length >= 2 && (!showKM || allProcsCentral));
+
+    const layout = useVertical
+      ? buildVerticalSpineDFDLayout(dfd, options, showKM)
+      : buildHorizontalDFDLayout(dfd, options, showKM);
+
+    const { renderNodes, renderFlows, coords, isVerticalSpine } = layout;
+    const nodeById = new Map(renderNodes.map((n) => [n.id, n]));
+
+    // Compute KM bounding frame when showKM is active
+    const kmTitle = dfd.architecture === 'TRANSACTION_CENTER'
+      ? 'Κέντρο Δοσοληψιών (ΚΔ)'
+      : 'Κεντρικός Μετασχηματισμός (ΚΜ)';
+    const kmTitleW = kmTitle.length * 7.4 + 22;
+    const kmTitleH = 22;
+    const minKMW = kmTitleW + 36;
+
     const centralCoords = showKM
-      ? dfd.processes.filter((p) => p.isCentral).map((p) => coords.get(p.id)).filter(Boolean)
+      ? renderNodes.filter((p) => p.type === 'process' && p.isCentral).map((p) => coords.get(p.id)).filter(Boolean)
       : [];
     let kmFrame = null;
     if (centralCoords.length > 0) {
@@ -951,7 +1538,6 @@
         maxCX += extra / 2;
       }
 
-      // Safety Clamp: ensure minCX / maxCX never violate clearance to any non-central node
       for (const [id, c] of coords.entries()) {
         const node = nodeById.get(id);
         if (!node || node.isCentral || c.shape === 'store') continue;
@@ -965,19 +1551,15 @@
         }
       }
 
-      // Ensure central processes remain fully enclosed
       minCX = Math.min(minCX, cMinX - 16);
       maxCX = Math.max(maxCX, cMaxX + 16);
 
-      // Ample headroom above central processes
-      const storeLaneBottom = hasTopStores ? 52 + 19 + 20 : -Infinity;
-      let minCY = cMinY - 50;
+      const hasTopStores = !isVerticalSpine && (dfd.stores || []).length > 0;
+      const storeLaneBottom = hasTopStores ? 52 + 23 + 22 : -Infinity;
+      let minCY = cMinY - 48;
       if (minCY < storeLaneBottom) minCY = storeLaneBottom;
-      const maxCY = cMaxY + 28;
+      const maxCY = cMaxY + 30;
 
-      // Position title badge on top border:
-      // If box is wide enough (multi-column KM), align near top-left with padding so it never
-      // collides with center flows from top stores; if single-column, center it.
       const badgeY = minCY - kmTitleH / 2;
       let badgeX = (minCX + maxCX) / 2 - kmTitleW / 2;
       if (maxCX - minCX >= kmTitleW + 64) {
@@ -997,27 +1579,11 @@
       };
     }
 
-    // Boundary point helper on node borders
-    function boundaryPoint(c, targetX, targetY) {
-      const dx = targetX - c.cx;
-      const dy = targetY - c.cy;
-      const dist = Math.hypot(dx, dy) || 1;
-      if (c.shape === 'circle') {
-        return { x: c.cx + (dx / dist) * (c.r + 2), y: c.cy + (dy / dist) * (c.r + 2) };
-      }
-      const hw = c.w / 2 + 2;
-      const hh = c.h / 2 + 2;
-      const sx = dx !== 0 ? hw / Math.abs(dx) : Infinity;
-      const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
-      const s = Math.min(sx, sy);
-      return { x: c.cx + dx * s, y: c.cy + dy * s };
-    }
-
-    // Track bidirectional pairs to offset curves cleanly
-    const pairSet = new Set(dfd.flows.map((f) => `${f.from}->${f.to}`));
+    // Build curved flow paths & horizontal textbook halo labels
+    const pairSet = new Set(renderFlows.map((f) => `${f.from}->${f.to}`));
     const flowRenderData = [];
 
-    for (const f of dfd.flows) {
+    for (const f of renderFlows) {
       const cFrom = coords.get(f.from);
       const cTo = coords.get(f.to);
       if (!cFrom || !cTo) continue;
@@ -1026,104 +1592,134 @@
       const dx = cTo.cx - cFrom.cx;
       const dy = cTo.cy - cFrom.cy;
       const dist = Math.hypot(dx, dy) || 1;
-      let nx = -dy / dist;
-      let ny = dx / dist;
+      const rawText = (f.data || []).map(formatDFDFlowItem).join(', ');
+      const lines = splitTextIntoLines(rawText, isVerticalSpine ? 25 : 22);
 
-      let curveOff = 0;
-      if (isBidir) {
-        curveOff = 32;
-      } else if (Math.abs(dx) < 36) {
-        // Vertical / same-column flows
-        const minCy = Math.min(cFrom.cy, cTo.cy);
-        const maxCy = Math.max(cFrom.cy, cTo.cy);
-        // Check if there are intervening nodes in this column
-        let hasIntervening = false;
-        for (const [nid, node] of coords.entries()) {
-          if (nid === f.from || nid === f.to) continue;
-          if (Math.abs(node.cx - cFrom.cx) < 36 && node.cy > minCy + 20 && node.cy < maxCy - 20) {
-            hasIntervening = true;
-            break;
-          }
-        }
-        if (hasIntervening) {
-          // Arc around intervening column nodes so lines never cut through intermediate nodes
-          nx = 1;
-          ny = 0;
-          curveOff = 96;
-        } else if (cFrom.shape === 'store' || cTo.shape === 'store') {
-          // Flow between store lane and process: gentle arc away from KM header
-          nx = 1;
-          ny = 0;
-          curveOff = 48;
-        } else if (maxCy - minCy > rowSpacing * 0.7) {
-          nx = 1;
-          ny = 0;
-          curveOff = 30;
-        }
-      } else if (Math.abs(dx) > 260) {
-        // Multi-column span: find an offset that cleanly clears all intermediate nodes
-        const minX = Math.min(cFrom.cx, cTo.cx);
-        const maxX = Math.max(cFrom.cx, cTo.cx);
-        const interNodes = [];
-        for (const [nid, node] of coords.entries()) {
-          if (nid === f.from || nid === f.to) continue;
-          if (node.cx > minX + 24 && node.cx < maxX - 24) {
-            interNodes.push(node);
-          }
-        }
+      let ctrlX = (cFrom.cx + cTo.cx) / 2;
+      let ctrlY = (cFrom.cy + cTo.cy) / 2;
+      let labelHintSide = -1; // -1 = above curve, +1 = below curve
 
-        const candidateOffsets = [-30, 30, -75, 75, -115, 115, -155, 155];
-        let chosenOff = -30;
-        for (const off of candidateOffsets) {
-          const testCtrlX = (cFrom.cx + cTo.cx) / 2 + nx * off;
-          const testCtrlY = (cFrom.cy + cTo.cy) / 2 + ny * off;
-          const pS = boundaryPoint(cFrom, testCtrlX, testCtrlY);
-          const pE = boundaryPoint(cTo, testCtrlX, testCtrlY);
-          let clean = true;
-          for (const node of interNodes) {
-            if (Math.abs(pE.x - pS.x) < 1) continue;
-            const t = (node.cx - pS.x) / (pE.x - pS.x);
-            if (t <= 0.05 || t >= 0.95) continue;
-            const u = 1 - t;
-            const cyAtNode = u * u * pS.y + 2 * u * t * testCtrlY + t * t * pE.y;
-            const safeR = (node.shape === 'circle' ? node.r : node.h / 2) + 16;
-            if (Math.abs(cyAtNode - node.cy) < safeR) {
-              clean = false;
+      if (isVerticalSpine) {
+        if (isBidir) {
+          // Left->Right arches UPWARD (ctrlY < midY), Right->Left arches DOWNWARD (ctrlY > midY)
+          // For vertical bidir (dx ~ 0), arch Left vs Right
+          if (Math.abs(dx) < 40) {
+            const bulgeX = dy > 0 ? 54 : -54;
+            ctrlX += bulgeX;
+          } else {
+            const bulgeMag = Math.max(46, lines.length * 10 + 30);
+            const archUp = dx > 0;
+            ctrlY += archUp ? -bulgeMag : bulgeMag;
+            labelHintSide = archUp ? -1 : 1;
+          }
+        } else if (Math.abs(dx) < 40) {
+          // Vertical process-to-process flow along central spine
+          const minCy = Math.min(cFrom.cy, cTo.cy);
+          const maxCy = Math.max(cFrom.cy, cTo.cy);
+          let hasIntervening = false;
+          for (const [nid, node] of coords.entries()) {
+            if (nid === f.from || nid === f.to) continue;
+            if (Math.abs(node.cx - cFrom.cx) < 48 && node.cy > minCy + 20 && node.cy < maxCy - 20) {
+              hasIntervening = true;
               break;
             }
           }
-          if (clean) {
-            chosenOff = off;
-            break;
+          if (hasIntervening) {
+            ctrlX += dy > 0 ? 115 : -115;
           }
+        } else {
+          // Gentle natural arc away from vertical center of process band
+          const gentle = dy < -20 ? -22 : (dy > 20 ? 22 : -14);
+          ctrlY += gentle;
+          labelHintSide = gentle <= 0 ? -1 : 1;
         }
-        curveOff = chosenOff;
-      }
+      } else {
+        // Horizontal layout curve computation
+        let nx = -dy / dist;
+        let ny = dx / dist;
+        let curveOff = 0;
 
-      const ctrlX = (cFrom.cx + cTo.cx) / 2 + nx * curveOff;
-      const ctrlY = (cFrom.cy + cTo.cy) / 2 + ny * curveOff;
+        if (isBidir) {
+          curveOff = 38;
+        } else if (Math.abs(dx) < 36) {
+          const minCy = Math.min(cFrom.cy, cTo.cy);
+          const maxCy = Math.max(cFrom.cy, cTo.cy);
+          let hasIntervening = false;
+          for (const [nid, node] of coords.entries()) {
+            if (nid === f.from || nid === f.to) continue;
+            if (Math.abs(node.cx - cFrom.cx) < 36 && node.cy > minCy + 20 && node.cy < maxCy - 20) {
+              hasIntervening = true;
+              break;
+            }
+          }
+          nx = 1;
+          ny = 0;
+          if (hasIntervening) curveOff = 104;
+          else if (cFrom.shape === 'store' || cTo.shape === 'store') curveOff = 48;
+          else if (maxCy - minCy > 105) curveOff = 32;
+        } else if (Math.abs(dx) > 260) {
+          const minXSpan = Math.min(cFrom.cx, cTo.cx);
+          const maxXSpan = Math.max(cFrom.cx, cTo.cx);
+          const interNodes = [];
+          for (const [nid, node] of coords.entries()) {
+            if (nid === f.from || nid === f.to) continue;
+            if (node.cx > minXSpan + 24 && node.cx < maxXSpan - 24) interNodes.push(node);
+          }
+          const candidateOffsets = [-32, 32, -80, 80, -125, 125, -165, 165];
+          let chosenOff = -32;
+          for (const off of candidateOffsets) {
+            const testCtrlX = (cFrom.cx + cTo.cx) / 2 + nx * off;
+            const testCtrlY = (cFrom.cy + cTo.cy) / 2 + ny * off;
+            const pS = boundaryPoint(cFrom, testCtrlX, testCtrlY);
+            const pE = boundaryPoint(cTo, testCtrlX, testCtrlY);
+            let clean = true;
+            for (const node of interNodes) {
+              if (Math.abs(pE.x - pS.x) < 1) continue;
+              const t = (node.cx - pS.x) / (pE.x - pS.x);
+              if (t <= 0.05 || t >= 0.95) continue;
+              const u = 1 - t;
+              const cyAtNode = u * u * pS.y + 2 * u * t * testCtrlY + t * t * pE.y;
+              const safeR = (node.shape === 'circle' ? node.r : node.h / 2) + 18;
+              if (Math.abs(cyAtNode - node.cy) < safeR) {
+                clean = false;
+                break;
+              }
+            }
+            if (clean) {
+              chosenOff = off;
+              break;
+            }
+          }
+          curveOff = chosenOff;
+        }
+
+        ctrlX = (cFrom.cx + cTo.cx) / 2 + nx * curveOff;
+        ctrlY = (cFrom.cy + cTo.cy) / 2 + ny * curveOff;
+      }
 
       const pStart = boundaryPoint(cFrom, ctrlX, ctrlY);
       const pEnd = boundaryPoint(cTo, ctrlX, ctrlY);
 
       flowRenderData.push({
         flow: f,
+        rawText,
+        lines,
         cFrom,
         cTo,
         ctrlX,
         ctrlY,
         pStart,
         pEnd,
-        nx,
-        ny,
-        curveOff,
-        isBidir
+        isBidir,
+        labelHintSide
       });
     }
 
-    // Place Flow Labels with anti-overlap clearance against nodes, KM frame borders, KM badge, curves & other labels
+    // Place ALL flow labels horizontally (0 deg rotation) with anti-overlap search
     const placedPills = [];
     const flowLabelParts = [];
+    const fontSize = 12.5;
+    const lineSpacing = fontSize + 4;
 
     function pillHitsObstacle(pt, pillW, pillH) {
       const pLeft = pt.x - pillW / 2;
@@ -1131,115 +1727,96 @@
       const pTop = pt.y - pillH / 2;
       const pBottom = pt.y + pillH / 2;
 
-      // 1. All nodes
       for (const c of coords.values()) {
         const nW = c.shape === 'circle' ? c.r * 2 : c.w;
         const nH = c.shape === 'circle' ? c.r * 2 : c.h;
-        const nLeft = c.cx - nW / 2 - 4;
-        const nRight = c.cx + nW / 2 + 4;
-        const nTop = c.cy - nH / 2 - 4;
-        const nBottom = c.cy + nH / 2 + 4;
-        if (pRight > nLeft && pLeft < nRight && pBottom > nTop && pTop < nBottom) {
+        if (pRight > c.cx - nW / 2 - 5 && pLeft < c.cx + nW / 2 + 5 &&
+            pBottom > c.cy - nH / 2 - 5 && pTop < c.cy + nH / 2 + 5) {
           return true;
         }
       }
 
-      // 2. KM dashed frame boundaries & title badge
       if (kmFrame) {
-        const frameMargin = 8;
-        // Top border
-        if (pRight > kmFrame.minCX - frameMargin && pLeft < kmFrame.maxCX + frameMargin &&
-            Math.abs(pt.y - kmFrame.minCY) < pillH / 2 + frameMargin) return true;
-        // Bottom border
-        if (pRight > kmFrame.minCX - frameMargin && pLeft < kmFrame.maxCX + frameMargin &&
-            Math.abs(pt.y - kmFrame.maxCY) < pillH / 2 + frameMargin) return true;
-        // Left border
-        if (pBottom > kmFrame.minCY - frameMargin && pTop < kmFrame.maxCY + frameMargin &&
-            Math.abs(pt.x - kmFrame.minCX) < pillW / 2 + frameMargin) return true;
-        // Right border
-        if (pBottom > kmFrame.minCY - frameMargin && pTop < kmFrame.maxCY + frameMargin &&
-            Math.abs(pt.x - kmFrame.maxCX) < pillW / 2 + frameMargin) return true;
-        // KM badge rect
-        const bLeft = kmFrame.badgeX - 6;
-        const bRight = kmFrame.badgeX + kmFrame.titleW + 6;
-        const bTop = kmFrame.badgeY - 6;
-        const bBottom = kmFrame.badgeY + kmFrame.titleH + 6;
-        if (pRight > bLeft && pLeft < bRight && pBottom > bTop && pTop < bBottom) return true;
+        const fm = 6;
+        if (pRight > kmFrame.minCX - fm && pLeft < kmFrame.maxCX + fm &&
+            Math.abs(pt.y - kmFrame.minCY) < pillH / 2 + fm) return true;
+        if (pRight > kmFrame.minCX - fm && pLeft < kmFrame.maxCX + fm &&
+            Math.abs(pt.y - kmFrame.maxCY) < pillH / 2 + fm) return true;
+        if (pBottom > kmFrame.minCY - fm && pTop < kmFrame.maxCY + fm &&
+            Math.abs(pt.x - kmFrame.minCX) < pillW / 2 + fm) return true;
+        if (pBottom > kmFrame.minCY - fm && pTop < kmFrame.maxCY + fm &&
+            Math.abs(pt.x - kmFrame.maxCX) < pillW / 2 + fm) return true;
+        if (pRight > kmFrame.badgeX - 6 && pLeft < kmFrame.badgeX + kmFrame.titleW + 6 &&
+            pBottom > kmFrame.badgeY - 6 && pTop < kmFrame.badgeY + kmFrame.titleH + 6) return true;
       }
 
-      // 3. Previously placed labels (prevent label-on-label overlap)
       for (const placed of placedPills) {
-        if (pRight > placed.left - 4 && pLeft < placed.right + 4 &&
-            pBottom > placed.top - 4 && pTop < placed.bottom + 4) {
+        if (pRight > placed.left - 3 && pLeft < placed.right + 3 &&
+            pBottom > placed.top - 3 && pTop < placed.bottom + 3) {
           return true;
         }
       }
-
       return false;
     }
 
     for (const fr of flowRenderData) {
-      const rawText = fr.flow.data.join(', ');
-      const clean = String(rawText || '');
-      const lines = clean.length > 22 ? splitTextIntoLines(clean, 20) : [clean];
+      const lines = fr.lines;
       const maxLen = Math.max(...lines.map((l) => l.length), 1);
-      const fontSize = 11;
-      const lineSpacing = fontSize + 4;
-      const pillW = Math.max(22, maxLen * (fontSize * 0.72) + 14);
+      const pillW = Math.max(24, maxLen * (fontSize * 0.65) + 12);
       const pillH = lines.length > 1 ? lines.length * lineSpacing + 6 : fontSize + 8;
 
-      const getPillCandidate = (t, side = 1) => {
+      const isMostlyVertical = Math.abs(fr.pEnd.x - fr.pStart.x) < 42;
+
+      const getCandidate = (t, side) => {
         const u = 1 - t;
         const curveX = u * u * fr.pStart.x + 2 * u * t * fr.ctrlX + t * t * fr.pEnd.x;
         const curveY = u * u * fr.pStart.y + 2 * u * t * fr.ctrlY + t * t * fr.pEnd.y;
 
-        // Tangent vector at parameter t: B'(t) = 2(1-t)(ctrl - pStart) + 2t(pEnd - ctrl)
+        if (isVerticalSpine && isMostlyVertical && side === 0) {
+          // Clean centered halo right over vertical inter-process arrow (like Screenshot 2 P1.3 -> P1.4)
+          return { x: curveX, y: curveY };
+        }
+
         const tx = 2 * (1 - t) * (fr.ctrlX - fr.pStart.x) + 2 * t * (fr.pEnd.x - fr.ctrlX);
         const ty = 2 * (1 - t) * (fr.ctrlY - fr.pStart.y) + 2 * t * (fr.pEnd.y - fr.ctrlY);
         const tDist = Math.hypot(tx, ty) || 1;
         let pnx = -ty / tDist;
         let pny = tx / tDist;
 
-        // Orient (pnx, pny) towards the outer (convex) side of this curve
-        if (fr.curveOff !== 0) {
-          const midX = (fr.pStart.x + fr.pEnd.x) / 2;
-          const midY = (fr.pStart.y + fr.pEnd.y) / 2;
-          const bulgeX = fr.ctrlX - midX;
-          const bulgeY = fr.ctrlY - midY;
+        // Orient normal toward convex/outer side of curve
+        const midX = (fr.pStart.x + fr.pEnd.x) / 2;
+        const midY = (fr.pStart.y + fr.pEnd.y) / 2;
+        const bulgeX = fr.ctrlX - midX;
+        const bulgeY = fr.ctrlY - midY;
+        if (Math.hypot(bulgeX, bulgeY) > 3) {
           if (bulgeX * pnx + bulgeY * pny < 0) {
             pnx = -pnx;
             pny = -pny;
           }
+        } else if (pny > 0) {
+          pnx = -pnx;
+          pny = -pny;
         }
 
-        // Clean, gentle offset immediately beside the arrow line (5px margin outside the pill)
-        const d = (pillH / 2 + 5) * side;
-
-        let deg = Math.atan2(ty, tx) * (180 / Math.PI);
-        if (deg > 90) deg -= 180;
-        else if (deg < -90) deg += 180;
-        if (Math.abs(deg) < 4) deg = 0;
-
+        const offsetDist = (Math.abs(pny) * (pillH / 2) + Math.abs(pnx) * (pillW / 2) * 0.35 + 6) * side;
         return {
-          x: curveX + pnx * d,
-          y: curveY + pny * d,
-          deg
+          x: curveX + pnx * offsetDist,
+          y: curveY + pny * offsetDist
         };
       };
 
-      // Stagger bidirectional flow labels along the path:
-      // Flow A->B sits near A (t=0.36), and Flow B->A sits near B (t=0.36 from B),
-      // ensuring the two labels in a bidirectional pair never crowd or collide with each other.
       const tSteps = fr.isBidir
-        ? [0.36, 0.40, 0.32, 0.44, 0.28, 0.48, 0.52]
+        ? (isVerticalSpine ? [0.48, 0.42, 0.54, 0.36, 0.60] : [0.38, 0.44, 0.32, 0.50, 0.58])
         : [0.50, 0.44, 0.56, 0.38, 0.62];
 
-      let bestPt = null;
+      const sideOrder = (isVerticalSpine && isMostlyVertical && !fr.isBidir)
+        ? [0, 1, -1]
+        : [1, -1, 0];
 
-      // Try outer side first, then inner side if outer side hits a node or label
-      for (const side of [1, -1]) {
+      let bestPt = null;
+      for (const side of sideOrder) {
         for (const t of tSteps) {
-          const cand = getPillCandidate(t, side);
+          const cand = getCandidate(t, side);
           if (!pillHitsObstacle(cand, pillW, pillH)) {
             bestPt = cand;
             break;
@@ -1249,26 +1826,31 @@
       }
 
       if (!bestPt) {
-        bestPt = getPillCandidate(fr.isBidir ? 0.36 : 0.50, 1);
+        const baseCand = getCandidate(fr.isBidir && !isVerticalSpine ? 0.38 : 0.50, sideOrder[0]);
+        for (const dyOff of [-16, 16, -32, 32, -48, 48, -64, 64]) {
+          for (const dxOff of [0, -24, 24]) {
+            const nudged = { x: baseCand.x + dxOff, y: baseCand.y + dyOff };
+            if (!pillHitsObstacle(nudged, pillW, pillH)) {
+              bestPt = nudged;
+              break;
+            }
+          }
+          if (bestPt) break;
+        }
+        if (!bestPt) bestPt = baseCand;
       }
 
-      placedPills.push({
-        left: bestPt.x - pillW / 2,
-        right: bestPt.x + pillW / 2,
-        top: bestPt.y - pillH / 2,
-        bottom: bestPt.y + pillH / 2
-      });
-
-      flowLabelParts.push(renderPillLabel(bestPt.x, bestPt.y, clean, pal, 'middle', fontSize, lines, bestPt.deg || 0));
+      const rendered = renderPillLabelWithBounds(bestPt.x, bestPt.y, fr.rawText, pal, 'middle', fontSize, lines, 0, true);
+      placedPills.push(rendered.bounds);
+      flowLabelParts.push(rendered.svg);
     }
 
-    // Calculate Comprehensive Bounding Box across ALL elements (with support for custom drag positions)
-    let minX = 0;
-    let minY = 0;
-    let maxX = 680;
-    let maxY = 260;
+    // Tight, exact bounding box (fixes old minX=0 / maxX=680 whitespace bug!)
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
 
-    // 1. All nodes
     for (const c of coords.values()) {
       const halfW = c.shape === 'circle' ? c.r : c.w / 2;
       const halfH = c.shape === 'circle' ? c.r : c.h / 2;
@@ -1278,7 +1860,6 @@
       maxY = Math.max(maxY, c.cy + halfH);
     }
 
-    // 2. KM Frame
     if (kmFrame) {
       minX = Math.min(minX, kmFrame.minCX, kmFrame.badgeX);
       minY = Math.min(minY, kmFrame.minCY, kmFrame.badgeY);
@@ -1286,15 +1867,16 @@
       maxY = Math.max(maxY, kmFrame.maxCY);
     }
 
-    // 3. Flow curves
     for (const fr of flowRenderData) {
-      minX = Math.min(minX, fr.pStart.x, fr.pEnd.x, fr.ctrlX);
-      minY = Math.min(minY, fr.pStart.y, fr.pEnd.y, fr.ctrlY);
-      maxX = Math.max(maxX, fr.pStart.x, fr.pEnd.x, fr.ctrlX);
-      maxY = Math.max(maxY, fr.pStart.y, fr.pEnd.y, fr.ctrlY);
+      // Quadratic bezier extrema lie within convex hull, tighter using t=0.5 apex
+      const apexX = 0.25 * fr.pStart.x + 0.5 * fr.ctrlX + 0.25 * fr.pEnd.x;
+      const apexY = 0.25 * fr.pStart.y + 0.5 * fr.ctrlY + 0.25 * fr.pEnd.y;
+      minX = Math.min(minX, fr.pStart.x, fr.pEnd.x, apexX);
+      minY = Math.min(minY, fr.pStart.y, fr.pEnd.y, apexY);
+      maxX = Math.max(maxX, fr.pStart.x, fr.pEnd.x, apexX);
+      maxY = Math.max(maxY, fr.pStart.y, fr.pEnd.y, apexY);
     }
 
-    // 4. Flow labels
     for (const pill of placedPills) {
       minX = Math.min(minX, pill.left);
       minY = Math.min(minY, pill.top);
@@ -1302,62 +1884,37 @@
       maxY = Math.max(maxY, pill.bottom);
     }
 
-    // 5. Legend
-    if (showLegend) {
-      maxX = Math.max(maxX, 660);
-    }
-
-    const padX = options.paddingX || options.padding || 36;
-    const padY = options.paddingY || options.padding || 28;
-    const legendH = showLegend ? 58 : 10;
-    const contentW = maxX - minX;
-    const contentH = maxY - minY + legendH;
-
-    let totalW = Math.max(680, Math.ceil(contentW + padX * 2));
-    let totalH = Math.max(260, Math.ceil(contentH + padY * 2));
-    let viewMinX = Math.floor(minX - padX);
-    let viewMinY = Math.floor(minY - padY);
-
-    if (options.canvasWidth && options.canvasWidth > totalW) {
-      const extraX = options.canvasWidth - totalW;
-      viewMinX -= extraX / 2;
-      totalW = options.canvasWidth;
-    }
-    if (options.canvasHeight && options.canvasHeight > totalH) {
-      const extraY = options.canvasHeight - totalH;
-      viewMinY -= extraY / 2;
-      totalH = options.canvasHeight;
-    }
+    const padX = options.paddingX || options.padding || (options.tightCrop ? 20 : 32);
+    const padY = options.paddingY || options.padding || (options.tightCrop ? 18 : 26);
+    const legendH = showLegend ? 48 : 8;
+    const vp = computeCanvasViewport(minX, minY, maxX, maxY, padX, padY, legendH, options);
 
     const svgParts = [];
     svgParts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewMinX} ${viewMinY} ${totalW} ${totalH}" width="${totalW}" height="${totalH}" style="font-family:${escXml(pal.font)}">`,
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vp.viewMinX} ${vp.viewMinY} ${vp.viewW} ${vp.viewH}" width="${vp.svgW}" height="${vp.svgH}" style="font-family:${escXml(pal.font)}">`,
       `<defs>`,
       `  <marker id="dfd-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">`,
-      `    <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="${pal.edge}" />`,
+      `    <path d="M 0 1.5 L 8.8 5 L 0 8.5 z" fill="${pal.edge}" />`,
       `  </marker>`,
       `</defs>`,
-      `<rect x="${viewMinX}" y="${viewMinY}" width="${totalW}" height="${totalH}" fill="${pal.bg}" />`
+      `<rect x="${vp.viewMinX}" y="${vp.viewMinY}" width="${vp.viewW}" height="${vp.viewH}" fill="${pal.bg}" />`
     );
 
-    // Draw Central Transformation (ΚΜ) Frame
     if (kmFrame) {
       svgParts.push(
-        `<rect x="${kmFrame.minCX.toFixed(1)}" y="${kmFrame.minCY.toFixed(1)}" width="${(kmFrame.maxCX - kmFrame.minCX).toFixed(1)}" height="${(kmFrame.maxCY - kmFrame.minCY).toFixed(1)}" rx="12" fill="${pal.kmBg}" stroke="${pal.kmStroke}" stroke-width="1.3" stroke-dasharray="6 4" />`,
+        `<rect x="${kmFrame.minCX.toFixed(1)}" y="${kmFrame.minCY.toFixed(1)}" width="${(kmFrame.maxCX - kmFrame.minCX).toFixed(1)}" height="${(kmFrame.maxCY - kmFrame.minCY).toFixed(1)}" rx="12" fill="${pal.kmBg}" stroke="${pal.kmStroke}" stroke-width="1.4" stroke-dasharray="6 4" />`,
         `<rect x="${kmFrame.badgeX.toFixed(1)}" y="${kmFrame.badgeY.toFixed(1)}" width="${kmFrame.titleW.toFixed(1)}" height="${kmFrame.titleH.toFixed(1)}" rx="4" fill="${pal.labelBg}" fill-opacity="0.96" stroke="${pal.kmStroke}" stroke-width="0.8" />`,
-        `<text x="${(kmFrame.badgeX + kmFrame.titleW / 2).toFixed(1)}" y="${(kmFrame.badgeY + kmFrame.titleH / 2 + 3.5).toFixed(1)}" text-anchor="middle" fill="${pal.kmStroke}" font-size="11" font-weight="700">${escXml(kmFrame.title)}</text>`
+        `<text x="${(kmFrame.badgeX + kmFrame.titleW / 2).toFixed(1)}" y="${(kmFrame.badgeY + kmFrame.titleH / 2 + 3.5).toFixed(1)}" text-anchor="middle" fill="${pal.kmStroke}" font-size="11.5" font-weight="700">${escXml(kmFrame.title)}</text>`
       );
     }
 
-    // Draw Flow Curves
     for (const fr of flowRenderData) {
       svgParts.push(
-        `<path d="M ${fr.pStart.x.toFixed(1)} ${fr.pStart.y.toFixed(1)} Q ${fr.ctrlX.toFixed(1)} ${fr.ctrlY.toFixed(1)}, ${fr.pEnd.x.toFixed(1)} ${fr.pEnd.y.toFixed(1)}" fill="none" stroke="${pal.edge}" stroke-width="1.65" marker-end="url(#dfd-arrow)" />`
+        `<path d="M ${fr.pStart.x.toFixed(1)} ${fr.pStart.y.toFixed(1)} Q ${fr.ctrlX.toFixed(1)} ${fr.ctrlY.toFixed(1)}, ${fr.pEnd.x.toFixed(1)} ${fr.pEnd.y.toFixed(1)}" fill="none" stroke="${pal.edge}" stroke-width="1.75" marker-end="url(#dfd-arrow)" />`
       );
     }
 
-    // Draw Nodes (interactive draggable elements)
-    for (const n of dfd.nodes) {
+    for (const n of renderNodes) {
       const c = coords.get(n.id);
       if (!c) continue;
       if (c.shape === 'circle') {
@@ -1365,10 +1922,10 @@
         const stroke = isC ? pal.rootStroke : pal.ctrlStroke;
         const fill = isC ? pal.rootFill : pal.ctrlFill;
         const lines = c.lines || [n.label];
-        const fSize = lines.length > 2 ? 10.5 : (lines.length === 2 ? 11.5 : 13);
+        const fSize = lines.length > 3 ? 12 : (lines.length >= 2 ? 13 : 14);
         svgParts.push(
           `<g class="dfd-node" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
-          `  <circle cx="${c.cx.toFixed(1)}" cy="${c.cy.toFixed(1)}" r="${c.r}" fill="${fill}" stroke="${stroke}" stroke-width="${isC ? 2.4 : 1.8}" />`,
+          `  <circle cx="${c.cx.toFixed(1)}" cy="${c.cy.toFixed(1)}" r="${c.r}" fill="${fill}" stroke="${stroke}" stroke-width="${isC ? 2.4 : 1.9}" />`,
           renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
           `</g>`
         );
@@ -1378,13 +1935,13 @@
         const y1 = c.cy - c.h / 2;
         const y2 = c.cy + c.h / 2;
         const lines = c.lines || [n.label];
-        const fSize = lines.length > 1 ? 11 : 12;
+        const fSize = lines.length > 1 ? 12.5 : 13.5;
         svgParts.push(
           `<g class="dfd-store" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
           `  <rect x="${x1.toFixed(1)}" y="${y1.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" fill="${pal.storeFill}" stroke="none" />`,
           `  <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${pal.storeStroke}" stroke-width="2" />`,
           `  <line x1="${x1.toFixed(1)}" y1="${y2.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${pal.storeStroke}" stroke-width="2" />`,
-          renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
+          renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '600', fill: pal.ink }),
           `</g>`
         );
       } else {
@@ -1392,11 +1949,11 @@
         const y = c.cy - c.h / 2;
         const dash = n.type === 'unknown_io' ? ' stroke-dasharray="5 3"' : '';
         const lines = c.lines || [n.label];
-        const fSize = lines.length > 1 ? 11.5 : 12;
+        const fSize = lines.length > 1 ? 12.5 : 13.5;
         svgParts.push(
           `<g class="dfd-entity" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
-          `  <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" rx="3" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.7"${dash} />`,
-          renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
+          `  <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" rx="2" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.8"${dash} />`,
+          renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '600', fill: pal.ink }),
           `</g>`
         );
       }
@@ -1405,26 +1962,26 @@
     svgParts.push(...flowLabelParts);
 
     if (showLegend) {
-      const ly = Math.max(maxY + 32, viewMinY + totalH - 30);
-      const startX = Math.max(20, viewMinX + 24);
+      const ly = maxY + 32;
+      const startX = minX;
       const legendParts = [
-        `  <circle cx="${startX + 8}" cy="${ly - 2}" r="9" fill="${pal.ctrlFill}" stroke="${pal.ctrlStroke}" stroke-width="1.5" />`,
+        `  <circle cx="${startX + 8}" cy="${ly - 2}" r="9" fill="${pal.ctrlFill}" stroke="${pal.ctrlStroke}" stroke-width="1.6" />`,
         `  <text x="${startX + 24}" y="${ly + 2}">Μετασχηματισμός</text>`
       ];
-      let curX = startX + 148;
+      let curX = startX + 150;
       if (dfd.stores && dfd.stores.length > 0) {
         legendParts.push(
           `  <line x1="${curX}" y1="${ly - 9}" x2="${curX + 32}" y2="${ly - 9}" stroke="${pal.storeStroke}" stroke-width="1.8" />`,
           `  <line x1="${curX}" y1="${ly + 5}" x2="${curX + 32}" y2="${ly + 5}" stroke="${pal.storeStroke}" stroke-width="1.8" />`,
           `  <text x="${curX + 40}" y="${ly + 2}">Αποθήκη Δεδομένων</text>`
         );
-        curX += 180;
+        curX += 182;
       }
       legendParts.push(
-        `  <rect x="${curX}" y="${ly - 10}" width="26" height="16" rx="2" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.5" />`,
+        `  <rect x="${curX}" y="${ly - 10}" width="26" height="16" rx="2" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.6" />`,
         `  <text x="${curX + 34}" y="${ly + 2}">Πηγή / Αποδέκτης</text>`
       );
-      curX += 135;
+      curX += 140;
       if (kmFrame) {
         legendParts.push(
           `  <rect x="${curX}" y="${ly - 9}" width="26" height="14" rx="3" fill="none" stroke="${pal.kmStroke}" stroke-width="1.2" stroke-dasharray="4 3" />`,
@@ -1432,7 +1989,7 @@
         );
       }
       svgParts.push(
-        `<g class="dfd-legend" font-size="11" fill="${pal.muted}">`,
+        `<g class="dfd-legend" font-size="11.5" fill="${pal.muted}">`,
         ...legendParts,
         `</g>`
       );
@@ -1443,8 +2000,74 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 3. STANDALONE SVG & PNG EXPORT HELPERS
+  // 3. STANDALONE SVG & WORD-READY 300+ DPI PNG EXPORT HELPERS
   // ---------------------------------------------------------------------------
+  const CRC32_TABLE = (function () {
+    const t = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let k = 0; k < 8; k++) {
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      t[i] = c >>> 0;
+    }
+    return t;
+  }());
+
+  function crc32Bytes(bytes, start, end) {
+    let c = 0xFFFFFFFF;
+    for (let i = start; i < end; i++) {
+      c = CRC32_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    }
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  // Injects PNG pHYs chunk so MS Word pastes/imports the PNG at full crisp A4 width (~15.8cm)
+  function injectPngPhysDpi(pngBytes, dpi) {
+    if (!pngBytes || pngBytes.length < 33) return pngBytes;
+    // Verify PNG signature
+    if (pngBytes[0] !== 0x89 || pngBytes[1] !== 0x50 || pngBytes[2] !== 0x4E || pngBytes[3] !== 0x47) {
+      return pngBytes;
+    }
+    const ppm = Math.max(2835, Math.round(dpi / 0.0254)); // pixels per meter
+    const physChunk = new Uint8Array(21);
+    const dv = new DataView(physChunk.buffer);
+    dv.setUint32(0, 9, false); // length = 9
+    // 'pHYs'
+    physChunk[4] = 0x70;
+    physChunk[5] = 0x48;
+    physChunk[6] = 0x59;
+    physChunk[7] = 0x73;
+    dv.setUint32(8, ppm, false);  // X pixels per unit
+    dv.setUint32(12, ppm, false); // Y pixels per unit
+    physChunk[16] = 1;            // unit = meter
+    const crc = crc32Bytes(physChunk, 4, 17);
+    dv.setUint32(17, crc, false);
+
+    // Strip any existing pHYs chunk to avoid duplicates, insert right after IHDR (offset 33)
+    const ihdrEnd = 8 + 4 + 4 + new DataView(pngBytes.buffer, pngBytes.byteOffset, pngBytes.byteLength).getUint32(8, false) + 4;
+    const out = new Uint8Array(pngBytes.length + 21);
+    out.set(pngBytes.subarray(0, ihdrEnd), 0);
+    out.set(physChunk, ihdrEnd);
+    out.set(pngBytes.subarray(ihdrEnd), ihdrEnd + 21);
+    return out;
+  }
+
+  function computeWordTargetDpi(pixelWidth) {
+    // Target ~15.8 cm (6.22 inches) physical width in MS Word A4 document
+    const targetInches = 6.22;
+    return Math.max(220, Math.round(pixelWidth / targetInches));
+  }
+
+  function addDpiToPngBlob(blob, pixelWidth) {
+    if (!blob || typeof blob.arrayBuffer !== 'function') return Promise.resolve(blob);
+    const dpi = computeWordTargetDpi(pixelWidth);
+    return blob.arrayBuffer().then((buf) => {
+      const updated = injectPngPhysDpi(new Uint8Array(buf), dpi);
+      return new Blob([updated], { type: 'image/png' });
+    }).catch(() => blob);
+  }
+
   function serializeStandaloneSVG(svgStringOrEl) {
     if (typeof svgStringOrEl === 'string') return svgStringOrEl;
     if (!svgStringOrEl) return '';
@@ -1465,7 +2088,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
-  function renderSVGToCanvas(svgStringOrEl, scale = 2) {
+  function renderSVGToCanvas(svgStringOrEl, scale = 3) {
     return new Promise((resolve, reject) => {
       try {
         let svgText = '';
@@ -1520,19 +2143,21 @@
           try {
             const actualW = img.naturalWidth || w;
             const actualH = img.naturalHeight || h;
+            // Cap max canvas side at 4800px for universal browser safety while guaranteeing >=2400px HiDPI width
+            const maxDim = Math.max(actualW, actualH);
+            const effectiveScale = Math.min(scale, 4800 / Math.max(1, maxDim));
             const canvas = document.createElement('canvas');
-            canvas.width = Math.round(actualW * scale);
-            canvas.height = Math.round(actualH * scale);
+            canvas.width = Math.round(actualW * effectiveScale);
+            canvas.height = Math.round(actualH * effectiveScale);
             const ctx = canvas.getContext('2d');
             if (!ctx) {
               return reject(new Error('Canvas 2D context not available'));
             }
 
-            // Solid background to avoid dark/transparent issues when inserting in Word
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.scale(scale, scale);
+            ctx.scale(effectiveScale, effectiveScale);
             ctx.drawImage(img, 0, 0, actualW, actualH);
             resolve(canvas);
           } catch (canvasErr) {
@@ -1551,7 +2176,7 @@
     });
   }
 
-  function downloadPNG(svgStringOrEl, filename = 'diagram.png', scale = 2) {
+  function downloadPNG(svgStringOrEl, filename = 'diagram.png', scale = 3) {
     return renderSVGToCanvas(svgStringOrEl, scale).then((canvas) => {
       return new Promise((resolve, reject) => {
         try {
@@ -1572,7 +2197,9 @@
           if (canvas.toBlob) {
             canvas.toBlob((blob) => {
               if (blob) {
-                executeDownload(URL.createObjectURL(blob));
+                addDpiToPngBlob(blob, canvas.width).then((hiDpiBlob) => {
+                  executeDownload(URL.createObjectURL(hiDpiBlob));
+                });
               } else {
                 executeDownload(canvas.toDataURL('image/png'));
               }
@@ -1587,7 +2214,7 @@
     });
   }
 
-  function copyPNGToClipboard(svgStringOrEl, scale = 2) {
+  function copyPNGToClipboard(svgStringOrEl, scale = 3) {
     return renderSVGToCanvas(svgStringOrEl, scale).then((canvas) => {
       return new Promise((resolve, reject) => {
         try {
@@ -1596,13 +2223,15 @@
           }
           canvas.toBlob((blob) => {
             if (!blob) return reject(new Error('Failed to create PNG blob'));
-            if (navigator.clipboard && window.ClipboardItem) {
-              navigator.clipboard.write([
-                new ClipboardItem({ 'image/png': blob })
-              ]).then(resolve).catch(reject);
-            } else {
-              reject(new Error('Clipboard API not available'));
-            }
+            addDpiToPngBlob(blob, canvas.width).then((hiDpiBlob) => {
+              if (navigator.clipboard && window.ClipboardItem) {
+                navigator.clipboard.write([
+                  new ClipboardItem({ 'image/png': hiDpiBlob })
+                ]).then(resolve).catch(reject);
+              } else {
+                reject(new Error('Clipboard API not available'));
+              }
+            });
           }, 'image/png');
         } catch (err) {
           reject(err);
@@ -1616,6 +2245,7 @@
     renderDFDSVG,
     splitTextIntoLines,
     renderMultilineText,
+    injectPngPhysDpi,
     serializeStandaloneSVG,
     downloadSVG,
     downloadPNG,

@@ -144,6 +144,7 @@
               <span class="zoom-readout" id="ddp-zoom-label">100%</span>
               <button class="tool-mini-btn" id="ddp-zoom-in" title="Μεγέθυνση">+</button>
               <button class="tool-mini-btn" id="ddp-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
+              <button class="tool-mini-btn" id="ddp-auto-layout" title="Επαναφορά στην αυτόματη διάταξη του ΔΔΠ">Αυτόματη Διάταξη</button>
             </div>
             <div class="diagram-toolbar-group" role="group" aria-label="Διαστάσεις Καμβά">
               <label for="ddp-canvas-size" class="toolbar-label" style="font-size:0.74rem; color:var(--muted); margin-right:2px;">Καμβάς:</label>
@@ -192,8 +193,14 @@
               <button class="tool-mini-btn active" id="dfd-level-1-btn" title="ΔΡΔ Επιπέδου 1 (Αναλυτικές διεργασίες)">Επίπεδο 1</button>
               <button class="tool-mini-btn" id="dfd-level-0-btn" title="Διάγραμμα Πλαισίου / Επίπεδο 0 (Μία διεργασία συστήματος &amp; εξωτερικές οντότητες)">Επίπεδο 0 (Πλαίσιο)</button>
             </div>
-            <div class="diagram-toolbar-group" role="group" aria-label="Περίγραμμα ΚΜ">
+            <div class="diagram-toolbar-group" role="group" aria-label="Περίγραμμα ΚΜ &amp; Διάταξη">
               <button class="tool-mini-btn active" id="dfd-toggle-km-btn" title="Ενεργοποίηση/Απενεργοποίηση διακεκομμένου περιγράμματος Κεντρικού Μετασχηματισμού (Ανάλυση Μετασχηματισμού)">Περίγραμμα ΚΜ: ON</button>
+              <select class="tool-mini-select" id="dfd-layout-mode" title="Επιλογή αλγορίθμου αυτόματης διάταξης ΔΡΔ">
+                <option value="auto">Διάταξη: Αυτόματη (ΕΑΠ)</option>
+                <option value="vertical">Διάταξη: Κάθετη ΕΑΠ (P1.1↓)</option>
+                <option value="horizontal">Διάταξη: Οριζόντια (ΚΜ/ΚΔ)</option>
+              </select>
+              <button class="tool-mini-btn active" id="dfd-clone-toggle" title="Τοπική επανάληψη κοινών Αποθηκών &amp; Οντοτήτων δίπλα σε κάθε διεργασία ώστε να μην διασταυρώνονται τα βέλη">Επανάληψη Αποθηκών: ON</button>
             </div>
             <div class="diagram-toolbar-group" role="group" aria-label="Διαστάσεις Καμβά">
               <label for="dfd-canvas-size" class="toolbar-label" style="font-size:0.74rem; color:var(--muted); margin-right:2px;">Καμβάς:</label>
