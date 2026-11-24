@@ -188,9 +188,10 @@
   // ---------------------------------------------------------------------------
   function loadCodeFromHash() {
     try {
-      const hash = window.location.hash;
-      if (hash && hash.startsWith('#code=') && window.LZString) {
-        const dec = LZString.decompressFromEncodedURIComponent(hash.substring(6));
+      const lz = typeof LZString !== 'undefined' ? LZString : (typeof window !== 'undefined' ? window.LZString : null);
+      const hash = typeof window !== 'undefined' && window.location ? window.location.hash : '';
+      if (hash && hash.startsWith('#code=') && lz) {
+        const dec = lz.decompressFromEncodedURIComponent(hash.substring(6));
         if (dec && dec.trim()) return dec;
       }
     } catch (e) {
@@ -200,9 +201,11 @@
   }
 
   function buildShareURL(code) {
-    if (!window.LZString) return null;
-    const compressed = LZString.compressToEncodedURIComponent(code);
+    const lz = typeof LZString !== 'undefined' ? LZString : (typeof window !== 'undefined' ? window.LZString : null);
+    if (!lz || typeof window === 'undefined' || !window.location) return null;
+    const compressed = lz.compressToEncodedURIComponent(code);
     const url = new URL(window.location.href);
+    url.search = '';
     url.hash = `code=${compressed}`;
     try {
       window.history.replaceState(null, '', url.toString());
@@ -210,19 +213,176 @@
     return url.toString();
   }
 
-  function shareCode(code, okMessage) {
-    const url = buildShareURL(code);
-    if (!url) {
+  async function requestShortUrl(longUrl) {
+    if (typeof window === 'undefined' || !window.location) {
+      return { ok: false, reason: 'unsupported' };
+    }
+    const proto = window.location.protocol;
+    const host = window.location.hostname;
+    if (proto === 'file:' || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return { ok: false, reason: 'local' };
+    }
+
+    // Try is.gd first
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch('https://is.gd/create.php?format=json&url=' + encodeURIComponent(longUrl), {
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.shorturl) {
+          return { ok: true, shortUrl: data.shorturl };
+        }
+      }
+    } catch (e1) {
+      // is.gd failed or timed out
+    }
+
+    // Fallback to v.gd
+    try {
+      const controller2 = new AbortController();
+      const timer2 = setTimeout(() => controller2.abort(), 6000);
+      const res2 = await fetch('https://v.gd/create.php?format=json&url=' + encodeURIComponent(longUrl), {
+        signal: controller2.signal
+      });
+      clearTimeout(timer2);
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2 && data2.shorturl) {
+          return { ok: true, shortUrl: data2.shorturl };
+        }
+      }
+    } catch (e2) {
+      // v.gd failed
+    }
+
+    return { ok: false, reason: 'network' };
+  }
+
+  function showShareModal(code, fullUrl) {
+    if (typeof document === 'undefined') return Promise.resolve(fullUrl);
+
+    const existing = document.getElementById('eap-share-modal');
+    if (existing) existing.remove();
+
+    const charCount = fullUrl ? fullUrl.length.toLocaleString('el-GR') : '0';
+
+    const modal = createModal({
+      id: 'eap-share-modal',
+      title: 'Κοινοποίηση Κώδικα',
+      bodyHTML: `
+        <div class="eap-share-modal-body">
+          <p class="eap-share-intro">Επιλέξτε τη μορφή συνδέσμου που θέλετε να μοιραστείτε:</p>
+
+          <div class="eap-share-card">
+            <div class="eap-share-card-header">
+              <div class="eap-share-title-group">
+                <span class="eap-share-tag eap-tag-short">⚡ Σύντομος Σύνδεσμος</span>
+                <span class="eap-share-tag-desc">Προτεινόμενο για chat, forum, emails</span>
+              </div>
+            </div>
+            <div class="eap-share-row">
+              <input type="text" id="eap-share-short-input" class="eap-share-input" readonly placeholder="Δημιουργία σύντομου συνδέσμου..." />
+              <button type="button" id="eap-share-short-btn" class="btn-run eap-share-btn" disabled>Αντιγραφή</button>
+            </div>
+            <div id="eap-share-short-status" class="eap-share-status">⏳ Δημιουργία σύντομου συνδέσμου...</div>
+          </div>
+
+          <div class="eap-share-card">
+            <div class="eap-share-card-header">
+              <div class="eap-share-title-group">
+                <span class="eap-share-tag eap-tag-perm">🔒 Μόνιμος Σύνδεσμος</span>
+                <span class="eap-share-length-info">(${charCount} χαρακτήρες)</span>
+              </div>
+            </div>
+            <div class="eap-share-row">
+              <input type="text" id="eap-share-perm-input" class="eap-share-input" readonly />
+              <button type="button" id="eap-share-perm-btn" class="tab-action-btn eap-share-btn">Αντιγραφή</button>
+            </div>
+            <p class="eap-share-desc">
+              Περιέχει ολόκληρο τον κώδικα απευθείας στο URL (LZ-String). Λειτουργεί αυτόνομα χωρίς εξωτερικές υπηρεσίες και δεν λήγει ποτέ.
+            </p>
+          </div>
+        </div>
+      `
+    });
+
+    const shortInput = modal.body.querySelector('#eap-share-short-input');
+    const shortBtn = modal.body.querySelector('#eap-share-short-btn');
+    const shortStatus = modal.body.querySelector('#eap-share-short-status');
+    const permInput = modal.body.querySelector('#eap-share-perm-input');
+    const permBtn = modal.body.querySelector('#eap-share-perm-btn');
+
+    permInput.value = fullUrl || '';
+
+    const setupCopyAction = (btn, input, successMsg) => {
+      btn.addEventListener('click', () => {
+        const text = input.value;
+        if (!text) return;
+        copyTextToClipboard(text, successMsg).then((ok) => {
+          if (ok) {
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Αντιγράφηκε!';
+            btn.classList.add('eap-copied-success');
+            setTimeout(() => {
+              btn.textContent = originalText;
+              btn.classList.remove('eap-copied-success');
+            }, 2000);
+          }
+        });
+      });
+    };
+
+    setupCopyAction(shortBtn, shortInput, 'Ο σύντομος σύνδεσμος αντιγράφηκε στο πρόχειρο!');
+    setupCopyAction(permBtn, permInput, 'Ο μόνιμος σύνδεσμος αντιγράφηκε στο πρόχειρο!');
+
+    [shortInput, permInput].forEach((inp) => {
+      inp.addEventListener('focus', () => inp.select());
+      inp.addEventListener('click', () => inp.select());
+    });
+
+    modal.open();
+
+    // Asynchronously fetch the short URL
+    requestShortUrl(fullUrl).then((result) => {
+      if (!modal.isOpen()) return;
+      if (result.ok && result.shortUrl) {
+        shortInput.value = result.shortUrl;
+        shortBtn.removeAttribute('disabled');
+        shortStatus.textContent = '✓ Ο σύντομος σύνδεσμος είναι έτοιμος!';
+        shortStatus.className = 'eap-share-status success';
+        shortBtn.focus();
+      } else {
+        shortInput.value = '';
+        shortInput.placeholder = 'Μη διαθέσιμος';
+        shortBtn.setAttribute('disabled', 'disabled');
+        if (result.reason === 'local') {
+          shortStatus.textContent = 'ℹ️ Η συντόμευση λειτουργεί online (μη διαθέσιμη σε localhost / τοπικό αρχείο).';
+        } else {
+          shortStatus.textContent = '⚠️ Αποτυχία σύνδεσης με την υπηρεσία συντόμευσης. Χρησιμοποιήστε τον μόνιμο σύνδεσμο.';
+        }
+        shortStatus.className = 'eap-share-status warn';
+        permBtn.focus();
+      }
+    });
+
+    return Promise.resolve(fullUrl);
+  }
+
+  function shareCode(code) {
+    if (!code || !code.trim()) {
+      showToast('Δεν υπάρχει κώδικας για κοινοποίηση.');
+      return Promise.resolve(null);
+    }
+    const fullUrl = buildShareURL(code);
+    if (!fullUrl) {
       showToast('Η βιβλιοθήκη LZ-String δεν είναι διαθέσιμη.');
       return Promise.resolve(null);
     }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(url)
-        .then(() => { showToast(okMessage || 'Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!'); return url; })
-        .catch(() => { showPrompt('Αντιγράψτε τον σύνδεσμο:', { defaultValue: url, readonly: true }); return url; });
-    }
-    showPrompt('Αντιγράψτε τον σύνδεσμο:', { defaultValue: url, readonly: true });
-    return Promise.resolve(url);
+    return showShareModal(code, fullUrl);
   }
 
   // ---------------------------------------------------------------------------
@@ -320,6 +480,7 @@
     if (modal) {
       return {
         el: modal,
+        body: modal.querySelector('.modal-body'),
         open: () => { modal.style.display = 'flex'; },
         close: () => { modal.style.display = 'none'; },
         isOpen: () => modal.style.display === 'flex'
@@ -506,6 +667,7 @@
     loadCodeFromHash,
     buildShareURL,
     shareCode,
+    showShareModal,
     saveTextAsFile,
     readTextFile,
     pickFile,

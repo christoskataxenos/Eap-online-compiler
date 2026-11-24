@@ -1351,6 +1351,156 @@ button:disabled {
     text-transform: none;
     letter-spacing: 0;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Share Modal */
+/* -------------------------------------------------------------------------- */
+.eap-share-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.eap-share-intro {
+    margin: 0 0 2px 0;
+    font-size: 0.92rem;
+    color: var(--text-color);
+}
+.eap-share-card {
+    background: var(--card-bg, rgba(127, 127, 127, 0.05));
+    border: 1px solid var(--panel-header-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.eap-share-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.eap-share-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.eap-share-tag {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+.eap-tag-short {
+    background: rgba(46, 160, 67, 0.15);
+    color: #2ea043;
+    border: 1px solid rgba(46, 160, 67, 0.3);
+}
+[data-theme="dark"] .eap-tag-short {
+    background: rgba(63, 185, 80, 0.2);
+    color: #3fb950;
+    border-color: rgba(63, 185, 80, 0.4);
+}
+.eap-tag-perm {
+    background: rgba(9, 105, 218, 0.12);
+    color: #0969da;
+    border: 1px solid rgba(9, 105, 218, 0.25);
+}
+[data-theme="dark"] .eap-tag-perm {
+    background: rgba(88, 166, 255, 0.18);
+    color: #58a6ff;
+    border-color: rgba(88, 166, 255, 0.4);
+}
+.eap-share-tag-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted, #768390);
+}
+.eap-share-length-info {
+    font-size: 0.78rem;
+    color: var(--text-muted, #768390);
+    font-family: var(--font-mono);
+}
+.eap-share-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.eap-share-input {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    font-size: 0.86rem;
+    font-family: var(--font-mono);
+    border: 1px solid var(--panel-header-border);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    box-sizing: border-box;
+    outline: none;
+}
+.eap-share-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--button-bg) 30%, transparent);
+}
+.eap-share-btn {
+    padding: 7px 16px;
+    font-size: 0.86rem;
+    cursor: pointer;
+    white-space: nowrap;
+    border-radius: 6px;
+    min-width: 105px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    text-transform: none;
+    letter-spacing: 0;
+    transition: all 0.2s ease;
+}
+.eap-share-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.eap-share-btn.eap-copied-success {
+    background-color: #2ea043 !important;
+    color: #ffffff !important;
+    border-color: #2ea043 !important;
+}
+.eap-share-status {
+    font-size: 0.8rem;
+    color: var(--text-muted, #768390);
+    line-height: 1.4;
+}
+.eap-share-status.success {
+    color: #2ea043;
+}
+[data-theme="dark"] .eap-share-status.success {
+    color: #3fb950;
+}
+.eap-share-status.warn {
+    color: #cf222e;
+}
+[data-theme="dark"] .eap-share-status.warn {
+    color: #f85149;
+}
+.eap-share-desc {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted, #768390);
+    line-height: 1.45;
+}
+@media (max-width: 520px) {
+    .eap-share-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .eap-share-btn {
+        width: 100%;
+    }
+}
 .modal-close:hover {
     color: var(--accent) !important;
 }
