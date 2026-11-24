@@ -181,6 +181,7 @@
               <span class="zoom-readout" id="dfd-zoom-label">100%</span>
               <button class="tool-mini-btn" id="dfd-zoom-in" title="Μεγέθυνση">+</button>
               <button class="tool-mini-btn" id="dfd-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
+              <button class="tool-mini-btn" id="dfd-edit-in-builder-btn" style="color:var(--accent); font-weight:600;" title="Φόρτωση του τρέχοντος ΔΡΔ στον ΔΡΔ Builder για πλήρη παραμετροποίηση">Επεξεργασία στον Builder ✎</button>
             </div>
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="dfd-print-btn" title="Ασπρόμαυρη μορφή ΕΑΠ έτοιμη για επικόλληση σε MS Word">Ασπρόμαυρο (Word)</button>
@@ -291,8 +292,12 @@
               <textarea id="dfd-dsl-input" class="builder-textarea" spellcheck="false"></textarea>
             </div>
 
-            <div class="builder-row" style="justify-content:flex-end;">
-              <button type="button" class="builder-primary-btn" id="dfd-build-btn">Παραγωγή ΔΔΠ &amp; Ψευδοκώδικα</button>
+            <div class="builder-row" style="justify-content:space-between; align-items:center;">
+              <button type="button" class="tool-mini-btn" id="dfd-load-from-compiler-btn" title="Φόρτωση του παραγόμενου ΔΡΔ από τον τρέχοντα ψευδοκώδικα">⟳ Φόρτωση από Κώδικα</button>
+              <div style="display:flex; gap:8px;">
+                <button type="button" class="tool-mini-btn" id="dfd-preview-builder-btn" title="Προεπισκόπηση &amp; Εξαγωγή του προσαρμοσμένου ΔΡΔ χωρίς αλλαγή ψευδοκώδικα">Προεπισκόπηση στο ΔΡΔ</button>
+                <button type="button" class="builder-primary-btn" id="dfd-build-btn">Παραγωγή ΔΔΠ &amp; Ψευδοκώδικα</button>
+              </div>
             </div>
           </div>
         </div>

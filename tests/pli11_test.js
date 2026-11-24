@@ -389,6 +389,49 @@ function testUniversalKMFrameIsolationAndNoOverlaps() {
   console.log('testUniversalKMFrameIsolationAndNoOverlaps passed');
 }
 
+function testDirectivesAndDFDSync() {
+  const code = `
+/* @KM: M3 */
+/* @ALIAS: Δ = "Αρχείο Πελατών" */
+/* @MERGE_SOURCES: "Χρήστης" = * */
+/* @MERGE_SINKS: "Οθόνη" = * */
+/* @HIDE_FLOW: P */
+
+${PLI11_EXAMPLES.GE1_2023_2024}
+`;
+
+  const res = Core.compilePLI11(code);
+  const dfd = res.dfd;
+
+  const centrals = dfd.processes.filter((p) => p.isCentral).map((p) => p.label);
+  assert.deepStrictEqual(centrals, ['M3'], 'Expected only M3 to be central');
+  assert.ok(dfd.entities.some((e) => e.label === 'Χρήστης'), 'Expected merged entity Χρήστης');
+  assert.ok(dfd.entities.some((e) => e.label === 'Οθόνη'), 'Expected merged entity Οθόνη');
+
+  const hasFlowP = dfd.flows.some((f) => f.data.includes('P') || f.data.includes('Ρ'));
+  assert.strictEqual(hasFlowP, false, 'Expected flow P to be hidden');
+
+  const dsl = Core.serializeDFDToDSL(dfd);
+  assert.ok(dsl.includes('KM: M3'));
+  assert.ok(dsl.includes('[Χρήστης]'));
+  assert.ok(dsl.includes('[Οθόνη]'));
+
+  const spec = Core.parseDFDText(dsl);
+  assert.strictEqual(spec.mode, 'KM');
+  assert.deepStrictEqual(spec.central, ['M3']);
+
+  const reDFD = Core.dfdSpecToDFD(spec);
+  assert.strictEqual(reDFD.processes.length, dfd.processes.length);
+  assert.ok(reDFD.processes.some((p) => p.label === 'M3' && p.isCentral));
+  assert.ok(reDFD.entities.some((e) => e.label === 'Χρήστης'));
+  assert.ok(reDFD.entities.some((e) => e.label === 'Οθόνη'));
+
+  const svg = Renderer.renderDFDSVG(reDFD);
+  assert.ok(svg.includes('Χρήστης'));
+  assert.ok(svg.includes('Οθόνη'));
+  console.log('testDirectivesAndDFDSync passed');
+}
+
 testOfficialExamplesZeroErrors();
 testHomoglyphNormalization();
 testValidatorRules();
@@ -397,4 +440,5 @@ testDFDSynthesisAndMermaid();
 testReverseDFDBuilderRoundTrip();
 testSVGRenderingAndHelpers();
 testUniversalKMFrameIsolationAndNoOverlaps();
+testDirectivesAndDFDSync();
 console.log('All ΠΛΗ11 tests passed!');

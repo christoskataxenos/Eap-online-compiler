@@ -1468,7 +1468,8 @@
       rootNode,
       architecture,
       counts,
-      duplicateProcs
+      duplicateProcs,
+      comments: ast.comments || []
     };
   }
 
@@ -1966,27 +1967,104 @@
     return parts;
   }
 
-  function synthesizeDFD(model) {
+  // ---------------------------------------------------------------------------
+  // 6. DIRECTIVES PARSER (IN-CODE PRAGMAS FOR DFD / DDP CUSTOMIZATION)
+  // Supports @KM: M3, @MODE: KD, @ALIAS: A="Χρήστης", @MERGE_SOURCES, @HIDE_FLOW
+  // ---------------------------------------------------------------------------
+  function parseDirectives(comments = []) {
+    const directives = {
+      central: null,          // Set<string> of process tags
+      mode: null,             // 'KM' | 'KD'
+      aliases: new Map(),     // canonVar -> string
+      mergeSources: [],       // [{ label: string, vars: Set<string> | '*' }]
+      mergeSinks: [],         // [{ label: string, vars: Set<string> | '*' }]
+      hiddenFlows: new Set()  // Set<string> of var canons to suppress
+    };
+
+    for (const c of comments) {
+      const text = String(c.text || '').replace(/^\/\*+/, '').replace(/\*+\/$/, '').trim();
+      const lines = text.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.includes('@')) continue;
+
+        const m = trimmed.match(/@([A-Za-z\u0370-\u03FF_]+)\s*:\s*(.+)$/i);
+        if (!m) continue;
+        const tag = normalizeId(m[1]);
+        const body = m[2].trim();
+
+        if (tag === 'KM' || tag === 'CENTRAL' || tag === 'KENTRIKO') {
+          directives.central = new Set(
+            body.split(/[,;\s]+/).map((s) => normalizeId(s.trim())).filter(Boolean)
+          );
+        } else if (tag === 'MODE' || tag === 'TYPOS') {
+          const u = normalizeId(body);
+          if (u.includes('KD') || u.includes('TRANSACTION')) directives.mode = 'KD';
+          else if (u.includes('KM') || u.includes('TRANSFORMATION')) directives.mode = 'KM';
+        } else if (tag === 'ALIAS' || tag === 'ONOMASIA' || tag === 'LABEL') {
+          const pairRegex = /([A-Za-z\u0370-\u03FF_0-9]+)\s*=\s*(?:"([^"]+)"|'([^']+)'|«([^»]+)»|([^,;]+))/g;
+          let mPair;
+          while ((mPair = pairRegex.exec(body)) !== null) {
+            const k = normalizeId(mPair[1]);
+            const v = (mPair[2] || mPair[3] || mPair[4] || mPair[5] || '').trim();
+            if (k && v) directives.aliases.set(k, v);
+          }
+        } else if (tag === 'MERGE_SOURCES' || tag === 'MERGE_INPUTS' || tag === 'SYGCHONEYSH_PIGON') {
+          const parts = body.split('=');
+          if (parts.length === 2) {
+            const label = parts[0].trim().replace(/^["'«]/, '').replace(/["'»]$/, '').trim();
+            const varsPart = parts[1].trim();
+            const vars = varsPart === '*' ? '*' : new Set(varsPart.split(/[,;\s]+/).map((s) => normalizeId(s.trim())).filter(Boolean));
+            directives.mergeSources.push({ label, vars });
+          }
+        } else if (tag === 'MERGE_SINKS' || tag === 'MERGE_OUTPUTS' || tag === 'SYGCHONEYSH_APODEKTON') {
+          const parts = body.split('=');
+          if (parts.length === 2) {
+            const label = parts[0].trim().replace(/^["'«]/, '').replace(/["'»]$/, '').trim();
+            const varsPart = parts[1].trim();
+            const vars = varsPart === '*' ? '*' : new Set(varsPart.split(/[,;\s]+/).map((s) => normalizeId(s.trim())).filter(Boolean));
+            directives.mergeSinks.push({ label, vars });
+          }
+        } else if (tag === 'HIDE_FLOW' || tag === 'IGNORE' || tag === 'APOKRYPSI') {
+          for (const v of body.split(/[,;\s]+/)) {
+            const clean = normalizeId(v.trim());
+            if (clean) directives.hiddenFlows.add(clean);
+          }
+        }
+      }
+    }
+
+    return directives;
+  }
+
+  function synthesizeDFD(model, opts = {}) {
+    const directives = opts.directives || parseDirectives(model.comments || []);
     const processes = new Map(); // procKey -> { id, key, label, isCentral, isTransactionCenter }
     const endpoints = new Map(); // endpointKey -> { id, label, type: 'process'|'store'|'entity'|'unknown_io', isCentral }
     const rawFlows = [];         // { fromKey, toKey, dataSet: Set, dataList: [] }
 
-    function ensureProcess(key, displayLabel, isCentral = false, isTC = false) {
+    const isTC = directives.mode ? (directives.mode === 'KD') : (model.architecture === 'TRANSACTION_CENTER');
+
+    function ensureProcess(key, displayLabel, isCentral = false, isProcTC = false) {
+      const canonKey = normalizeId(key);
+      const effectiveCentral = directives.central ? directives.central.has(canonKey) : isCentral;
+      const effectiveLabel = directives.aliases.get(canonKey) || displayLabel || key;
       if (!processes.has(key)) {
         const ep = {
           id: sanitizeMermaidId(key, 'P'),
           key,
-          label: displayLabel || key,
+          label: effectiveLabel,
           type: 'process',
-          isCentral,
-          isTransactionCenter: isTC
+          isCentral: effectiveCentral,
+          isTransactionCenter: isProcTC
         };
         processes.set(key, ep);
         endpoints.set(ep.id, ep);
       } else {
         const existing = processes.get(key);
-        if (isCentral) existing.isCentral = true;
-        if (isTC) existing.isTransactionCenter = true;
+        if (effectiveCentral) existing.isCentral = true;
+        if (isProcTC) existing.isTransactionCenter = true;
+        if (directives.aliases.has(canonKey)) existing.label = effectiveLabel;
       }
       return processes.get(key);
     }
@@ -1994,7 +2072,33 @@
     function ensureIOEndpoint(ioKind, ioTarget, fallbackHint, varName) {
       let type = 'unknown_io';
       let label = '';
-      if (ioKind === 'DATA_STORE') {
+      const canonVar = normalizeId(varName);
+
+      // Check merge rules first
+      let mergedLabel = null;
+      if (fallbackHint === 'read') {
+        for (const rule of directives.mergeSources) {
+          if (rule.vars === '*' || rule.vars.has(canonVar)) {
+            mergedLabel = rule.label;
+            break;
+          }
+        }
+      } else {
+        for (const rule of directives.mergeSinks) {
+          if (rule.vars === '*' || rule.vars.has(canonVar)) {
+            mergedLabel = rule.label;
+            break;
+          }
+        }
+      }
+
+      if (mergedLabel) {
+        type = 'entity';
+        label = mergedLabel;
+      } else if (directives.aliases.has(canonVar)) {
+        type = 'entity';
+        label = directives.aliases.get(canonVar);
+      } else if (ioKind === 'DATA_STORE') {
         type = 'store';
         label = ioTarget || 'Αποθήκη Δεδομένων';
       } else if (ioKind === 'EXTERNAL_ENTITY') {
@@ -2012,10 +2116,14 @@
       return endpoints.get(id);
     }
 
-    // Track central processes from ROOT_CONTROL
+    // Track central processes from ROOT_CONTROL (or explicit @KM directive)
     const centralKeys = new Set();
-    const isTC = model.architecture === 'TRANSACTION_CENTER';
-    if (model.rootNode) {
+    if (directives.central) {
+      for (const k of directives.central) {
+        centralKeys.add(k);
+        ensureProcess(k, k, true, isTC);
+      }
+    } else if (model.rootNode) {
       // Any Calc_* directly called by root corresponds to central transformation(s)
       const rootEdges = model.edges.filter((e) => e.from === model.rootNode.id);
       const directCalcs = rootEdges.filter((e) => {
@@ -2225,6 +2333,7 @@
 
     function addFlowEdge(fromId, toId, dataLabel) {
       if (fromId === toId) return;
+      if (directives.hiddenFlows.has(normalizeId(dataLabel))) return;
       const key = `${fromId}->${toId}`;
       if (!flowEdgeMap.has(key)) {
         flowEdgeMap.set(key, { from: fromId, to: toId, data: [] });
@@ -2312,7 +2421,7 @@
       entities: activeEndpoints.filter((n) => n.type === 'entity' || n.type === 'unknown_io'),
       flows,
       hasGenericIO: activeEndpoints.some((n) => n.type === 'unknown_io'),
-      architecture: model.architecture
+      architecture: isTC ? 'TRANSACTION_CENTER' : 'TRANSFORMATION_CENTER'
     };
   }
 
@@ -2445,7 +2554,13 @@
   // 8. REVERSE COMPILER: DFD TEXT / MODEL -> ΔΔΠ + ΠΛΗ11 PSEUDOCODE
   // ---------------------------------------------------------------------------
   function parseDFDEndpoint(rawToken) {
-    const t = String(rawToken || '').trim();
+    let t = String(rawToken || '').trim();
+    if (t.startsWith('[') && t.endsWith(']')) {
+      return { type: 'entity', name: t.slice(1, -1).trim(), roleHint: 'entity' };
+    }
+    if (t.startsWith('(') && t.endsWith(')')) {
+      return { type: 'store', name: t.slice(1, -1).trim(), roleHint: 'store' };
+    }
     const norm = stripAccents(t).toUpperCase();
     const mSrc = t.match(/^(?:ΠΗΓΗ|SOURCE)\s+(.+)$/i);
     if (mSrc) return { type: 'entity', name: mSrc[1].trim(), roleHint: 'source' };
@@ -2454,10 +2569,10 @@
     const mStore = t.match(/^(?:ΑΠΟΘΗΚΗ|STORE|ΑΡΧΕΙΟ)\s+(.+)$/i);
     if (mStore) return { type: 'store', name: mStore[1].trim(), roleHint: 'store' };
 
-    if (/^(?:ΠΗΓΗ|ΑΠΟΔΕΚΤΗΣ|ΧΡΗΣΤΗΣ|SOURCE|SINK)/i.test(norm)) {
+    if (/^(?:ΠΗΓΗ|ΑΠΟΔΕΚΤΗΣ|ΧΡΗΣΤΗΣ|ΟΘΟΝΗ|ΠΕΛΑΤΗΣ|SOURCE|SINK|USER)/i.test(norm)) {
       return { type: 'entity', name: t, roleHint: 'entity' };
     }
-    if (/^(?:ΑΠΟΘΗΚΗ|ΑΡΧΕΙΟ|ΑΔ|AD|DB)/i.test(norm)) {
+    if (/^(?:ΑΠΟΘΗΚΗ|ΑΡΧΕΙΟ|ΒΑΣΗ|ΑΔ|AD|DB)/i.test(norm)) {
       return { type: 'store', name: t, roleHint: 'store' };
     }
     return { type: 'process', name: t, roleHint: 'process' };
@@ -2892,6 +3007,119 @@
     return allBlocks.join('\n\n');
   }
 
+  function serializeDFDToDSL(dfd) {
+    if (!dfd || !dfd.flows) return '';
+    const nodeMap = new Map((dfd.nodes || []).map((n) => [n.id, n]));
+    const mode = dfd.architecture === 'TRANSACTION_CENTER' ? 'KD' : 'KM';
+    const central = (dfd.processes || []).filter((p) => p.isCentral).map((p) => p.label || p.key);
+
+    const lines = [];
+    if (central.length > 0) {
+      lines.push(`${mode}: ${central.join(', ')}`);
+    }
+
+    function formatEndpoint(node, id) {
+      if (!node) return id;
+      const lbl = node.label || node.key || id;
+      if (node.type === 'entity' || node.type === 'unknown_io') {
+        return `[${lbl}]`;
+      }
+      if (node.type === 'store') {
+        return `(${lbl})`;
+      }
+      return lbl;
+    }
+
+    for (const f of dfd.flows) {
+      const u = nodeMap.get(f.from);
+      const v = nodeMap.get(f.to);
+      if (!u || !v) continue;
+      const fromName = formatEndpoint(u, f.from);
+      const toName = formatEndpoint(v, f.to);
+      const dataStr = (f.data || []).join(', ');
+      lines.push(`${fromName} -> ${toName} : ${dataStr}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  function dfdSpecToDFD(spec) {
+    if (!spec) return null;
+    const isTC = spec.mode === 'KD';
+    const procs = new Map();
+    const entities = new Map();
+    const stores = new Map();
+    const centralSet = new Set((spec.central || []).map(normalizeId));
+
+    const flows = Array.isArray(spec.flows) ? spec.flows : [];
+    for (const f of flows) {
+      const regEndpoint = (name, type) => {
+        const id = sanitizeMermaidId(name, type === 'process' ? 'P' : (type === 'store' ? 'S' : 'IO'));
+        if (type === 'process') {
+          if (!procs.has(id)) {
+            procs.set(id, {
+              id,
+              key: name,
+              label: name,
+              type: 'process',
+              isCentral: centralSet.has(normalizeId(name)),
+              isTransactionCenter: isTC && centralSet.has(normalizeId(name))
+            });
+          }
+        } else if (type === 'store') {
+          if (!stores.has(id)) {
+            stores.set(id, { id, key: name, label: name, type: 'store', isCentral: false });
+          }
+        } else {
+          if (!entities.has(id)) {
+            entities.set(id, { id, key: name, label: name, type: 'entity', isCentral: false });
+          }
+        }
+        return id;
+      };
+
+      const fromId = regEndpoint(f.from, f.fromType);
+      const toId = regEndpoint(f.to, f.toType);
+      f.fromId = fromId;
+      f.toId = toId;
+    }
+
+    for (const c of (spec.central || [])) {
+      const id = sanitizeMermaidId(c, 'P');
+      if (!procs.has(id)) {
+        procs.set(id, {
+          id,
+          key: c,
+          label: c,
+          type: 'process',
+          isCentral: true,
+          isTransactionCenter: isTC
+        });
+      }
+    }
+
+    const compiledFlows = flows.map((f) => ({
+      from: f.fromId,
+      to: f.toId,
+      data: Array.isArray(f.data) ? f.data : String(f.data || '').split(/[,;]+/).map((s) => s.trim()).filter(Boolean)
+    }));
+
+    const processes = Array.from(procs.values());
+    const storesArr = Array.from(stores.values());
+    const entitiesArr = Array.from(entities.values());
+    const nodes = [...processes, ...storesArr, ...entitiesArr];
+
+    return {
+      architecture: isTC ? 'TRANSACTION_CENTER' : 'TRANSFORMATION_CENTER',
+      processes,
+      stores: storesArr,
+      entities: entitiesArr,
+      nodes,
+      flows: compiledFlows,
+      hasGenericIO: false
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // 9. SYMBOLIC CALL-TRACE STEPPER
   // ---------------------------------------------------------------------------
@@ -3187,6 +3415,9 @@
     generateDFDMermaid,
     parseDFDText,
     compileDFDToPLI11,
+    serializeDFDToDSL,
+    dfdSpecToDFD,
+    parseDirectives,
     buildCallTrace,
     formatPLI11,
     compilePLI11

@@ -99,6 +99,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const dfdFlowsTbody = document.getElementById('dfd-flows-tbody');
   const dfdDslInput = document.getElementById('dfd-dsl-input');
   const dfdBuildBtn = document.getElementById('dfd-build-btn');
+  const dfdEditInBuilderBtn = document.getElementById('dfd-edit-in-builder-btn');
+  const dfdLoadFromCompilerBtn = document.getElementById('dfd-load-from-compiler-btn');
+  const dfdPreviewBuilderBtn = document.getElementById('dfd-preview-builder-btn');
 
   // ---------------------------------------------------------------------------
   // SETTINGS (shared via EAPCommon)
@@ -949,6 +952,49 @@ document.addEventListener('DOMContentLoaded', () => {
     switchTab('tab-ddp');
     showToast('Ο ψευδοκώδικας και το ΔΔΠ παράχθηκαν επιτυχώς!');
   });
+
+  if (dfdEditInBuilderBtn) {
+    dfdEditInBuilderBtn.addEventListener('click', () => {
+      if (currentCompiled && currentCompiled.dfd) {
+        const dsl = Core.serializeDFDToDSL(currentCompiled.dfd);
+        loadDSLIntoBuilder(dsl);
+      }
+      switchTab('tab-builder');
+      showToast('Το ΔΡΔ φορτώθηκε στον Builder για παραμετροποίηση!');
+    });
+  }
+
+  if (dfdLoadFromCompilerBtn) {
+    dfdLoadFromCompilerBtn.addEventListener('click', () => {
+      if (currentCompiled && currentCompiled.dfd) {
+        const dsl = Core.serializeDFDToDSL(currentCompiled.dfd);
+        loadDSLIntoBuilder(dsl);
+        showToast('Το ΔΡΔ φορτώθηκε από τον ψευδοκώδικα!');
+      } else {
+        showToast('Δεν υπάρχει μεταγλωττισμένο ΔΡΔ για φόρτωση.');
+      }
+    });
+  }
+
+  if (dfdPreviewBuilderBtn) {
+    dfdPreviewBuilderBtn.addEventListener('click', () => {
+      const spec = Core.parseDFDText(dfdDslInput.value);
+      if (spec.parseErrors.length > 0) {
+        showToast(spec.parseErrors[0], 3500);
+        return;
+      }
+      if (spec.flows.length === 0) {
+        showToast('Προσθέστε τουλάχιστον μία ροή δεδομένων στο ΔΡΔ.');
+        return;
+      }
+      const customDFD = Core.dfdSpecToDFD(spec);
+      if (!currentCompiled) currentCompiled = {};
+      currentCompiled.dfd = customDFD;
+      renderDFDView(true);
+      switchTab('tab-dfd');
+      showToast('Προεπισκόπηση προσαρμοσμένου ΔΡΔ (έτοιμο για εξαγωγή)!');
+    });
+  }
 
   if (PLI11_DFD_PRESETS && PLI11_DFD_PRESETS.GE1_2025_26) {
     loadDSLIntoBuilder(PLI11_DFD_PRESETS.GE1_2025_26.dsl);
