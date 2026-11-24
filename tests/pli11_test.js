@@ -462,6 +462,228 @@ function testDFDCustomPositionsAndDragSupport() {
   console.log('testDFDCustomPositionsAndDragSupport passed');
 }
 
+function testKMToggleAndDirectives() {
+  const codeWithNoKM = `/* @KM: NONE */
+PROCEDURE MAIN
+  LOCAL VAR A, B, C;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ A, B, C;
+  CALL GET_A(A);
+  CALL CALC_COMPUTE(A, B);
+  CALL PUT_C(B);
+END_PROCEDURE;
+PROCEDURE GET_A(x: IN/OUT) Διάβασε x; END_PROCEDURE;
+PROCEDURE CALC_COMPUTE(x: IN, y: IN/OUT) y = x * 2; END_PROCEDURE;
+PROCEDURE PUT_C(y: IN) Εμφάνισε y; END_PROCEDURE;`;
+
+  const res = Core.compilePLI11(codeWithNoKM);
+  assert.strictEqual(res.dfd.noKM, true, 'Expected noKM to be true');
+  assert.strictEqual(res.dfd.showKMFrame, false, 'Expected showKMFrame to be false');
+  assert.ok(res.dfd.processes.every((p) => !p.isCentral), 'Expected all processes to have isCentral = false');
+
+  const svgNoKM = Renderer.renderDFDSVG(res.dfd);
+  assert.ok(!svgNoKM.includes('stroke-dasharray="6 4"'), 'Should not render dashed KM frame when KM is disabled');
+  assert.ok(!svgNoKM.includes('Περίγραμμα ΚΜ'), 'Legend should not contain KM label when KM is disabled');
+
+  // Test toggling KM off on standard example
+  const stdRes = Core.compilePLI11(PLI11_EXAMPLES.GE1_2023_2024);
+  const svgToggledOff = Renderer.renderDFDSVG(stdRes.dfd, { showKMFrame: false });
+  assert.ok(!svgToggledOff.includes('stroke-dasharray="6 4"'), 'Should omit KM box when showKMFrame is false');
+  assert.ok(!svgToggledOff.includes('Περίγραμμα ΚΜ'), 'Should omit KM in legend when showKMFrame is false');
+
+  console.log('testKMToggleAndDirectives passed');
+}
+
+function testLevel0ContextDiagramSynthesis() {
+  const res = Core.compilePLI11(PLI11_EXAMPLES.GE1_2025_2026_FULL);
+  const dfd0 = res.dfdLevel0;
+
+  assert.ok(dfd0, 'Level 0 Context Diagram should exist');
+  assert.strictEqual(dfd0.level, 0, 'Level should be 0');
+  assert.strictEqual(dfd0.isContextDiagram, true, 'isContextDiagram should be true');
+  assert.strictEqual(dfd0.processes.length, 1, 'Context Diagram must have exactly 1 system process');
+  assert.strictEqual(dfd0.stores.length, 0, 'Context Diagram must not expose internal data stores');
+  assert.ok(dfd0.entities.length >= 2, 'External sources and sinks must be preserved');
+  assert.ok(dfd0.flows.length >= 2, 'External flows must connect entities to process 0');
+  assert.ok(dfd0.flows.every((f) => f.from === 'P_SYSTEM_0' || f.to === 'P_SYSTEM_0'), 'All flows in Level 0 must touch process 0');
+
+  const svg0 = Renderer.renderDFDSVG(dfd0);
+  assert.ok(svg0.includes('P_SYSTEM_0'), 'SVG should contain system process');
+  assert.ok(!svg0.includes('stroke-dasharray="6 4"'), 'Context Diagram must never have a KM boundary box');
+  assert.ok(!svg0.includes('Περίγραμμα ΚΜ'), 'Context Diagram legend must not show KM');
+  assert.ok(!svg0.includes('Αποθήκη Δεδομένων'), 'Context Diagram legend must not show stores when none exist');
+
+  // Mermaid Level 0 test
+  const mermaid0 = Core.generateDFDMermaid(dfd0);
+  assert.ok(!mermaid0.includes('subgraph KM'), 'Mermaid for Level 0 must not contain subgraph KM');
+  assert.ok(mermaid0.includes('P_SYSTEM_0'), 'Mermaid should contain system process node');
+
+  console.log('testLevel0ContextDiagramSynthesis passed');
+}
+
+function testDFDBuilderNoKMAndLevel0() {
+  const dslNoKM = `ΧΩΡΙΣ_ΚΜ
+ΠΗΓΗ Χρήστης -> M1 : Είσοδος
+M1 -> M2 : Επεξεργασία
+M2 -> ΑΠΟΔΕΚΤΗΣ Οθόνη : Έξοδος`;
+
+  const spec = Core.parseDFDText(dslNoKM);
+  assert.deepStrictEqual(spec.central, [], 'Expected central to be empty');
+  const dfd = Core.dfdSpecToDFD(spec);
+  assert.strictEqual(dfd.noKM, true);
+  assert.strictEqual(dfd.showKMFrame, false);
+
+  const dslLevel0 = `ΕΠΙΠΕΔΟ: 0
+ΧΩΡΙΣ_ΚΜ
+ΠΗΓΗ Χρήστης -> 0. Σύστημα : Είσοδος
+0. Σύστημα -> ΑΠΟΔΕΚΤΗΣ Οθόνη : Έξοδος`;
+  const spec0 = Core.parseDFDText(dslLevel0);
+  assert.strictEqual(spec0.level, 0);
+
+  console.log('testDFDBuilderNoKMAndLevel0 passed');
+}
+
+function testTextWrappingAndNoOverflow() {
+  // Test splitTextIntoLines
+  const longEntity = 'Τραπεζικές πληρωμές με χρήση κάρτας';
+  const lines = Renderer.splitTextIntoLines(longEntity, 20);
+  assert.ok(lines.length >= 2, `Expected at least 2 lines for "${longEntity}", got ${lines.length}`);
+  assert.ok(lines.every((l) => l.length <= 22), `All lines should be reasonably short: ${JSON.stringify(lines)}`);
+
+  // Test SVG Multiline Text Generation
+  const svgText = Renderer.renderMultilineText(lines, 150, 80, { fontSize: 12 });
+  assert.ok(svgText.includes('<tspan'), 'Expected multiline <tspan> elements');
+  assert.ok(svgText.includes('Τραπεζικές πληρωμές'), 'Expected first line in SVG');
+
+  // Test DFD with long entity and process
+  const dsl = `
+ΧΩΡΙΣ_ΚΜ
+ΠΗΓΗ Τραπεζικές πληρωμές με χρήση κάρτας -> 0. Σύστημα Ηλεκτρονικών Πληρωμών : Αίτημα_Πληρωμής
+0. Σύστημα Ηλεκτρονικών Πληρωμών -> ΑΠΟΔΕΚΤΗΣ Αποτέλεσμα_Έγκρισης_Συναλλαγής : Απόδειξη
+`;
+  const spec = Core.parseDFDText(dsl);
+  const dfd = Core.dfdSpecToDFD(spec);
+  const svg = Renderer.renderDFDSVG(dfd, { showLegend: false });
+
+  // Verify entity rectangle exists and has dynamic width without overflow
+  assert.ok(svg.includes('class="dfd-entity"'), 'Expected dfd-entity group');
+  assert.ok(svg.includes('<tspan'), 'Expected multiline tspans for long labels');
+
+  // Verify DDP module box with long name
+  const ddpCode = `
+PROCEDURE EXEC_ROOT
+  LOCAL VAR X;
+  CALL ΔΙΑΧΕΙΡΙΣΗ_ΤΡΑΠΕΖΙΚΩΝ_ΣΥΝΑΛΛΑΓΩΝ(X);
+END_PROCEDURE;
+
+PROCEDURE ΔΙΑΧΕΙΡΙΣΗ_ΤΡΑΠΕΖΙΚΩΝ_ΣΥΝΑΛΛΑΓΩΝ(X: IN)
+  Επεξεργασία;
+END_PROCEDURE;
+`;
+  const res = Core.compilePLI11(ddpCode);
+  const ddpSvg = Renderer.renderDDPSVG(res.model, { showLegend: false });
+  assert.ok(ddpSvg.includes('class="ddp-node"'), 'Expected ddp-node group');
+  assert.ok(ddpSvg.includes('<tspan'), 'Expected wrapped tspans in DDP node');
+
+  console.log('testTextWrappingAndNoOverflow passed');
+}
+
+function testCanvasDimensionsOptions() {
+  const code = `
+PROCEDURE EXEC_ROOT
+  LOCAL VAR A, B;
+  CALL CALC_M1(A, B);
+END_PROCEDURE;
+
+PROCEDURE CALC_M1(A: IN, B: OUT)
+  B <- A;
+END_PROCEDURE;
+`;
+  const compiled = Core.compilePLI11(code);
+
+  // DDP with Full HD dimensions
+  const ddpHD = Renderer.renderDDPSVG(compiled.model, {
+    canvasWidth: 1920,
+    canvasHeight: 1080
+  });
+  assert.ok(ddpHD.includes('width="1920"'), 'DDP should have width 1920');
+  assert.ok(ddpHD.includes('height="1080"'), 'DDP should have height 1080');
+  assert.ok(ddpHD.includes('viewBox="'), 'DDP should have viewBox');
+
+  // DFD with A4 Landscape dimensions
+  const dfdA4 = Renderer.renderDFDSVG(compiled.dfd, {
+    canvasWidth: 1120,
+    canvasHeight: 790
+  });
+  assert.ok(dfdA4.includes('width="1120"'), 'DFD should have width 1120');
+  assert.ok(dfdA4.includes('height="790"'), 'DFD should have height 790');
+
+  // Verify PNG export and clipboard methods
+  assert.strictEqual(typeof Renderer.downloadPNG, 'function');
+  assert.strictEqual(typeof Renderer.copyPNGToClipboard, 'function');
+
+  console.log('testCanvasDimensionsOptions passed');
+}
+
+function testDFDFlowLabelOffsetBesideArrows() {
+  const dsl = [
+    'ΕΠΙΠΕΔΟ: 0',
+    'ΧΩΡΙΣ_ΚΜ',
+    '[Διαχειριστής] -> (P0) : Εντολή_Ελέγχου_και_Σχόλια',
+    '(P0) -> [Διαχειριστής] : Αιτήσεις_και_Αποτελέσματα_Ελέγχου',
+    '[Αιτών] -> (P0) : Στοιχεία Αίτησης και Δικαιολογητικά',
+    '(P0) -> [Αιτών] : eMail_Επιβεβαίωσης και Σύνδεσμος Κάρτας'
+  ].join('\n');
+
+  const spec = Core.parseDFDText(dsl);
+  const dfd = Core.dfdSpecToDFD(spec);
+
+  const svg = Renderer.renderDFDSVG(dfd);
+
+  // Extract curves
+  const pathRegex = /<path d="M ([0-9.-]+) ([0-9.-]+) Q ([0-9.-]+) ([0-9.-]+), ([0-9.-]+) ([0-9.-]+)"/g;
+  const curves = [];
+  let m;
+  while ((m = pathRegex.exec(svg)) !== null) {
+    curves.push({
+      pStart: { x: parseFloat(m[1]), y: parseFloat(m[2]) },
+      ctrl: { x: parseFloat(m[3]), y: parseFloat(m[4]) },
+      pEnd: { x: parseFloat(m[5]), y: parseFloat(m[6]) }
+    });
+  }
+
+  // Extract pills
+  const pillRegex = /<g pointer-events="none" class="ddp-pill-label"([^>]*)>\s*<rect x="([0-9.-]+)" y="([0-9.-]+)" width="([0-9.]+)" height="([0-9.]+)"/g;
+  const pills = [];
+  while ((m = pillRegex.exec(svg)) !== null) {
+    const rawTransform = m[1];
+    const transMatch = /translate\(([0-9.-]+),\s*([0-9.-]+)\)/.exec(rawTransform);
+    const cx = transMatch ? parseFloat(transMatch[1]) : parseFloat(m[2]) + parseFloat(m[4]) / 2;
+    const cy = transMatch ? parseFloat(transMatch[2]) : parseFloat(m[3]) + parseFloat(m[5]) / 2;
+    pills.push({
+      cx,
+      cy,
+      w: parseFloat(m[4]),
+      h: parseFloat(m[5])
+    });
+  }
+
+  assert.strictEqual(curves.length, 4, 'Should have 4 flow curves');
+  assert.strictEqual(pills.length, 4, 'Should have 4 flow labels');
+
+  // Verify pills are opaque
+  assert.ok(svg.includes('fill-opacity="1"'), 'Pill labels should have opaque background');
+
+  // Verify bidirectional flow labels are staggered and never superimposed
+  for (let i = 0; i < pills.length; i++) {
+    for (let j = i + 1; j < pills.length; j++) {
+      const dist = Math.hypot(pills[i].cx - pills[j].cx, pills[i].cy - pills[j].cy);
+      assert.ok(dist > 18, `Pills ${i} and ${j} should not be superimposed (dist: ${dist})`);
+    }
+  }
+
+  console.log('testDFDFlowLabelOffsetBesideArrows passed');
+}
+
 testOfficialExamplesZeroErrors();
 testHomoglyphNormalization();
 testValidatorRules();
@@ -472,4 +694,10 @@ testSVGRenderingAndHelpers();
 testUniversalKMFrameIsolationAndNoOverlaps();
 testDirectivesAndDFDSync();
 testDFDCustomPositionsAndDragSupport();
+testKMToggleAndDirectives();
+testLevel0ContextDiagramSynthesis();
+testDFDBuilderNoKMAndLevel0();
+testTextWrappingAndNoOverflow();
+testCanvasDimensionsOptions();
+testDFDFlowLabelOffsetBesideArrows();
 console.log('All ΠΛΗ11 tests passed!');

@@ -145,10 +145,22 @@
               <button class="tool-mini-btn" id="ddp-zoom-in" title="Μεγέθυνση">+</button>
               <button class="tool-mini-btn" id="ddp-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
             </div>
+            <div class="diagram-toolbar-group" role="group" aria-label="Διαστάσεις Καμβά">
+              <label for="ddp-canvas-size" class="toolbar-label" style="font-size:0.74rem; color:var(--muted); margin-right:2px;">Καμβάς:</label>
+              <select class="tool-mini-select" id="ddp-canvas-size" title="Επιλογή διαστάσεων καμβά για άνετη προβολή και εξαγωγή σε Word">
+                <option value="auto">Αυτόματο (Fit)</option>
+                <option value="a4-landscape">A4 Οριζόντιο (1120×790)</option>
+                <option value="a4-portrait">A4 Κάθετο (790×1120)</option>
+                <option value="1280x720">HD 720p (1280×720)</option>
+                <option value="1920x1080">Full HD (1920×1080)</option>
+                <option value="custom">Προσαρμοσμένο...</option>
+              </select>
+            </div>
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="ddp-print-btn" title="Ασπρόμαυρη μορφή ΕΑΠ έτοιμη για επικόλληση σε MS Word">Ασπρόμαυρο (Word)</button>
+              <button class="tool-mini-btn" id="ddp-copy-png" title="Αντιγραφή εικόνας PNG υψηλής ανάλυσης στο πρόχειρο για άμεσο Ctrl+V στο Word">Αντιγραφή PNG (Word)</button>
+              <button class="tool-mini-btn" id="ddp-export-png" title="Λήψη διαγράμματος υψηλής ανάλυσης PNG">Export PNG</button>
               <button class="tool-mini-btn" id="ddp-export-svg" title="Λήψη διαγράμματος ως αρχείο SVG">Export SVG</button>
-              <button class="tool-mini-btn" id="ddp-export-png" title="Λήψη διαγράμματος υψηλής ανάλυσης PNG για MS Word">Export PNG</button>
             </div>
           </div>
 
@@ -176,6 +188,24 @@
           </div>
 
           <div class="diagram-toolbar">
+            <div class="diagram-toolbar-group" role="group" aria-label="Επίπεδο ΔΡΔ">
+              <button class="tool-mini-btn active" id="dfd-level-1-btn" title="ΔΡΔ Επιπέδου 1 (Αναλυτικές διεργασίες)">Επίπεδο 1</button>
+              <button class="tool-mini-btn" id="dfd-level-0-btn" title="Διάγραμμα Πλαισίου / Επίπεδο 0 (Μία διεργασία συστήματος &amp; εξωτερικές οντότητες)">Επίπεδο 0 (Πλαίσιο)</button>
+            </div>
+            <div class="diagram-toolbar-group" role="group" aria-label="Περίγραμμα ΚΜ">
+              <button class="tool-mini-btn active" id="dfd-toggle-km-btn" title="Ενεργοποίηση/Απενεργοποίηση διακεκομμένου περιγράμματος Κεντρικού Μετασχηματισμού (Ανάλυση Μετασχηματισμού)">Περίγραμμα ΚΜ: ON</button>
+            </div>
+            <div class="diagram-toolbar-group" role="group" aria-label="Διαστάσεις Καμβά">
+              <label for="dfd-canvas-size" class="toolbar-label" style="font-size:0.74rem; color:var(--muted); margin-right:2px;">Καμβάς:</label>
+              <select class="tool-mini-select" id="dfd-canvas-size" title="Επιλογή διαστάσεων καμβά για άνετη προβολή και εξαγωγή σε Word">
+                <option value="auto">Αυτόματο (Fit)</option>
+                <option value="a4-landscape">A4 Οριζόντιο (1120×790)</option>
+                <option value="a4-portrait">A4 Κάθετο (790×1120)</option>
+                <option value="1280x720">HD 720p (1280×720)</option>
+                <option value="1920x1080">Full HD (1920×1080)</option>
+                <option value="custom">Προσαρμοσμένο...</option>
+              </select>
+            </div>
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="dfd-zoom-out" title="Σμίκρυνση">-</button>
               <span class="zoom-readout" id="dfd-zoom-label">100%</span>
@@ -186,8 +216,9 @@
             </div>
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="dfd-print-btn" title="Ασπρόμαυρη μορφή ΕΑΠ έτοιμη για επικόλληση σε MS Word">Ασπρόμαυρο (Word)</button>
+              <button class="tool-mini-btn" id="dfd-copy-png" title="Αντιγραφή εικόνας PNG υψηλής ανάλυσης στο πρόχειρο για άμεσο Ctrl+V στο Word">Αντιγραφή PNG (Word)</button>
+              <button class="tool-mini-btn" id="dfd-export-png" title="Λήψη ΔΡΔ υψηλής ανάλυσης PNG">Export PNG</button>
               <button class="tool-mini-btn" id="dfd-export-svg" title="Λήψη ΔΡΔ ως αρχείο SVG">Export SVG</button>
-              <button class="tool-mini-btn" id="dfd-export-png" title="Λήψη ΔΡΔ υψηλής ανάλυσης PNG για MS Word">Export PNG</button>
             </div>
           </div>
 
@@ -231,8 +262,9 @@
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="mermaid-rerender-btn" title="Ανανέωση προεπισκόπησης από τον κώδικα Mermaid">Ανανέωση Preview</button>
               <button class="tool-mini-btn" id="mermaid-reset-btn" title="Επαναφορά Mermaid από τον κύριο Ψευδοκώδικα">Επαναφορά από Κώδικα</button>
+              <button class="tool-mini-btn" id="mermaid-copy-png" title="Αντιγραφή Mermaid ως εικόνα PNG στο πρόχειρο για άμεσο Ctrl+V στο Word">Αντιγραφή PNG (Word)</button>
+              <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης">Export PNG</button>
               <button class="tool-mini-btn" id="mermaid-export-svg" title="Λήψη του Mermaid διαγράμματος ως αρχείο SVG">Export SVG</button>
-              <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης για Word">Export PNG</button>
               <button class="tool-mini-btn" id="mermaid-copy-code-btn" title="Αντιγραφή κώδικα Mermaid στο πρόχειρο">Αντιγραφή Κώδικα</button>
             </div>
           </div>
@@ -257,9 +289,10 @@
               </div>
               <div class="builder-field" style="max-width: 210px;">
                 <label for="dfd-mode-select">Τύπος Κέντρου:</label>
-                <select id="dfd-mode-select" class="builder-select" aria-label="Τύπος κέντρου (ΚΜ ή ΚΔ)">
+                <select id="dfd-mode-select" class="builder-select" aria-label="Τύπος κέντρου (ΚΜ, ΚΔ ή Χωρίς ΚΜ)">
                   <option value="KM">Κεντρικός Μετασχηματισμός (ΚΜ)</option>
                   <option value="KD">Κέντρο Δοσοληψιών (ΚΔ)</option>
+                  <option value="NONE">Χωρίς Περίγραμμα (Απλό ΔΡΔ)</option>
                 </select>
               </div>
               <div class="builder-field" style="max-width: 220px;">

@@ -120,6 +120,73 @@
   }
 
   // ---------------------------------------------------------------------------
+  // TEXT WRAPPING & MULTI-LINE SVG TEXT HELPERS
+  // ---------------------------------------------------------------------------
+  function splitTextIntoLines(text, maxCharsPerLine = 20) {
+    if (!text) return [''];
+    const str = String(text).trim();
+    if (str.length <= maxCharsPerLine) return [str];
+
+    if (str.includes('\n')) {
+      return str.split('\n').flatMap((line) => splitTextIntoLines(line, maxCharsPerLine));
+    }
+
+    const words = str.split(/\s+/);
+    if (words.length === 1) {
+      if (str.length > maxCharsPerLine && str.includes('_')) {
+        const parts = str.split('_');
+        const lines = [];
+        let cur = '';
+        for (const p of parts) {
+          if (!cur) cur = p;
+          else if ((cur + '_' + p).length <= maxCharsPerLine) cur += '_' + p;
+          else {
+            lines.push(cur);
+            cur = p;
+          }
+        }
+        if (cur) lines.push(cur);
+        return lines.length > 0 ? lines : [str];
+      }
+      return [str];
+    }
+
+    const lines = [];
+    let currentLine = '';
+    for (const word of words) {
+      if (!currentLine) {
+        currentLine = word;
+      } else if ((currentLine + ' ' + word).length <= maxCharsPerLine) {
+        currentLine += ' ' + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines.length > 0 ? lines : [str];
+  }
+
+  function renderMultilineText(lines, cx, cy, options = {}) {
+    const fontSize = options.fontSize || 12;
+    const fontWeight = options.fontWeight || '700';
+    const fill = options.fill || '#000';
+    const n = lines.length;
+    if (n === 0) return '';
+    if (n === 1) {
+      return `<text x="${cx.toFixed(1)}" y="${(cy + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${fill}" font-size="${fontSize}" font-weight="${fontWeight}">${escXml(lines[0])}</text>`;
+    }
+    const lineHeight = options.lineHeight || (fontSize + 4);
+    const startY = cy - ((n - 1) * lineHeight) / 2;
+    const tspans = lines.map((line, idx) => {
+      const y = startY + idx * lineHeight;
+      return `<tspan x="${cx.toFixed(1)}" y="${y.toFixed(1)}">${escXml(line)}</tspan>`;
+    }).join('');
+
+    return `<text text-anchor="middle" dominant-baseline="middle" fill="${fill}" font-size="${fontSize}" font-weight="${fontWeight}">${tspans}</text>`;
+  }
+
+  // ---------------------------------------------------------------------------
   // 1. ΔΔΠ (STRUCTURE CHART) SVG RENDERER
   // ---------------------------------------------------------------------------
   function renderDDPSVG(model, options = {}) {
@@ -140,10 +207,14 @@
     const vGap = 128;
 
     const nodeDims = new Map();
+    const nodeLines = new Map();
     for (const n of model.nodes) {
-      const labelLen = (n.name || '').length;
-      const w = Math.max(122, Math.min(260, labelLen * 8.4 + 28));
-      nodeDims.set(n.id, { w, h: boxH });
+      const lines = splitTextIntoLines(n.name || '', 20);
+      nodeLines.set(n.id, lines);
+      const maxLen = Math.max(...lines.map((l) => l.length), 1);
+      const w = Math.max(122, maxLen * 8.6 + 28);
+      const h = Math.max(boxH, lines.length * 16 + (n.isStub ? 22 : 16));
+      nodeDims.set(n.id, { w, h });
     }
 
     // Build spanning forest from root (plus any orphan component roots)
@@ -260,13 +331,48 @@
       cursorX += w + 84;
     }
 
-    const totalWidth = Math.max(660, cursorX - 36);
+    let minX = Infinity;
+    let minY = 20;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const pos of coords.values()) {
+      minX = Math.min(minX, pos.x);
+      maxX = Math.max(maxX, pos.x + pos.w);
+      minY = Math.min(minY, pos.y);
+      maxY = Math.max(maxY, pos.y + pos.h);
+    }
+    if (!Number.isFinite(minX)) {
+      minX = 0;
+      maxX = 660;
+      minY = 0;
+      maxY = 240;
+    }
+
+    const padX = options.paddingX || options.padding || 36;
+    const padY = options.paddingY || options.padding || 28;
     const legendH = showLegend ? 46 : 14;
-    const totalHeight = 48 + (maxDepth + 1) * vGap - (vGap - boxH) + 52 + legendH;
+    const contentW = maxX - minX;
+    const contentH = maxY - minY + legendH;
+
+    let totalWidth = Math.max(660, Math.ceil(contentW + padX * 2));
+    let totalHeight = Math.max(240, Math.ceil(contentH + padY * 2));
+    let viewMinX = Math.floor(minX - padX);
+    let viewMinY = Math.floor(minY - padY);
+
+    if (options.canvasWidth && options.canvasWidth > totalWidth) {
+      const extraX = options.canvasWidth - totalWidth;
+      viewMinX -= extraX / 2;
+      totalWidth = options.canvasWidth;
+    }
+    if (options.canvasHeight && options.canvasHeight > totalHeight) {
+      const extraY = options.canvasHeight - totalHeight;
+      viewMinY -= extraY / 2;
+      totalHeight = options.canvasHeight;
+    }
 
     const svgParts = [];
     svgParts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalWidth} ${totalHeight}" width="${totalWidth}" height="${totalHeight}" style="font-family:${escXml(pal.font)}">`,
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewMinX} ${viewMinY} ${totalWidth} ${totalHeight}" width="${totalWidth}" height="${totalHeight}" style="font-family:${escXml(pal.font)}">`,
       `<defs>`,
       `  <marker id="eap-couple-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">`,
       `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.ink}" />`,
@@ -275,7 +381,7 @@
       `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.activeStroke}" />`,
       `  </marker>`,
       `</defs>`,
-      `<rect width="${totalWidth}" height="${totalHeight}" fill="${pal.bg}" />`
+      `<rect x="${viewMinX}" y="${viewMinY}" width="${totalWidth}" height="${totalHeight}" fill="${pal.bg}" />`
     );
 
     // Divider if orphan components exist next to main root
@@ -445,11 +551,15 @@
         ? `<rect x="${(pos.x - 4).toFixed(1)}" y="${(pos.y - 4).toFixed(1)}" width="${(pos.w + 8).toFixed(1)}" height="${(pos.h + 8).toFixed(1)}" rx="7" fill="none" stroke="${pal.activeStroke}" stroke-width="2.5" />`
         : '';
 
+      const lines = nodeLines.get(n.id) || [n.name];
+      const textCy = n.isStub ? pos.cy - 5 : pos.cy;
+      const fSize = lines.length > 2 ? 11 : (lines.length === 2 ? 12 : 13);
+
       svgParts.push(
         `<g class="ddp-node" data-node-id="${escXml(n.id)}" data-line="${n.startLine}" style="cursor:pointer">`,
         activeOutline,
         `  <rect x="${pos.x.toFixed(1)}" y="${pos.y.toFixed(1)}" width="${pos.w.toFixed(1)}" height="${pos.h.toFixed(1)}" rx="4" fill="${st.fill}" stroke="${isActive ? pal.activeStroke : st.stroke}" stroke-width="${isActive ? 2.5 : st.sw}"${dash} />`,
-        `  <text x="${pos.cx.toFixed(1)}" y="${(pos.cy + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${pal.ink}" font-size="13" font-weight="700">${escXml(n.name)}</text>`,
+        renderMultilineText(lines, pos.cx, textCy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
         n.isStub
           ? `  <text x="${pos.cx.toFixed(1)}" y="${(pos.y + pos.h - 6).toFixed(1)}" text-anchor="middle" fill="${pal.muted}" font-size="9">stub</text>`
           : '',
@@ -462,19 +572,20 @@
 
     // Legend
     if (showLegend) {
-      const ly = totalHeight - 20;
+      const ly = viewMinY + totalHeight - 20;
+      const lx = Math.max(20, viewMinX + 24);
       svgParts.push(
         `<g class="ddp-legend" font-size="11" fill="${pal.muted}">`,
-        `  <line x1="20" y1="${ly}" x2="42" y2="${ly}" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
-        `  <circle cx="20" cy="${ly}" r="3" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.3" />`,
-        `  <text x="50" y="${ly + 4}">Ζεύγος δεδομένων (IN/OUT)</text>`,
-        `  <line x1="220" y1="${ly}" x2="242" y2="${ly}" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
-        `  <circle cx="220" cy="${ly}" r="3" fill="${pal.ink}" />`,
-        `  <text x="250" y="${ly + 4}">Σημαία ελέγχου (flag)</text>`,
-        `  <polygon points="395,${ly - 5} 400,${ly} 395,${ly + 5} 390,${ly}" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.3" />`,
-        `  <text x="408" y="${ly + 4}">Επιλογή (IF/CASE)</text>`,
-        `  <path d="M 522 ${ly + 3} A 9 6 0 1 1 540 ${ly + 3}" fill="none" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
-        `  <text x="548" y="${ly + 4}">Επανάληψη (Loop)</text>`,
+        `  <line x1="${lx}" y1="${ly}" x2="${lx + 22}" y2="${ly}" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
+        `  <circle cx="${lx}" cy="${ly}" r="3" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.3" />`,
+        `  <text x="${lx + 30}" y="${ly + 4}">Ζεύγος δεδομένων (IN/OUT)</text>`,
+        `  <line x1="${lx + 200}" y1="${ly}" x2="${lx + 222}" y2="${ly}" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
+        `  <circle cx="${lx + 200}" cy="${ly}" r="3" fill="${pal.ink}" />`,
+        `  <text x="${lx + 230}" y="${ly + 4}">Σημαία ελέγχου (flag)</text>`,
+        `  <polygon points="${lx + 375},${ly - 5} ${lx + 380},${ly} ${lx + 375},${ly + 5} ${lx + 370},${ly}" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.3" />`,
+        `  <text x="${lx + 388}" y="${ly + 4}">Επιλογή (IF/CASE)</text>`,
+        `  <path d="M ${lx + 502} ${ly + 3} A 9 6 0 1 1 ${lx + 520} ${ly + 3}" fill="none" stroke="${pal.ink}" stroke-width="1.3" marker-end="url(#eap-couple-arrow)" />`,
+        `  <text x="${lx + 528}" y="${ly + 4}">Επανάληψη (Loop)</text>`,
         `</g>`
       );
     }
@@ -483,18 +594,31 @@
     return svgParts.join('\n');
   }
 
-  function renderPillLabel(x, y, text, pal, anchor = 'middle', fontSize = 11) {
+  function renderPillLabel(x, y, text, pal, anchor = 'middle', fontSize = 11, linesOverride = null, rotationDeg = 0) {
     const clean = String(text || '');
-    const estW = Math.max(22, clean.length * (fontSize * 0.72) + 14);
-    const estH = fontSize + 8;
-    let rx = x - estW / 2;
-    if (anchor === 'start') rx = x - 4;
-    else if (anchor === 'end') rx = x - estW + 4;
-    const ry = y - estH / 2;
+    const lines = linesOverride || (Array.isArray(text) ? text : [clean]);
+    const maxLen = Math.max(...lines.map((l) => l.length), 1);
+    const estW = Math.max(22, maxLen * (fontSize * 0.72) + 14);
+    const lineSpacing = fontSize + 4;
+    const estH = lines.length > 1 ? lines.length * lineSpacing + 6 : fontSize + 8;
 
-    return `<g pointer-events="none" class="ddp-pill-label">
-      <rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${estW.toFixed(1)}" height="${estH.toFixed(1)}" rx="4" fill="${pal.labelBg}" fill-opacity="0.96" stroke="${pal.labelBorder}" stroke-width="0.8" />
-      <text x="${x.toFixed(1)}" y="${(y + 1).toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="${pal.ink}" font-size="${fontSize}" font-weight="600">${escXml(clean)}</text>
+    const isRotated = rotationDeg !== 0 && !isNaN(rotationDeg);
+    const rotAttr = isRotated ? ` transform="translate(${x.toFixed(1)}, ${y.toFixed(1)}) rotate(${rotationDeg.toFixed(1)})"` : '';
+    let rx = isRotated ? -estW / 2 : x - estW / 2;
+    if (anchor === 'start') rx = isRotated ? -4 : x - 4;
+    else if (anchor === 'end') rx = isRotated ? -estW + 4 : x - estW + 4;
+    const ry = isRotated ? -estH / 2 : y - estH / 2;
+
+    const textBaseX = isRotated ? 0 : x;
+    const textBaseY = isRotated ? 0 : y;
+
+    const textSvg = lines.length === 1
+      ? `<text x="${textBaseX.toFixed(1)}" y="${(textBaseY + 1).toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="${pal.ink}" font-size="${fontSize}" font-weight="600">${escXml(lines[0])}</text>`
+      : renderMultilineText(lines, textBaseX, textBaseY, { fontSize, fontWeight: '600', fill: pal.ink, lineSpacing });
+
+    return `<g pointer-events="none" class="ddp-pill-label"${rotAttr}>
+      <rect x="${rx.toFixed(1)}" y="${ry.toFixed(1)}" width="${estW.toFixed(1)}" height="${estH.toFixed(1)}" rx="4" fill="${pal.labelBg}" fill-opacity="1" stroke="${pal.labelBorder}" stroke-width="0.8" />
+      ${textSvg}
     </g>`;
   }
 
@@ -504,6 +628,7 @@
   function renderDFDSVG(dfd, options = {}) {
     const pal = getPalette(options);
     const showLegend = options.showLegend !== false;
+    const showKM = options.showKMFrame !== false && !options.noKM && !dfd.noKM && dfd.showKMFrame !== false && dfd.level !== 0 && !dfd.isContextDiagram;
 
     if (!dfd || !dfd.nodes || dfd.nodes.length === 0) {
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240" width="680" height="240" style="font-family:${escXml(pal.font)}">
@@ -666,10 +791,14 @@
       let maxHw = 32;
       for (const n of list) {
         if (n.type === 'process') {
-          const r = Math.max(32, Math.min(46, (n.label || '').length * 4.5 + 18));
+          const lines = splitTextIntoLines(n.label || '', 16);
+          const maxLen = Math.max(...lines.map((l) => l.length), 1);
+          const r = Math.max(34, Math.max(maxLen * 4.8 + 14, lines.length * 12 + 16));
           maxHw = Math.max(maxHw, r);
         } else {
-          const w = Math.max(120, Math.min(210, (n.label || '').length * 7.8 + 24));
+          const lines = splitTextIntoLines(n.label || '', 20);
+          const maxLen = Math.max(...lines.map((l) => l.length), 1);
+          const w = Math.max(120, maxLen * 8.6 + 28);
           maxHw = Math.max(maxHw, w / 2);
         }
       }
@@ -751,11 +880,16 @@
       list.forEach((node, idx) => {
         const y = startY + idx * rowSpacing;
         if (node.type === 'process') {
-          const r = Math.max(32, Math.min(46, (node.label || '').length * 4.5 + 18));
-          coords.set(node.id, { cx: x, cy: y, r, w: r * 2, h: r * 2, shape: 'circle' });
+          const lines = splitTextIntoLines(node.label || '', 16);
+          const maxLen = Math.max(...lines.map((l) => l.length), 1);
+          const r = Math.max(34, Math.max(maxLen * 4.8 + 14, lines.length * 12 + 16));
+          coords.set(node.id, { cx: x, cy: y, r, w: r * 2, h: r * 2, shape: 'circle', lines });
         } else {
-          const w = Math.max(120, Math.min(210, (node.label || '').length * 7.8 + 24));
-          coords.set(node.id, { cx: x, cy: y, w, h: 46, shape: 'rect' });
+          const lines = splitTextIntoLines(node.label || '', 20);
+          const maxLen = Math.max(...lines.map((l) => l.length), 1);
+          const w = Math.max(120, maxLen * 8.6 + 28);
+          const h = Math.max(46, lines.length * 17 + 14);
+          coords.set(node.id, { cx: x, cy: y, w, h, shape: 'rect', lines });
         }
       });
     }
@@ -770,15 +904,18 @@
         const avgX = connected.length > 0
           ? connected.reduce((acc, p) => acc + p.cx, 0) / connected.length
           : 260;
-        const w = Math.max(125, Math.min(200, (s.label || '').length * 8 + 26));
-        return { store: s, desiredX: avgX, w };
+        const lines = splitTextIntoLines(s.label || '', 22);
+        const maxLen = Math.max(...lines.map((l) => l.length), 1);
+        const w = Math.max(125, maxLen * 8.6 + 32);
+        const h = Math.max(38, lines.length * 16 + 14);
+        return { store: s, desiredX: avgX, w, h, lines };
       });
       storeInfos.sort((a, b) => a.desiredX - b.desiredX);
 
       let prevRight = 36;
       for (const info of storeInfos) {
         const cx = Math.max(prevRight + info.w / 2 + 30, info.desiredX);
-        coords.set(info.store.id, { cx, cy: 52, w: info.w, h: 38, shape: 'store' });
+        coords.set(info.store.id, { cx, cy: 52, w: info.w, h: info.h, shape: 'store', lines: info.lines });
         prevRight = cx + info.w / 2;
       }
     }
@@ -796,7 +933,9 @@
     // Central Transformation (ΚΜ) container box and header.
     // Bounding box wraps ONLY the central processes with generous padding and sits
     // safely below the store lane with ample headroom above the central circle(s).
-    const centralCoords = dfd.processes.filter((p) => p.isCentral).map((p) => coords.get(p.id)).filter(Boolean);
+    const centralCoords = showKM
+      ? dfd.processes.filter((p) => p.isCentral).map((p) => coords.get(p.id)).filter(Boolean)
+      : [];
     let kmFrame = null;
     if (centralCoords.length > 0) {
       const cMinX = Math.min(...centralCoords.map((c) => c.cx - c.r));
@@ -892,7 +1031,7 @@
 
       let curveOff = 0;
       if (isBidir) {
-        curveOff = 28;
+        curveOff = 32;
       } else if (Math.abs(dx) < 36) {
         // Vertical / same-column flows
         const minCy = Math.min(cFrom.cy, cTo.cy);
@@ -974,11 +1113,15 @@
         ctrlX,
         ctrlY,
         pStart,
-        pEnd
+        pEnd,
+        nx,
+        ny,
+        curveOff,
+        isBidir
       });
     }
 
-    // Place Flow Labels with anti-overlap clearance against nodes, KM frame borders, KM badge & other labels
+    // Place Flow Labels with anti-overlap clearance against nodes, KM frame borders, KM badge, curves & other labels
     const placedPills = [];
     const flowLabelParts = [];
 
@@ -992,10 +1135,10 @@
       for (const c of coords.values()) {
         const nW = c.shape === 'circle' ? c.r * 2 : c.w;
         const nH = c.shape === 'circle' ? c.r * 2 : c.h;
-        const nLeft = c.cx - nW / 2 - 8;
-        const nRight = c.cx + nW / 2 + 8;
-        const nTop = c.cy - nH / 2 - 8;
-        const nBottom = c.cy + nH / 2 + 8;
+        const nLeft = c.cx - nW / 2 - 4;
+        const nRight = c.cx + nW / 2 + 4;
+        const nTop = c.cy - nH / 2 - 4;
+        const nBottom = c.cy + nH / 2 + 4;
         if (pRight > nLeft && pLeft < nRight && pBottom > nTop && pTop < nBottom) {
           return true;
         }
@@ -1003,7 +1146,7 @@
 
       // 2. KM dashed frame boundaries & title badge
       if (kmFrame) {
-        const frameMargin = 10;
+        const frameMargin = 8;
         // Top border
         if (pRight > kmFrame.minCX - frameMargin && pLeft < kmFrame.maxCX + frameMargin &&
             Math.abs(pt.y - kmFrame.minCY) < pillH / 2 + frameMargin) return true;
@@ -1017,17 +1160,17 @@
         if (pBottom > kmFrame.minCY - frameMargin && pTop < kmFrame.maxCY + frameMargin &&
             Math.abs(pt.x - kmFrame.maxCX) < pillW / 2 + frameMargin) return true;
         // KM badge rect
-        const bLeft = kmFrame.badgeX - 8;
-        const bRight = kmFrame.badgeX + kmFrame.titleW + 8;
-        const bTop = kmFrame.badgeY - 8;
-        const bBottom = kmFrame.badgeY + kmFrame.titleH + 8;
+        const bLeft = kmFrame.badgeX - 6;
+        const bRight = kmFrame.badgeX + kmFrame.titleW + 6;
+        const bTop = kmFrame.badgeY - 6;
+        const bBottom = kmFrame.badgeY + kmFrame.titleH + 6;
         if (pRight > bLeft && pLeft < bRight && pBottom > bTop && pTop < bBottom) return true;
       }
 
-      // 3. Previously placed labels
+      // 3. Previously placed labels (prevent label-on-label overlap)
       for (const placed of placedPills) {
-        if (pRight > placed.left - 6 && pLeft < placed.right + 6 &&
-            pBottom > placed.top - 6 && pTop < placed.bottom + 6) {
+        if (pRight > placed.left - 4 && pLeft < placed.right + 4 &&
+            pBottom > placed.top - 4 && pTop < placed.bottom + 4) {
           return true;
         }
       }
@@ -1036,29 +1179,77 @@
     }
 
     for (const fr of flowRenderData) {
-      const text = fr.flow.data.join(', ');
-      const clean = String(text || '');
-      const pillW = Math.max(22, clean.length * (11 * 0.72) + 14);
-      const pillH = 19;
+      const rawText = fr.flow.data.join(', ');
+      const clean = String(rawText || '');
+      const lines = clean.length > 22 ? splitTextIntoLines(clean, 20) : [clean];
+      const maxLen = Math.max(...lines.map((l) => l.length), 1);
+      const fontSize = 11;
+      const lineSpacing = fontSize + 4;
+      const pillW = Math.max(22, maxLen * (fontSize * 0.72) + 14);
+      const pillH = lines.length > 1 ? lines.length * lineSpacing + 6 : fontSize + 8;
 
-      const labelAt = (t) => {
+      const getPillCandidate = (t, side = 1) => {
         const u = 1 - t;
+        const curveX = u * u * fr.pStart.x + 2 * u * t * fr.ctrlX + t * t * fr.pEnd.x;
+        const curveY = u * u * fr.pStart.y + 2 * u * t * fr.ctrlY + t * t * fr.pEnd.y;
+
+        // Tangent vector at parameter t: B'(t) = 2(1-t)(ctrl - pStart) + 2t(pEnd - ctrl)
+        const tx = 2 * (1 - t) * (fr.ctrlX - fr.pStart.x) + 2 * t * (fr.pEnd.x - fr.ctrlX);
+        const ty = 2 * (1 - t) * (fr.ctrlY - fr.pStart.y) + 2 * t * (fr.pEnd.y - fr.ctrlY);
+        const tDist = Math.hypot(tx, ty) || 1;
+        let pnx = -ty / tDist;
+        let pny = tx / tDist;
+
+        // Orient (pnx, pny) towards the outer (convex) side of this curve
+        if (fr.curveOff !== 0) {
+          const midX = (fr.pStart.x + fr.pEnd.x) / 2;
+          const midY = (fr.pStart.y + fr.pEnd.y) / 2;
+          const bulgeX = fr.ctrlX - midX;
+          const bulgeY = fr.ctrlY - midY;
+          if (bulgeX * pnx + bulgeY * pny < 0) {
+            pnx = -pnx;
+            pny = -pny;
+          }
+        }
+
+        // Clean, gentle offset immediately beside the arrow line (5px margin outside the pill)
+        const d = (pillH / 2 + 5) * side;
+
+        let deg = Math.atan2(ty, tx) * (180 / Math.PI);
+        if (deg > 90) deg -= 180;
+        else if (deg < -90) deg += 180;
+        if (Math.abs(deg) < 4) deg = 0;
+
         return {
-          x: u * u * fr.pStart.x + 2 * u * t * fr.ctrlX + t * t * fr.pEnd.x,
-          y: u * u * fr.pStart.y + 2 * u * t * fr.ctrlY + t * t * fr.pEnd.y
+          x: curveX + pnx * d,
+          y: curveY + pny * d,
+          deg
         };
       };
 
-      let bestPt = labelAt(0.5);
-      if (pillHitsObstacle(bestPt, pillW, pillH)) {
-        const candidates = [0.44, 0.56, 0.38, 0.62, 0.32, 0.68, 0.25, 0.75, 0.20, 0.80];
-        for (const t of candidates) {
-          const cand = labelAt(t);
+      // Stagger bidirectional flow labels along the path:
+      // Flow A->B sits near A (t=0.36), and Flow B->A sits near B (t=0.36 from B),
+      // ensuring the two labels in a bidirectional pair never crowd or collide with each other.
+      const tSteps = fr.isBidir
+        ? [0.36, 0.40, 0.32, 0.44, 0.28, 0.48, 0.52]
+        : [0.50, 0.44, 0.56, 0.38, 0.62];
+
+      let bestPt = null;
+
+      // Try outer side first, then inner side if outer side hits a node or label
+      for (const side of [1, -1]) {
+        for (const t of tSteps) {
+          const cand = getPillCandidate(t, side);
           if (!pillHitsObstacle(cand, pillW, pillH)) {
             bestPt = cand;
             break;
           }
         }
+        if (bestPt) break;
+      }
+
+      if (!bestPt) {
+        bestPt = getPillCandidate(fr.isBidir ? 0.36 : 0.50, 1);
       }
 
       placedPills.push({
@@ -1068,7 +1259,7 @@
         bottom: bestPt.y + pillH / 2
       });
 
-      flowLabelParts.push(renderPillLabel(bestPt.x, bestPt.y, text, pal, 'middle', 11));
+      flowLabelParts.push(renderPillLabel(bestPt.x, bestPt.y, clean, pal, 'middle', fontSize, lines, bestPt.deg || 0));
     }
 
     // Calculate Comprehensive Bounding Box across ALL elements (with support for custom drag positions)
@@ -1116,13 +1307,27 @@
       maxX = Math.max(maxX, 660);
     }
 
-    const padX = 36;
-    const padY = 28;
-    const viewMinX = Math.min(0, Math.floor(minX - padX));
-    const viewMinY = Math.min(0, Math.floor(minY - padY));
+    const padX = options.paddingX || options.padding || 36;
+    const padY = options.paddingY || options.padding || 28;
     const legendH = showLegend ? 58 : 10;
-    const totalW = Math.max(680, Math.ceil(maxX + padX - viewMinX));
-    const totalH = Math.max(260, Math.ceil(maxY + legendH + padY - viewMinY));
+    const contentW = maxX - minX;
+    const contentH = maxY - minY + legendH;
+
+    let totalW = Math.max(680, Math.ceil(contentW + padX * 2));
+    let totalH = Math.max(260, Math.ceil(contentH + padY * 2));
+    let viewMinX = Math.floor(minX - padX);
+    let viewMinY = Math.floor(minY - padY);
+
+    if (options.canvasWidth && options.canvasWidth > totalW) {
+      const extraX = options.canvasWidth - totalW;
+      viewMinX -= extraX / 2;
+      totalW = options.canvasWidth;
+    }
+    if (options.canvasHeight && options.canvasHeight > totalH) {
+      const extraY = options.canvasHeight - totalH;
+      viewMinY -= extraY / 2;
+      totalH = options.canvasHeight;
+    }
 
     const svgParts = [];
     svgParts.push(
@@ -1156,12 +1361,15 @@
       const c = coords.get(n.id);
       if (!c) continue;
       if (c.shape === 'circle') {
-        const stroke = n.isCentral ? pal.rootStroke : pal.ctrlStroke;
-        const fill = n.isCentral ? pal.rootFill : pal.ctrlFill;
+        const isC = showKM && n.isCentral;
+        const stroke = isC ? pal.rootStroke : pal.ctrlStroke;
+        const fill = isC ? pal.rootFill : pal.ctrlFill;
+        const lines = c.lines || [n.label];
+        const fSize = lines.length > 2 ? 10.5 : (lines.length === 2 ? 11.5 : 13);
         svgParts.push(
           `<g class="dfd-node" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
-          `  <circle cx="${c.cx.toFixed(1)}" cy="${c.cy.toFixed(1)}" r="${c.r}" fill="${fill}" stroke="${stroke}" stroke-width="${n.isCentral ? 2.4 : 1.8}" />`,
-          `  <text x="${c.cx.toFixed(1)}" y="${(c.cy + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${pal.ink}" font-size="13" font-weight="700">${escXml(n.label)}</text>`,
+          `  <circle cx="${c.cx.toFixed(1)}" cy="${c.cy.toFixed(1)}" r="${c.r}" fill="${fill}" stroke="${stroke}" stroke-width="${isC ? 2.4 : 1.8}" />`,
+          renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
           `</g>`
         );
       } else if (c.shape === 'store') {
@@ -1169,22 +1377,26 @@
         const x2 = c.cx + c.w / 2;
         const y1 = c.cy - c.h / 2;
         const y2 = c.cy + c.h / 2;
+        const lines = c.lines || [n.label];
+        const fSize = lines.length > 1 ? 11 : 12;
         svgParts.push(
           `<g class="dfd-store" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
           `  <rect x="${x1.toFixed(1)}" y="${y1.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" fill="${pal.storeFill}" stroke="none" />`,
           `  <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${pal.storeStroke}" stroke-width="2" />`,
           `  <line x1="${x1.toFixed(1)}" y1="${y2.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${pal.storeStroke}" stroke-width="2" />`,
-          `  <text x="${c.cx.toFixed(1)}" y="${(c.cy + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${pal.ink}" font-size="12" font-weight="700">${escXml(n.label)}</text>`,
+          renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
           `</g>`
         );
       } else {
         const x = c.cx - c.w / 2;
         const y = c.cy - c.h / 2;
         const dash = n.type === 'unknown_io' ? ' stroke-dasharray="5 3"' : '';
+        const lines = c.lines || [n.label];
+        const fSize = lines.length > 1 ? 11.5 : 12;
         svgParts.push(
           `<g class="dfd-entity" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
           `  <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" rx="3" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.7"${dash} />`,
-          `  <text x="${c.cx.toFixed(1)}" y="${(c.cy + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${pal.ink}" font-size="12" font-weight="700">${escXml(n.label)}</text>`,
+          renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
           `</g>`
         );
       }
@@ -1194,17 +1406,34 @@
 
     if (showLegend) {
       const ly = Math.max(maxY + 32, viewMinY + totalH - 30);
+      const startX = Math.max(20, viewMinX + 24);
+      const legendParts = [
+        `  <circle cx="${startX + 8}" cy="${ly - 2}" r="9" fill="${pal.ctrlFill}" stroke="${pal.ctrlStroke}" stroke-width="1.5" />`,
+        `  <text x="${startX + 24}" y="${ly + 2}">Μετασχηματισμός</text>`
+      ];
+      let curX = startX + 148;
+      if (dfd.stores && dfd.stores.length > 0) {
+        legendParts.push(
+          `  <line x1="${curX}" y1="${ly - 9}" x2="${curX + 32}" y2="${ly - 9}" stroke="${pal.storeStroke}" stroke-width="1.8" />`,
+          `  <line x1="${curX}" y1="${ly + 5}" x2="${curX + 32}" y2="${ly + 5}" stroke="${pal.storeStroke}" stroke-width="1.8" />`,
+          `  <text x="${curX + 40}" y="${ly + 2}">Αποθήκη Δεδομένων</text>`
+        );
+        curX += 180;
+      }
+      legendParts.push(
+        `  <rect x="${curX}" y="${ly - 10}" width="26" height="16" rx="2" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.5" />`,
+        `  <text x="${curX + 34}" y="${ly + 2}">Πηγή / Αποδέκτης</text>`
+      );
+      curX += 135;
+      if (kmFrame) {
+        legendParts.push(
+          `  <rect x="${curX}" y="${ly - 9}" width="26" height="14" rx="3" fill="none" stroke="${pal.kmStroke}" stroke-width="1.2" stroke-dasharray="4 3" />`,
+          `  <text x="${curX + 34}" y="${ly + 2}">Περίγραμμα ΚΜ</text>`
+        );
+      }
       svgParts.push(
         `<g class="dfd-legend" font-size="11" fill="${pal.muted}">`,
-        `  <circle cx="28" cy="${ly - 2}" r="9" fill="${pal.ctrlFill}" stroke="${pal.ctrlStroke}" stroke-width="1.5" />`,
-        `  <text x="44" y="${ly + 2}">Μετασχηματισμός</text>`,
-        `  <line x1="168" y1="${ly - 9}" x2="200" y2="${ly - 9}" stroke="${pal.storeStroke}" stroke-width="1.8" />`,
-        `  <line x1="168" y1="${ly + 5}" x2="200" y2="${ly + 5}" stroke="${pal.storeStroke}" stroke-width="1.8" />`,
-        `  <text x="208" y="${ly + 2}">Αποθήκη Δεδομένων</text>`,
-        `  <rect x="348" y="${ly - 10}" width="26" height="16" rx="2" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.5" />`,
-        `  <text x="382" y="${ly + 2}">Πηγή / Αποδέκτης</text>`,
-        `  <rect x="512" y="${ly - 9}" width="26" height="14" rx="3" fill="none" stroke="${pal.kmStroke}" stroke-width="1.2" stroke-dasharray="4 3" />`,
-        `  <text x="546" y="${ly + 2}">Περίγραμμα ΚΜ</text>`,
+        ...legendParts,
         `</g>`
       );
     }
@@ -1233,59 +1462,163 @@
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  function renderSVGToCanvas(svgStringOrEl, scale = 2) {
+    return new Promise((resolve, reject) => {
+      try {
+        let svgText = '';
+        if (typeof svgStringOrEl === 'string') {
+          svgText = svgStringOrEl;
+        } else if (svgStringOrEl && svgStringOrEl.nodeType) {
+          const serializer = new XMLSerializer();
+          svgText = serializer.serializeToString(svgStringOrEl);
+        } else {
+          return reject(new Error('Invalid SVG input for PNG export'));
+        }
+
+        if (!svgText.includes('xmlns="http://www.w3.org/2000/svg"')) {
+          svgText = svgText.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        if (svgText.includes('xlink:href') && !svgText.includes('xmlns:xlink=')) {
+          svgText = svgText.replace('<svg', '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+        }
+
+        let w = 800;
+        let h = 450;
+        const wMatch = svgText.match(/<svg[^>]*\bwidth=["']([0-9.]+)(?:px)?["']/i);
+        const hMatch = svgText.match(/<svg[^>]*\bheight=["']([0-9.]+)(?:px)?["']/i);
+        if (wMatch && parseFloat(wMatch[1]) > 0) w = parseFloat(wMatch[1]);
+        if (hMatch && parseFloat(hMatch[1]) > 0) h = parseFloat(hMatch[1]);
+
+        if (w === 800 && h === 450) {
+          const vbMatch = svgText.match(/<svg[^>]*\bviewBox=["']([0-9.\s,-]+)["']/i);
+          if (vbMatch) {
+            const parts = vbMatch[1].trim().split(/[\s,]+/).map(Number);
+            if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+              w = parts[2];
+              h = parts[3];
+            }
+          }
+        }
+
+        if (!wMatch || !hMatch) {
+          svgText = svgText.replace(/<svg\b([^>]*?)(\bwidth=["'][^"']*["'])?([^>]*?)(\bheight=["'][^"']*["'])?([^>]*)>/i, (m, p1, p2, p3, p4, p5) => {
+            const clean = (p1 + ' ' + (p3 || '') + ' ' + (p5 || '')).replace(/\s+/g, ' ').trim();
+            return `<svg ${clean} width="${w}" height="${h}">`;
+          });
+        }
+
+        const encodedData = unescape(encodeURIComponent(svgText));
+        const base64Uri = 'data:image/svg+xml;base64,' + btoa(encodedData);
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        img.onload = () => {
+          try {
+            const actualW = img.naturalWidth || w;
+            const actualH = img.naturalHeight || h;
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(actualW * scale);
+            canvas.height = Math.round(actualH * scale);
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              return reject(new Error('Canvas 2D context not available'));
+            }
+
+            // Solid background to avoid dark/transparent issues when inserting in Word
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.scale(scale, scale);
+            ctx.drawImage(img, 0, 0, actualW, actualH);
+            resolve(canvas);
+          } catch (canvasErr) {
+            reject(canvasErr);
+          }
+        };
+
+        img.onerror = () => {
+          reject(new Error('Failed to rasterize SVG into image'));
+        };
+
+        img.src = base64Uri;
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
 
   function downloadPNG(svgStringOrEl, filename = 'diagram.png', scale = 2) {
-    return new Promise((resolve, reject) => {
-      const svgText = serializeStandaloneSVG(svgStringOrEl);
-      const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => {
+    return renderSVGToCanvas(svgStringOrEl, scale).then((canvas) => {
+      return new Promise((resolve, reject) => {
         try {
-          const w = img.naturalWidth || 900;
-          const h = img.naturalHeight || 500;
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.round(w * scale);
-          canvas.height = Math.round(h * scale);
-          const ctx = canvas.getContext('2d');
-          ctx.scale(scale, scale);
-          ctx.drawImage(img, 0, 0, w, h);
-          URL.revokeObjectURL(url);
-          canvas.toBlob((pngBlob) => {
-            if (!pngBlob) {
-              reject(new Error('PNG conversion failed'));
-              return;
-            }
-            const pngUrl = URL.createObjectURL(pngBlob);
+          function executeDownload(downloadUrl) {
             const a = document.createElement('a');
-            a.href = pngUrl;
+            a.style.display = 'none';
+            a.href = downloadUrl;
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            a.remove();
-            setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
+            setTimeout(() => {
+              a.remove();
+              if (downloadUrl.startsWith('blob:')) URL.revokeObjectURL(downloadUrl);
+            }, 60000);
             resolve();
-          }, 'image/png');
+          }
+
+          if (canvas.toBlob) {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                executeDownload(URL.createObjectURL(blob));
+              } else {
+                executeDownload(canvas.toDataURL('image/png'));
+              }
+            }, 'image/png');
+          } else {
+            executeDownload(canvas.toDataURL('image/png'));
+          }
         } catch (err) {
-          URL.revokeObjectURL(url);
           reject(err);
         }
-      };
-      img.onerror = (e) => {
-        URL.revokeObjectURL(url);
-        reject(e);
-      };
-      img.src = url;
+      });
+    });
+  }
+
+  function copyPNGToClipboard(svgStringOrEl, scale = 2) {
+    return renderSVGToCanvas(svgStringOrEl, scale).then((canvas) => {
+      return new Promise((resolve, reject) => {
+        try {
+          if (!canvas.toBlob) {
+            return reject(new Error('Canvas toBlob not supported'));
+          }
+          canvas.toBlob((blob) => {
+            if (!blob) return reject(new Error('Failed to create PNG blob'));
+            if (navigator.clipboard && window.ClipboardItem) {
+              navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]).then(resolve).catch(reject);
+            } else {
+              reject(new Error('Clipboard API not available'));
+            }
+          }, 'image/png');
+        } catch (err) {
+          reject(err);
+        }
+      });
     });
   }
 
   return {
     renderDDPSVG,
     renderDFDSVG,
+    splitTextIntoLines,
+    renderMultilineText,
     serializeStandaloneSVG,
     downloadSVG,
-    downloadPNG
+    downloadPNG,
+    copyPNGToClipboard
   };
 }));

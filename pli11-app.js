@@ -54,8 +54,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const ddpZoomFit = document.getElementById('ddp-zoom-fit');
   const ddpZoomLabel = document.getElementById('ddp-zoom-label');
   const ddpPrintBtn = document.getElementById('ddp-print-btn');
+  const ddpCanvasSizeSelect = document.getElementById('ddp-canvas-size');
   const ddpExportSvg = document.getElementById('ddp-export-svg');
   const ddpExportPng = document.getElementById('ddp-export-png');
+  const ddpCopyPng = document.getElementById('ddp-copy-png');
 
   const traceStatusBar = document.getElementById('trace-status-bar');
   const traceStepPill = document.getElementById('trace-step-pill');
@@ -72,9 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const dfdZoomFit = document.getElementById('dfd-zoom-fit');
   const dfdAutoLayout = document.getElementById('dfd-auto-layout');
   const dfdZoomLabel = document.getElementById('dfd-zoom-label');
+  const dfdLevel1Btn = document.getElementById('dfd-level-1-btn');
+  const dfdLevel0Btn = document.getElementById('dfd-level-0-btn');
+  const dfdToggleKmBtn = document.getElementById('dfd-toggle-km-btn');
+  const dfdCanvasSizeSelect = document.getElementById('dfd-canvas-size');
   const dfdPrintBtn = document.getElementById('dfd-print-btn');
   const dfdExportSvg = document.getElementById('dfd-export-svg');
   const dfdExportPng = document.getElementById('dfd-export-png');
+  const dfdCopyPng = document.getElementById('dfd-copy-png');
 
   // DOM References - Validator
   const valBadge = document.getElementById('val-badge');
@@ -165,7 +172,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (PLI11_EXAMPLES && PLI11_EXAMPLES[id]) {
         stopAutoTrace();
         resetTraceState();
-        customDFDPositions = {};
+        customDFDPositionsLevel1 = {};
+        customDFDPositionsLevel0 = {};
         editor.setValue(PLI11_EXAMPLES[id]);
         runCompile();
         if (id === 'OE1_TRAPS_DEMO') {
@@ -212,8 +220,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const ddpPanZoom = Viewport.createPanZoom(ddpViewport, ddpCanvas, ddpZoomLabel);
   const dfdPanZoom = Viewport.createPanZoom(dfdViewport, dfdCanvas, dfdZoomLabel);
 
-  // Free interactive dragging for DFD nodes
-  let customDFDPositions = {};
+  // Free interactive dragging for DFD nodes & Level/KM management
+  let dfdActiveLevel = 1; // 0 (Context Diagram) | 1 (Detailed DFD)
+  let dfdShowKMFrame = true; // boolean toggle for KM container frame
+  let customDFDPositionsLevel1 = {};
+  let customDFDPositionsLevel0 = {};
+
+  const getCustomPositions = () => (dfdActiveLevel === 0 ? customDFDPositionsLevel0 : customDFDPositionsLevel1);
+  const getActiveDFD = () => {
+    if (!currentCompiled) return null;
+    return dfdActiveLevel === 0 ? (currentCompiled.dfdLevel0 || currentCompiled.dfd) : currentCompiled.dfd;
+  };
+
   const dfdBoxDrag = {
     active: false,
     nodeId: null,
@@ -231,7 +249,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const dy = (e.clientY - dfdBoxDrag.startClientY) / scale;
     const snappedX = Math.round((dfdBoxDrag.startBoxX + dx) / 8) * 8;
     const snappedY = Math.round((dfdBoxDrag.startBoxY + dy) / 8) * 8;
-    customDFDPositions[dfdBoxDrag.nodeId] = { x: snappedX, y: snappedY };
+    const targetPositions = getCustomPositions();
+    targetPositions[dfdBoxDrag.nodeId] = { x: snappedX, y: snappedY };
     if (!dfdBoxDrag.rafPending) {
       dfdBoxDrag.rafPending = true;
       requestAnimationFrame(() => {
@@ -245,6 +264,66 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dfdBoxDrag.active) dfdBoxDrag.active = false;
   });
 
+  function updateDFDToolbarButtons() {
+    if (dfdLevel1Btn && dfdLevel0Btn && dfdToggleKmBtn) {
+      if (dfdActiveLevel === 0) {
+        dfdLevel0Btn.classList.add('active');
+        dfdLevel1Btn.classList.remove('active');
+        dfdToggleKmBtn.classList.remove('active');
+        dfdToggleKmBtn.disabled = true;
+        dfdToggleKmBtn.textContent = 'Περίγραμμα ΚΜ: N/A';
+        dfdToggleKmBtn.setAttribute('title', 'Το Περίγραμμα ΚΜ δεν εφαρμόζεται στο Διάγραμμα Πλαισίου (Επίπεδο 0)');
+        dfdToggleKmBtn.style.opacity = '0.55';
+        dfdToggleKmBtn.style.cursor = 'not-allowed';
+      } else {
+        dfdLevel1Btn.classList.add('active');
+        dfdLevel0Btn.classList.remove('active');
+        dfdToggleKmBtn.disabled = false;
+        dfdToggleKmBtn.style.opacity = '1';
+        dfdToggleKmBtn.style.cursor = 'pointer';
+        if (dfdShowKMFrame) {
+          dfdToggleKmBtn.classList.add('active');
+          dfdToggleKmBtn.textContent = 'Περίγραμμα ΚΜ: ON';
+          dfdToggleKmBtn.setAttribute('title', 'Κλικ για απόκρυψη του περιγράμματος Κεντρικού Μετασχηματισμού');
+        } else {
+          dfdToggleKmBtn.classList.remove('active');
+          dfdToggleKmBtn.textContent = 'Περίγραμμα ΚΜ: OFF';
+          dfdToggleKmBtn.setAttribute('title', 'Κλικ για εμφάνιση του περιγράμματος Κεντρικού Μετασχηματισμού');
+        }
+      }
+    }
+  }
+
+  if (dfdLevel1Btn) {
+    dfdLevel1Btn.addEventListener('click', () => {
+      if (dfdActiveLevel === 1) return;
+      dfdActiveLevel = 1;
+      updateDFDToolbarButtons();
+      renderDFDView(true);
+      showToast('Εμφάνιση ΔΡΔ Επιπέδου 1 (Αναλυτικό).');
+    });
+  }
+
+  if (dfdLevel0Btn) {
+    dfdLevel0Btn.addEventListener('click', () => {
+      if (dfdActiveLevel === 0) return;
+      dfdActiveLevel = 0;
+      updateDFDToolbarButtons();
+      renderDFDView(true);
+      showToast('Εμφάνιση Διαγράμματος Πλαισίου (Επίπεδο 0).');
+    });
+  }
+
+  if (dfdToggleKmBtn) {
+    dfdToggleKmBtn.addEventListener('click', () => {
+      if (dfdActiveLevel === 0) return;
+      dfdShowKMFrame = !dfdShowKMFrame;
+      updateDFDToolbarButtons();
+      renderDFDView(false);
+      showToast(dfdShowKMFrame ? 'Περίγραμμα ΚΜ: Ενεργό.' : 'Περίγραμμα ΚΜ: Ανενεργό.');
+    });
+  }
+
   ddpZoomIn.addEventListener('click', () => ddpPanZoom.zoomIn());
   ddpZoomOut.addEventListener('click', () => ddpPanZoom.zoomOut());
   ddpZoomFit.addEventListener('click', () => ddpPanZoom.fit());
@@ -254,9 +333,100 @@ document.addEventListener('DOMContentLoaded', () => {
   dfdZoomFit.addEventListener('click', () => dfdPanZoom.fit());
   if (dfdAutoLayout) {
     dfdAutoLayout.addEventListener('click', () => {
-      customDFDPositions = {};
+      if (dfdActiveLevel === 0) {
+        customDFDPositionsLevel0 = {};
+      } else {
+        customDFDPositionsLevel1 = {};
+      }
       renderDFDView(true);
       showToast('Η αυτόματη διάταξη του ΔΡΔ επαναφέρθηκε.');
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // CANVAS DIMENSION MANAGEMENT (DDP & DFD)
+  // ---------------------------------------------------------------------------
+  const CANVAS_PRESETS = {
+    'auto': null,
+    'a4-landscape': { width: 1120, height: 790 },
+    'a4-portrait': { width: 790, height: 1120 },
+    '1280x720': { width: 1280, height: 720 },
+    '1920x1080': { width: 1920, height: 1080 }
+  };
+
+  let ddpCanvasSetting = SettingsManager.get('pli11DdpCanvasSetting', 'auto');
+  let ddpCustomCanvas = SettingsManager.get('pli11DdpCustomCanvas', { width: 1400, height: 900 });
+
+  let dfdCanvasSetting = SettingsManager.get('pli11DfdCanvasSetting', 'auto');
+  let dfdCustomCanvas = SettingsManager.get('pli11DfdCustomCanvas', { width: 1400, height: 900 });
+
+  function getCanvasDims(setting, custom) {
+    if (setting === 'auto') return null;
+    if (setting === 'custom') return custom && custom.width && custom.height ? custom : null;
+    return CANVAS_PRESETS[setting] || null;
+  }
+
+  if (ddpCanvasSizeSelect) {
+    ddpCanvasSizeSelect.value = ddpCanvasSetting;
+    ddpCanvasSizeSelect.addEventListener('change', () => {
+      const val = ddpCanvasSizeSelect.value;
+      if (val === 'custom') {
+        const currentPrompt = `${ddpCustomCanvas.width}x${ddpCustomCanvas.height}`;
+        const input = prompt('Εισάγετε διαστάσεις καμβά ΔΔΠ (Πλάτος x Ύψος σε px, π.χ. 1600x900):', currentPrompt);
+        if (input) {
+          const parts = input.toLowerCase().replace(/[,x]/g, ' ').trim().split(/\s+/).map(Number);
+          if (parts.length >= 2 && parts[0] >= 300 && parts[1] >= 200) {
+            ddpCustomCanvas = { width: Math.round(parts[0]), height: Math.round(parts[1]) };
+            SettingsManager.set('pli11DdpCustomCanvas', ddpCustomCanvas);
+            ddpCanvasSetting = 'custom';
+          } else {
+            showToast('Μη έγκυρες διαστάσεις (π.χ. 1600x900).');
+            ddpCanvasSizeSelect.value = ddpCanvasSetting;
+            return;
+          }
+        } else {
+          ddpCanvasSizeSelect.value = ddpCanvasSetting;
+          return;
+        }
+      } else {
+        ddpCanvasSetting = val;
+      }
+      SettingsManager.set('pli11DdpCanvasSetting', ddpCanvasSetting);
+      renderDDPView(true);
+      const dims = getCanvasDims(ddpCanvasSetting, ddpCustomCanvas);
+      showToast(dims ? `Καμβάς ΔΔΠ: ${dims.width} × ${dims.height} px` : 'Καμβάς ΔΔΠ: Αυτόματο (Fit)');
+    });
+  }
+
+  if (dfdCanvasSizeSelect) {
+    dfdCanvasSizeSelect.value = dfdCanvasSetting;
+    dfdCanvasSizeSelect.addEventListener('change', () => {
+      const val = dfdCanvasSizeSelect.value;
+      if (val === 'custom') {
+        const currentPrompt = `${dfdCustomCanvas.width}x${dfdCustomCanvas.height}`;
+        const input = prompt('Εισάγετε διαστάσεις καμβά ΔΡΔ (Πλάτος x Ύψος σε px, π.χ. 1600x900):', currentPrompt);
+        if (input) {
+          const parts = input.toLowerCase().replace(/[,x]/g, ' ').trim().split(/\s+/).map(Number);
+          if (parts.length >= 2 && parts[0] >= 300 && parts[1] >= 200) {
+            dfdCustomCanvas = { width: Math.round(parts[0]), height: Math.round(parts[1]) };
+            SettingsManager.set('pli11DfdCustomCanvas', dfdCustomCanvas);
+            dfdCanvasSetting = 'custom';
+          } else {
+            showToast('Μη έγκυρες διαστάσεις (π.χ. 1600x900).');
+            dfdCanvasSizeSelect.value = dfdCanvasSetting;
+            return;
+          }
+        } else {
+          dfdCanvasSizeSelect.value = dfdCanvasSetting;
+          return;
+        }
+      } else {
+        dfdCanvasSetting = val;
+      }
+      SettingsManager.set('pli11DfdCanvasSetting', dfdCanvasSetting);
+      renderDFDView(true);
+      const dims = getCanvasDims(dfdCanvasSetting, dfdCustomCanvas);
+      showToast(dims ? `Καμβάς ΔΡΔ: ${dims.width} × ${dims.height} px` : 'Καμβάς ΔΡΔ: Αυτόματο (Fit)');
     });
   }
 
@@ -274,9 +444,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   ddpExportSvg.addEventListener('click', () => {
     if (!currentCompiled) return;
+    const dims = getCanvasDims(ddpCanvasSetting, ddpCustomCanvas);
     const svg = Renderer.renderDDPSVG(currentCompiled.model, {
       printMode: ddpPrintMode,
-      theme: getCurrentTheme()
+      theme: getCurrentTheme(),
+      canvasWidth: dims ? dims.width : null,
+      canvasHeight: dims ? dims.height : null
     });
     Renderer.downloadSVG(svg, 'eap-pli11-ddp.svg');
     showToast('Το ΔΔΠ εξήχθη ως SVG!');
@@ -284,37 +457,95 @@ document.addEventListener('DOMContentLoaded', () => {
 
   ddpExportPng.addEventListener('click', () => {
     if (!currentCompiled) return;
+    const dims = getCanvasDims(ddpCanvasSetting, ddpCustomCanvas);
     const svg = Renderer.renderDDPSVG(currentCompiled.model, {
       printMode: ddpPrintMode,
-      theme: getCurrentTheme()
+      theme: getCurrentTheme(),
+      canvasWidth: dims ? dims.width : null,
+      canvasHeight: dims ? dims.height : null
     });
     Renderer.downloadPNG(svg, 'eap-pli11-ddp.png', 2)
       .then(() => showToast('Το ΔΔΠ εξήχθη ως PNG (2x)!'))
-      .catch(() => showToast('Σφάλμα εξαγωγής PNG.'));
+      .catch((err) => showToast('Σφάλμα εξαγωγής PNG: ' + (err.message || 'Αποτυχία')));
   });
 
+  if (ddpCopyPng) {
+    ddpCopyPng.addEventListener('click', () => {
+      if (!currentCompiled) return;
+      const dims = getCanvasDims(ddpCanvasSetting, ddpCustomCanvas);
+      const svg = Renderer.renderDDPSVG(currentCompiled.model, {
+        printMode: ddpPrintMode,
+        theme: getCurrentTheme(),
+        canvasWidth: dims ? dims.width : null,
+        canvasHeight: dims ? dims.height : null
+      });
+      Renderer.copyPNGToClipboard(svg, 2)
+        .then(() => showToast('Το ΔΔΠ αντιγράφηκε ως PNG! Πατήστε Ctrl+V στο Word.'))
+        .catch(() => {
+          Renderer.downloadPNG(svg, 'eap-pli11-ddp.png', 2)
+            .then(() => showToast('Έγινε λήψη αρχείου PNG!'))
+            .catch((err) => showToast('Σφάλμα: ' + (err.message || 'Αποτυχία')));
+        });
+    });
+  }
+
   dfdExportSvg.addEventListener('click', () => {
-    if (!currentCompiled) return;
-    const svg = Renderer.renderDFDSVG(currentCompiled.dfd, {
+    const activeDFD = getActiveDFD();
+    if (!activeDFD) return;
+    const dims = getCanvasDims(dfdCanvasSetting, dfdCustomCanvas);
+    const svg = Renderer.renderDFDSVG(activeDFD, {
       printMode: dfdPrintMode,
       theme: getCurrentTheme(),
-      positions: customDFDPositions
+      positions: getCustomPositions(),
+      showKMFrame: dfdActiveLevel === 0 ? false : dfdShowKMFrame,
+      canvasWidth: dims ? dims.width : null,
+      canvasHeight: dims ? dims.height : null
     });
-    Renderer.downloadSVG(svg, 'eap-pli11-drd.svg');
-    showToast('Το ΔΡΔ εξήχθη ως SVG!');
+    const filename = dfdActiveLevel === 0 ? 'eap-pli11-context-diagram.svg' : 'eap-pli11-drd-level1.svg';
+    Renderer.downloadSVG(svg, filename);
+    showToast(`Το ${dfdActiveLevel === 0 ? 'Διάγραμμα Πλαισίου' : 'ΔΡΔ'} εξήχθη ως SVG!`);
   });
 
   dfdExportPng.addEventListener('click', () => {
-    if (!currentCompiled) return;
-    const svg = Renderer.renderDFDSVG(currentCompiled.dfd, {
+    const activeDFD = getActiveDFD();
+    if (!activeDFD) return;
+    const dims = getCanvasDims(dfdCanvasSetting, dfdCustomCanvas);
+    const svg = Renderer.renderDFDSVG(activeDFD, {
       printMode: dfdPrintMode,
       theme: getCurrentTheme(),
-      positions: customDFDPositions
+      positions: getCustomPositions(),
+      showKMFrame: dfdActiveLevel === 0 ? false : dfdShowKMFrame,
+      canvasWidth: dims ? dims.width : null,
+      canvasHeight: dims ? dims.height : null
     });
-    Renderer.downloadPNG(svg, 'eap-pli11-drd.png', 2)
-      .then(() => showToast('Το ΔΡΔ εξήχθη ως PNG (2x)!'))
-      .catch(() => showToast('Σφάλμα εξαγωγής PNG.'));
+    const filename = dfdActiveLevel === 0 ? 'eap-pli11-context-diagram.png' : 'eap-pli11-drd-level1.png';
+    Renderer.downloadPNG(svg, filename, 2)
+      .then(() => showToast(`Το ${dfdActiveLevel === 0 ? 'Διάγραμμα Πλαισίου' : 'ΔΡΔ'} εξήχθη ως PNG (2x)!`))
+      .catch((err) => showToast('Σφάλμα εξαγωγής PNG: ' + (err.message || 'Αποτυχία')));
   });
+
+  if (dfdCopyPng) {
+    dfdCopyPng.addEventListener('click', () => {
+      const activeDFD = getActiveDFD();
+      if (!activeDFD) return;
+      const dims = getCanvasDims(dfdCanvasSetting, dfdCustomCanvas);
+      const svg = Renderer.renderDFDSVG(activeDFD, {
+        printMode: dfdPrintMode,
+        theme: getCurrentTheme(),
+        positions: getCustomPositions(),
+        showKMFrame: dfdActiveLevel === 0 ? false : dfdShowKMFrame,
+        canvasWidth: dims ? dims.width : null,
+        canvasHeight: dims ? dims.height : null
+      });
+      Renderer.copyPNGToClipboard(svg, 2)
+        .then(() => showToast('Το ΔΡΔ αντιγράφηκε ως PNG! Πατήστε Ctrl+V στο Word.'))
+        .catch(() => {
+          Renderer.downloadPNG(svg, 'eap-pli11-drd.png', 2)
+            .then(() => showToast('Έγινε λήψη αρχείου PNG!'))
+            .catch((err) => showToast('Σφάλμα: ' + (err.message || 'Αποτυχία')));
+        });
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // JUMP TO LINE IN CODEMIRROR
@@ -359,12 +590,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeStep = traceIndex >= 0 && currentCompiled.callTrace[traceIndex]
       ? currentCompiled.callTrace[traceIndex]
       : null;
+    const dims = getCanvasDims(ddpCanvasSetting, ddpCustomCanvas);
 
     const svgStr = Renderer.renderDDPSVG(currentCompiled.model, {
       printMode: ddpPrintMode,
       theme: getCurrentTheme(),
       activeNodeId: activeStep ? activeStep.activeNodeId : null,
-      activeEdgeId: activeStep ? activeStep.activeEdgeId : null
+      activeEdgeId: activeStep ? activeStep.activeEdgeId : null,
+      canvasWidth: dims ? dims.width : null,
+      canvasHeight: dims ? dims.height : null
     });
     ddpCanvas.innerHTML = svgStr;
 
@@ -403,13 +637,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderDFDView(fitAfter = false) {
     if (!currentCompiled) return;
-    dfdInfoBar.hidden = !currentCompiled.dfd.hasGenericIO;
-    dfdCanvas.innerHTML = Renderer.renderDFDSVG(currentCompiled.dfd, {
+    const activeDFD = getActiveDFD();
+    if (!activeDFD) return;
+    const dims = getCanvasDims(dfdCanvasSetting, dfdCustomCanvas);
+
+    dfdInfoBar.hidden = !activeDFD.hasGenericIO;
+    dfdCanvas.innerHTML = Renderer.renderDFDSVG(activeDFD, {
       printMode: dfdPrintMode,
       theme: getCurrentTheme(),
-      positions: customDFDPositions
+      positions: getCustomPositions(),
+      showKMFrame: dfdActiveLevel === 0 ? false : dfdShowKMFrame,
+      canvasWidth: dims ? dims.width : null,
+      canvasHeight: dims ? dims.height : null
     });
     bindInteractiveDFDNodes();
+    updateDFDToolbarButtons();
     if (fitAfter) {
       requestAnimationFrame(() => dfdPanZoom.fit());
     }
@@ -495,7 +737,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function getActiveMermaidCode() {
     if (!currentCompiled) return '';
-    return mermaidMode === 'ddp' ? currentCompiled.ddpMermaid : currentCompiled.dfdMermaid;
+    if (mermaidMode === 'ddp') return currentCompiled.ddpMermaid;
+    const activeDFD = getActiveDFD();
+    return activeDFD ? Core.generateDFDMermaid(activeDFD) : currentCompiled.dfdMermaid;
   }
 
   // ---------------------------------------------------------------------------
@@ -599,18 +843,49 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!svgEl) return null;
     const clone = svgEl.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
     const vb = clone.getAttribute('viewBox');
+    let vbW = 1200;
+    let vbH = 600;
     if (vb) {
       const parts = vb.split(/[\s,]+/).map(Number);
       if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
-        if (!clone.getAttribute('width') || clone.getAttribute('width').includes('%')) {
-          clone.setAttribute('width', parts[2]);
-        }
-        if (!clone.getAttribute('height') || clone.getAttribute('height').includes('%')) {
-          clone.setAttribute('height', parts[3]);
-        }
+        vbW = Math.ceil(parts[2]);
+        vbH = Math.ceil(parts[3]);
       }
     }
+    clone.setAttribute('width', String(vbW));
+    clone.setAttribute('height', String(vbH));
+    clone.style.maxWidth = '';
+
+    // Convert foreignObject to native SVG <text> elements to avoid browser SecurityError (tainted canvas)
+    const fos = clone.querySelectorAll('foreignObject');
+    fos.forEach((fo) => {
+      const text = fo.textContent.trim();
+      const fw = parseFloat(fo.getAttribute('width')) || 0;
+      const fh = parseFloat(fo.getAttribute('height')) || 0;
+      const fx = parseFloat(fo.getAttribute('x')) || 0;
+      const fy = parseFloat(fo.getAttribute('y')) || 0;
+      const child = fo.querySelector('span, div, p');
+      const textColor = (child && window.getComputedStyle(child).color) || '#ffffff';
+      const fontF = (child && window.getComputedStyle(child).fontFamily) || 'sans-serif';
+      const fontS = (child && window.getComputedStyle(child).fontSize) || '14px';
+      const fontW = (child && window.getComputedStyle(child).fontWeight) || '600';
+
+      const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      textEl.setAttribute('x', (fx + fw / 2).toFixed(1));
+      textEl.setAttribute('y', (fy + fh / 2).toFixed(1));
+      textEl.setAttribute('text-anchor', 'middle');
+      textEl.setAttribute('dominant-baseline', 'central');
+      textEl.setAttribute('fill', textColor);
+      textEl.setAttribute('font-size', fontS);
+      textEl.setAttribute('font-weight', fontW);
+      textEl.setAttribute('font-family', fontF);
+      textEl.textContent = text;
+      if (fo.parentNode) fo.parentNode.replaceChild(textEl, fo);
+    });
+
     return clone;
   }
 
@@ -637,7 +912,25 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       Renderer.downloadPNG(svgEl, `mermaid-${mermaidMode}.png`, 2)
         .then(() => showToast('Έγινε λήψη Mermaid PNG (HiDPI για MS Word)!'))
-        .catch(() => showToast('Αποτυχία μετατροπής Mermaid σε PNG.'));
+        .catch((err) => showToast('Αποτυχία εξαγωγής Mermaid σε PNG: ' + (err.message || 'Σφάλμα')));
+    });
+  }
+
+  const mermaidCopyPng = document.getElementById('mermaid-copy-png');
+  if (mermaidCopyPng) {
+    mermaidCopyPng.addEventListener('click', () => {
+      const svgEl = getPreparedMermaidSVG();
+      if (!svgEl) {
+        showToast('Δεν υπάρχει διαθέσιμο διάγραμμα Mermaid προς εξαγωγή.');
+        return;
+      }
+      Renderer.copyPNGToClipboard(svgEl, 2)
+        .then(() => showToast('Το διάγραμμα Mermaid αντιγράφηκε ως PNG! Πατήστε Ctrl+V στο Word.'))
+        .catch(() => {
+          Renderer.downloadPNG(svgEl, `mermaid-${mermaidMode}.png`, 2)
+            .then(() => showToast('Έγινε λήψη αρχείου PNG!'))
+            .catch((err) => showToast('Σφάλμα: ' + (err.message || 'Αποτυχία')));
+        });
     });
   }
 
@@ -696,6 +989,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   function runCompile(opts = {}) {
     currentCompiled = Core.compilePLI11(editor.getValue());
+    if (currentCompiled && currentCompiled.directives) {
+      if (typeof currentCompiled.directives.level === 'number') {
+        dfdActiveLevel = currentCompiled.directives.level;
+      }
+      if (currentCompiled.directives.noKM) {
+        dfdShowKMFrame = false;
+      } else if (currentCompiled.directives.central) {
+        dfdShowKMFrame = true;
+      }
+    }
     renderStatsAndHeader();
     renderDDPView(opts.fit !== false);
     renderDFDView(opts.fit !== false);
@@ -883,7 +1186,8 @@ document.addEventListener('DOMContentLoaded', () => {
   clearButton.addEventListener('click', () => {
     stopAutoTrace();
     resetTraceState();
-    customDFDPositions = {};
+    customDFDPositionsLevel1 = {};
+    customDFDPositionsLevel0 = {};
     editor.setValue('');
     runCompile({ fit: true });
     editor.focus();
@@ -964,8 +1268,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function syncBuilderTableToDSL() {
-    const modeTag = dfdModeSelect.value === 'KD' ? 'ΚΔ' : 'ΚΜ';
-    const centralLine = `${modeTag}: ${dfdCentralInput.value.trim() || 'M1'}`;
+    let centralLine = '';
+    if (dfdModeSelect.value === 'NONE') {
+      centralLine = '# Χωρίς περίγραμμα ΚΜ\nΧΩΡΙΣ_ΚΜ';
+    } else {
+      const modeTag = dfdModeSelect.value === 'KD' ? 'ΚΔ' : 'ΚΜ';
+      const cVal = dfdCentralInput.value.trim();
+      if (!cVal || /^(?:κανενας|none|οχι|0|-|χωρις)$/i.test(cVal)) {
+        centralLine = '# Χωρίς περίγραμμα ΚΜ\nΧΩΡΙΣ_ΚΜ';
+      } else {
+        centralLine = `${modeTag}: ${cVal}`;
+      }
+    }
     const flowLines = builderFlows.map((f) => {
       const left = formatEndpointDSL(f.from, f.fromType, true);
       const right = formatEndpointDSL(f.to, f.toType, false);
@@ -977,21 +1291,51 @@ document.addEventListener('DOMContentLoaded', () => {
   function loadDSLIntoBuilder(dslText) {
     dfdDslInput.value = dslText;
     const spec = Core.parseDFDText(dslText);
-    dfdModeSelect.value = spec.mode === 'KD' ? 'KD' : 'KM';
-    dfdCentralInput.value = (spec.central || []).join(', ');
+    if (!spec.central || spec.central.length === 0) {
+      dfdModeSelect.value = 'NONE';
+      dfdCentralInput.value = '';
+      dfdCentralInput.disabled = true;
+      dfdCentralInput.placeholder = 'Χωρίς περίγραμμα (Απλό ΔΡΔ)';
+    } else {
+      dfdModeSelect.value = spec.mode === 'KD' ? 'KD' : 'KM';
+      dfdCentralInput.value = spec.central.join(', ');
+      dfdCentralInput.disabled = false;
+      dfdCentralInput.placeholder = 'π.χ. M3, M4, M5';
+    }
     builderFlows = spec.flows;
     renderBuilderTable();
   }
 
   dfdDslInput.addEventListener('input', () => {
     const spec = Core.parseDFDText(dfdDslInput.value);
-    dfdModeSelect.value = spec.mode === 'KD' ? 'KD' : 'KM';
-    if (spec.central.length > 0) dfdCentralInput.value = spec.central.join(', ');
+    if (!spec.central || spec.central.length === 0) {
+      dfdModeSelect.value = 'NONE';
+      dfdCentralInput.value = '';
+      dfdCentralInput.disabled = true;
+      dfdCentralInput.placeholder = 'Χωρίς περίγραμμα (Απλό ΔΡΔ)';
+    } else {
+      dfdModeSelect.value = spec.mode === 'KD' ? 'KD' : 'KM';
+      dfdCentralInput.value = spec.central.join(', ');
+      dfdCentralInput.disabled = false;
+      dfdCentralInput.placeholder = 'π.χ. M3, M4, M5';
+    }
     builderFlows = spec.flows;
     renderBuilderTable();
   });
 
-  dfdModeSelect.addEventListener('change', syncBuilderTableToDSL);
+  dfdModeSelect.addEventListener('change', () => {
+    if (dfdModeSelect.value === 'NONE') {
+      dfdCentralInput.disabled = true;
+      dfdCentralInput.placeholder = 'Χωρίς περίγραμμα (Απλό ΔΡΔ)';
+    } else {
+      dfdCentralInput.disabled = false;
+      dfdCentralInput.placeholder = 'π.χ. M3, M4, M5';
+      if (!dfdCentralInput.value.trim()) {
+        dfdCentralInput.value = 'M1';
+      }
+    }
+    syncBuilderTableToDSL();
+  });
   dfdCentralInput.addEventListener('change', syncBuilderTableToDSL);
 
   dfdAddFlowBtn.addEventListener('click', () => {
@@ -1021,8 +1365,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (dfdEditInBuilderBtn) {
     dfdEditInBuilderBtn.addEventListener('click', () => {
-      if (currentCompiled && currentCompiled.dfd) {
-        const dsl = Core.serializeDFDToDSL(currentCompiled.dfd);
+      const activeDFD = getActiveDFD();
+      if (activeDFD) {
+        const dsl = Core.serializeDFDToDSL(activeDFD);
         loadDSLIntoBuilder(dsl);
       }
       switchTab('tab-builder');
@@ -1032,10 +1377,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (dfdLoadFromCompilerBtn) {
     dfdLoadFromCompilerBtn.addEventListener('click', () => {
-      if (currentCompiled && currentCompiled.dfd) {
-        const dsl = Core.serializeDFDToDSL(currentCompiled.dfd);
+      const activeDFD = getActiveDFD();
+      if (activeDFD) {
+        const dsl = Core.serializeDFDToDSL(activeDFD);
         loadDSLIntoBuilder(dsl);
-        showToast('Το ΔΡΔ φορτώθηκε από τον ψευδοκώδικα!');
+        showToast('Το ΔΡΔ φορτώθηκε από τον κώδικα!');
       } else {
         showToast('Δεν υπάρχει μεταγλωττισμένο ΔΡΔ για φόρτωση.');
       }
@@ -1055,9 +1401,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const customDFD = Core.dfdSpecToDFD(spec);
       if (!currentCompiled) currentCompiled = {};
-      currentCompiled.dfd = customDFD;
-      renderDFDView(true);
+      if (customDFD.level === 0) {
+        currentCompiled.dfdLevel0 = customDFD;
+        dfdActiveLevel = 0;
+      } else {
+        currentCompiled.dfd = customDFD;
+        dfdActiveLevel = 1;
+      }
+      dfdShowKMFrame = customDFD.showKMFrame !== false && !customDFD.noKM;
+      if (dfdActiveLevel === 0) customDFDPositionsLevel0 = {};
+      else customDFDPositionsLevel1 = {};
+      updateDFDToolbarButtons();
       switchTab('tab-dfd');
+      renderDFDView(true);
       showToast('Προεπισκόπηση προσαρμοσμένου ΔΡΔ (έτοιμο για εξαγωγή)!');
     });
   }
@@ -1390,6 +1746,9 @@ END_PROCEDURE;</code></pre>
 /* @MERGE_SINKS: false */">+ Εισαγωγή</button>
         </div>
         <pre><code>/* @KM: M3, M4 */          -> Ορίζει ρητά τις μονάδες του Κεντρικού Μετασχηματισμού
+/* @KM: NONE */            -> Απενεργοποιεί το περίγραμμα ΚΜ (απλό ΔΡΔ)
+/* @LEVEL: 0 */            -> Παράγει αυτόματα το Διάγραμμα Πλαισίου (Context Diagram)
+/* @LEVEL: 1 */            -> Παράγει το αναλυτικό ΔΡΔ Επιπέδου 1 (Προεπιλογή)
 /* @MODE: KM */            -> Επιλέγει λειτουργία ΚΜ (ή @MODE: TC για Κέντρο Δοσοληψιών)
 /* @MERGE_SOURCES: false */ -> Διατηρεί ξεχωριστές τις πηγές εισόδου στο ΔΡΔ
 /* @MERGE_SINKS: false */   -> Διατηρεί ξεχωριστούς τους αποδέκτες εξόδου στο ΔΡΔ

@@ -1974,6 +1974,8 @@
   function parseDirectives(comments = []) {
     const directives = {
       central: null,          // Set<string> of process tags
+      noKM: false,            // boolean: explicitly disable KM bounding frame
+      level: 1,               // 0 (Context Diagram) | 1 (Detailed DFD)
       mode: null,             // 'KM' | 'KD'
       aliases: new Map(),     // canonVar -> string
       mergeSources: [],       // [{ label: string, vars: Set<string> | '*' }]
@@ -1994,9 +1996,26 @@
         const body = m[2].trim();
 
         if (tag === 'KM' || tag === 'CENTRAL' || tag === 'KENTRIKO') {
-          directives.central = new Set(
-            body.split(/[,;\s]+/).map((s) => normalizeId(s.trim())).filter(Boolean)
-          );
+          const bodyNorm = normalizeId(body);
+          if (bodyNorm === 'NONE' || bodyNorm === 'OFF' || bodyNorm === 'OCHI' || bodyNorm === 'KANENAS' || bodyNorm === '0' || bodyNorm === 'FALSE' || bodyNorm === 'CHORIS') {
+            directives.central = new Set();
+            directives.noKM = true;
+          } else {
+            directives.central = new Set(
+              body.split(/[,;\s]+/).map((s) => normalizeId(s.trim())).filter(Boolean)
+            );
+            directives.noKM = false;
+          }
+        } else if (tag === 'NO_KM' || tag === 'NOKM' || tag === 'CHORIS_KM' || tag === 'OFF_KM') {
+          directives.central = new Set();
+          directives.noKM = true;
+        } else if (tag === 'LEVEL' || tag === 'EPIPEDO') {
+          const bodyNorm = normalizeId(body);
+          if (bodyNorm === '0' || bodyNorm === 'CONTEXT' || bodyNorm === 'PLAISIO' || bodyNorm === 'DIAGRAMMA_PLAISIOU') {
+            directives.level = 0;
+          } else {
+            directives.level = 1;
+          }
         } else if (tag === 'MODE' || tag === 'TYPOS') {
           const u = normalizeId(body);
           if (u.includes('KD') || u.includes('TRANSACTION')) directives.mode = 'KD';
@@ -2039,6 +2058,8 @@
 
   function synthesizeDFD(model, opts = {}) {
     const directives = opts.directives || parseDirectives(model.comments || []);
+    const reqLevel = typeof opts.level === 'number' ? opts.level : (typeof directives.level === 'number' ? directives.level : 1);
+    const noKM = Boolean(opts.noKM || directives.noKM || (directives.central && directives.central.size === 0));
     const processes = new Map(); // procKey -> { id, key, label, isCentral, isTransactionCenter }
     const endpoints = new Map(); // endpointKey -> { id, label, type: 'process'|'store'|'entity'|'unknown_io', isCentral }
     const rawFlows = [];         // { fromKey, toKey, dataSet: Set, dataList: [] }
@@ -2047,7 +2068,7 @@
 
     function ensureProcess(key, displayLabel, isCentral = false, isProcTC = false) {
       const canonKey = normalizeId(key);
-      const effectiveCentral = directives.central ? directives.central.has(canonKey) : isCentral;
+      const effectiveCentral = !noKM && (directives.central ? directives.central.has(canonKey) : isCentral);
       const effectiveLabel = directives.aliases.get(canonKey) || displayLabel || key;
       if (!processes.has(key)) {
         const ep = {
@@ -2118,7 +2139,9 @@
 
     // Track central processes from ROOT_CONTROL (or explicit @KM directive)
     const centralKeys = new Set();
-    if (directives.central) {
+    if (noKM) {
+      // KM frame disabled: no central processes
+    } else if (directives.central) {
       for (const k of directives.central) {
         centralKeys.add(k);
         ensureProcess(k, k, true, isTC);
@@ -2414,14 +2437,109 @@
 
     const activeEndpoints = Array.from(endpoints.values()).filter((ep) => usedEndpointIds.has(ep.id) || ep.type === 'process');
 
-    return {
+    const fullDFD = {
       nodes: activeEndpoints,
       processes: activeEndpoints.filter((n) => n.type === 'process'),
       stores: activeEndpoints.filter((n) => n.type === 'store'),
       entities: activeEndpoints.filter((n) => n.type === 'entity' || n.type === 'unknown_io'),
       flows,
       hasGenericIO: activeEndpoints.some((n) => n.type === 'unknown_io'),
-      architecture: isTC ? 'TRANSACTION_CENTER' : 'TRANSFORMATION_CENTER'
+      architecture: isTC ? 'TRANSACTION_CENTER' : 'TRANSFORMATION_CENTER',
+      level: 1,
+      noKM,
+      showKMFrame: !noKM
+    };
+
+    if (reqLevel === 0) {
+      return synthesizeDFDLevel0(fullDFD, model);
+    }
+    return fullDFD;
+  }
+
+  function synthesizeDFDLevel0(dfd, model) {
+    if (!dfd) return null;
+    const sysName = (model && model.rootNode && model.rootNode.name) ? model.rootNode.name : 'Σύστημα';
+    const sysLabel = /^[0-9]\./.test(sysName) ? sysName : `0. ${sysName}`;
+    const sysId = 'P_SYSTEM_0';
+
+    const sysProcess = {
+      id: sysId,
+      key: 'SYSTEM_0',
+      label: sysLabel,
+      type: 'process',
+      isCentral: false,
+      isTransactionCenter: false
+    };
+
+    const entityMap = new Map();
+    for (const ent of (dfd.entities || [])) {
+      entityMap.set(ent.id, { ...ent, isCentral: false });
+    }
+
+    const inDataByEntity = new Map();
+    const outDataByEntity = new Map();
+
+    for (const f of (dfd.flows || [])) {
+      const fromIsEntity = entityMap.has(f.from);
+      const toIsEntity = entityMap.has(f.to);
+
+      if (fromIsEntity && !toIsEntity) {
+        if (!inDataByEntity.has(f.from)) inDataByEntity.set(f.from, new Set());
+        for (const d of (f.data || [])) inDataByEntity.get(f.from).add(d);
+      } else if (!fromIsEntity && toIsEntity) {
+        if (!outDataByEntity.has(f.to)) outDataByEntity.set(f.to, new Set());
+        for (const d of (f.data || [])) outDataByEntity.get(f.to).add(d);
+      }
+    }
+
+    const compiledFlows = [];
+    const usedEntityIds = new Set();
+
+    for (const [entId, dataSet] of inDataByEntity.entries()) {
+      compiledFlows.push({
+        from: entId,
+        to: sysId,
+        data: Array.from(dataSet)
+      });
+      usedEntityIds.add(entId);
+    }
+
+    for (const [entId, dataSet] of outDataByEntity.entries()) {
+      compiledFlows.push({
+        from: sysId,
+        to: entId,
+        data: Array.from(dataSet)
+      });
+      usedEntityIds.add(entId);
+    }
+
+    const activeEntities = [];
+    for (const ent of (dfd.entities || [])) {
+      if (usedEntityIds.has(ent.id)) {
+        activeEntities.push(entityMap.get(ent.id));
+      }
+    }
+
+    if (activeEntities.length === 0 && (dfd.entities || []).length > 0) {
+      activeEntities.push(...(dfd.entities || []));
+    }
+
+    const processes = [sysProcess];
+    const stores = []; // Context Diagram has no internal data stores
+    const nodes = [sysProcess, ...activeEntities];
+
+    return {
+      architecture: dfd.architecture || 'TRANSFORMATION_CENTER',
+      processes,
+      stores,
+      entities: activeEntities,
+      nodes,
+      flows: compiledFlows,
+      hasGenericIO: activeEntities.some((n) => n.type === 'unknown_io'),
+      level: 0,
+      isContextDiagram: true,
+      noKM: true,
+      showKMFrame: false
     };
   }
 
@@ -2503,8 +2621,9 @@
     }
     const lines = ['flowchart LR'];
 
-    const centralProcs = dfd.processes.filter((p) => p.isCentral);
-    const otherProcs = dfd.processes.filter((p) => !p.isCentral);
+    const showKM = dfd.showKMFrame !== false && !dfd.noKM && dfd.level !== 0 && !dfd.isContextDiagram;
+    const centralProcs = showKM ? dfd.processes.filter((p) => p.isCentral) : [];
+    const otherProcs = dfd.processes.filter((p) => !centralProcs.includes(p));
 
     if (centralProcs.length > 0) {
       const sgTitle = 'Κεντρικός Μετασχηματισμός (ΚΜ)';
@@ -2540,7 +2659,7 @@
     lines.push('  classDef unknownIO fill:#2b2d42,stroke:#8d99ae,color:#ffffff,stroke-dasharray: 5 4');
 
     for (const p of dfd.processes) {
-      lines.push(`  class ${p.id} ${p.isCentral ? 'centralNode' : 'procNode'}`);
+      lines.push(`  class ${p.id} ${centralProcs.includes(p) ? 'centralNode' : 'procNode'}`);
     }
     for (const s of dfd.stores) lines.push(`  class ${s.id} storeNode`);
     for (const ent of dfd.entities) {
@@ -2582,6 +2701,7 @@
     const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
     let mode = 'KM';
     let central = [];
+    let level = 1;
     const flows = [];
     const parseErrors = [];
 
@@ -2589,11 +2709,34 @@
       const raw = lines[i].trim();
       if (!raw || raw.startsWith('#') || raw.startsWith('//')) continue;
 
-      const kmMatch = raw.match(/^(ΚΜ|KM|CM|ΚΔ|KD|TD|TC)\s*:\s*(.+)$/i);
+      if (/^(?:ΧΩΡΙΣ_ΚΜ|NO_KM|NOKM|CHORIS_KM)$/i.test(raw)) {
+        central = [];
+        continue;
+      }
+
+      const kmMatch = raw.match(/^(ΚΜ|KM|CM|ΚΔ|KD|TD|TC|ΧΩΡΙΣ_ΚΜ|NO_KM)\s*:\s*(.+)$/i);
       if (kmMatch) {
         const tag = stripAccents(kmMatch[1]).toUpperCase();
+        if (tag === 'ΧΩΡΙΣ_ΚΜ' || tag === 'NO_KM') {
+          mode = 'KM';
+          central = [];
+          continue;
+        }
         mode = (tag === 'ΚΔ' || tag === 'KD' || tag === 'TD' || tag === 'TC') ? 'KD' : 'KM';
-        central = kmMatch[2].split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
+        const parts = kmMatch[2].split(/[,;]+/).map((s) => s.trim()).filter(Boolean);
+        const normFirst = parts.length > 0 ? normalizeId(parts[0]) : '';
+        if (normFirst === 'NONE' || normFirst === 'KANENAS' || normFirst === 'OCHI' || normFirst === '0' || normFirst === '-' || normFirst === 'CHORIS') {
+          central = [];
+        } else {
+          central = parts;
+        }
+        continue;
+      }
+
+      const levelMatch = raw.match(/^(ΕΠΙΠΕΔΟ|LEVEL)\s*:\s*(.+)$/i);
+      if (levelMatch) {
+        const lvNorm = normalizeId(levelMatch[2]);
+        level = (lvNorm === '0' || lvNorm === 'CONTEXT' || lvNorm === 'PLAISIO') ? 0 : 1;
         continue;
       }
 
@@ -2618,13 +2761,20 @@
       }
     }
 
-    return { mode, central, flows, parseErrors };
+    return { mode, central, flows, parseErrors, level };
   }
 
   function compileDFDToPLI11(dfdSpec) {
     const mode = dfdSpec.mode === 'KD' ? 'KD' : 'KM';
     const flows = Array.isArray(dfdSpec.flows) ? dfdSpec.flows : [];
     const procs = new Set();
+
+    function cleanProcIdent(raw) {
+      let s = String(raw || '').replace(/^[0-9]+\.\s*/, '').replace(/[^A-Za-zΑ-Ωα-ω0-9_]/g, '_');
+      if (/^[0-9]/.test(s)) s = 'P_' + s;
+      if (!s) s = 'MAIN';
+      return s;
+    }
 
     for (const f of flows) {
       if (f.fromType === 'process') procs.add(f.from);
@@ -2758,7 +2908,8 @@
 
     const visitedUp = new Set();
     function emitUpstreamProc(pName, parentTargetSet) {
-      const execName = `EXEC_${pName}`;
+      const cleanName = cleanProcIdent(pName);
+      const execName = `EXEC_${cleanName}`;
       // Data returned to central/parent
       const outToParent = [];
       for (const e of procOutToProc.get(pName) || []) {
@@ -2804,7 +2955,7 @@
         }
       }
 
-      const calcName = addCalcLeaf(pName, calcIns, calcOuts);
+      const calcName = addCalcLeaf(cleanName, calcIns, calcOuts);
       calls.push(`CALL ${calcName}(${[...calcIns, ...calcOuts].join(',')});`);
 
       for (const io of procOutToIO.get(pName) || []) {
@@ -2828,7 +2979,8 @@
 
     const visitedDown = new Set();
     function emitDownstreamProc(pName, inFromParent) {
-      const execName = `EXEC_${pName}`;
+      const cleanName = cleanProcIdent(pName);
+      const execName = `EXEC_${cleanName}`;
       if (visitedDown.has(execName)) return execName;
       visitedDown.add(execName);
 
@@ -2864,7 +3016,7 @@
         }
       }
 
-      const calcName = addCalcLeaf(pName, calcIns, calcOuts);
+      const calcName = addCalcLeaf(cleanName, calcIns, calcOuts);
       calls.push(`CALL ${calcName}(${[...calcIns, ...calcOuts].join(',')});`);
 
       for (const io of procOutToIO.get(pName) || []) {
@@ -2890,7 +3042,7 @@
     }
 
     // Build Root Control Unit
-    const rootName = `EXEC_${orderedCentral.join('_')}`;
+    const rootName = `EXEC_${orderedCentral.map(cleanProcIdent).join('_')}`;
     const rootLocals = [];
     const rootCalls = [];
     const addRootLocal = (v) => { if (!rootLocals.includes(v)) rootLocals.push(v); };
@@ -2964,7 +3116,7 @@
         for (const io of procOutToIO.get(c) || []) io.data.forEach((d) => { addRootLocal(d); if (!outs.includes(d)) outs.push(d); });
         for (const outE of procOutToProc.get(c) || []) outE.data.forEach((d) => { addRootLocal(d); if (!outs.includes(d)) outs.push(d); });
 
-        const calcName = addCalcLeaf(c, ins, outs);
+        const calcName = addCalcLeaf(cleanProcIdent(c), ins, outs);
         rootCalls.push(`CALL ${calcName}(${[...ins, ...outs].join(',')});`);
       }
 
@@ -3109,6 +3261,9 @@
     const entitiesArr = Array.from(entities.values());
     const nodes = [...processes, ...storesArr, ...entitiesArr];
 
+    const noKM = spec.central ? (spec.central.length === 0) : false;
+    const isLevel0 = spec.level === 0;
+
     return {
       architecture: isTC ? 'TRANSACTION_CENTER' : 'TRANSFORMATION_CENTER',
       processes,
@@ -3116,7 +3271,11 @@
       entities: entitiesArr,
       nodes,
       flows: compiledFlows,
-      hasGenericIO: false
+      hasGenericIO: false,
+      level: isLevel0 ? 0 : 1,
+      isContextDiagram: isLevel0,
+      noKM: noKM || isLevel0,
+      showKMFrame: !noKM && !isLevel0
     };
   }
 
@@ -3388,15 +3547,19 @@
     const ast = parsePLI11(source);
     const model = analyzePLI11(ast);
     const validation = validatePLI11(ast, model);
-    const dfd = synthesizeDFD(model);
+    const directives = parseDirectives(model.comments || []);
+    const dfd = synthesizeDFD(model, { directives, level: 1 });
+    const dfdLevel0 = synthesizeDFDLevel0(dfd, model);
     const ddpMermaid = generateDDPMermaid(model);
-    const dfdMermaid = generateDFDMermaid(dfd);
+    const dfdMermaid = generateDFDMermaid(directives.level === 0 ? dfdLevel0 : dfd);
     const callTrace = buildCallTrace(ast, model);
     return {
       ast,
       model,
       validation,
+      directives,
       dfd,
+      dfdLevel0,
       ddpMermaid,
       dfdMermaid,
       callTrace
@@ -3411,6 +3574,7 @@
     analyzePLI11,
     validatePLI11,
     synthesizeDFD,
+    synthesizeDFDLevel0,
     generateDDPMermaid,
     generateDFDMermaid,
     parseDFDText,

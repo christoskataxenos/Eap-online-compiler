@@ -469,6 +469,30 @@
   color: #ffffff;
 }
 
+.tool-mini-select {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  outline: none;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+
+.tool-mini-select:hover,
+.tool-mini-select:focus {
+  border-color: var(--accent);
+}
+
+.toolbar-label {
+  user-select: none;
+  font-weight: 600;
+}
+
 .zoom-readout {
   font-family: var(--font-mono);
   font-size: 0.74rem;
