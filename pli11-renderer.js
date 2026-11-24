@@ -524,25 +524,118 @@
       if (inFlows.has(f.to)) inFlows.get(f.to).push(f);
     }
 
-    // Topological column assignment for processes
-    const procCol = new Map();
-    for (const p of dfd.processes) procCol.set(p.id, 1);
+    // -------------------------------------------------------------------------
+    // Universal 3-Stage Process Partitioning (ΠΛΗ11 / Structured Analysis)
+    // 1. Upstream processes (feed into KM directly or indirectly)
+    // 2. Central Transformation (KM) processes (isCentral = true)
+    // 3. Downstream processes (receive from KM or output to sinks/stores)
+    // -------------------------------------------------------------------------
+    const centralIds = new Set(dfd.processes.filter((p) => p.isCentral).map((p) => p.id));
+    const isUpstream = new Set();
 
-    // Relax edges between processes (up to N iterations to handle cycles cleanly)
-    for (let iter = 0; iter < dfd.processes.length; iter++) {
-      let changed = false;
-      for (const f of dfd.flows) {
-        const u = nodeById.get(f.from);
-        const v = nodeById.get(f.to);
-        if (u && v && u.type === 'process' && v.type === 'process') {
-          const nextCol = procCol.get(u.id) + 1;
-          if (nextCol > procCol.get(v.id) && nextCol <= dfd.processes.length + 1) {
-            procCol.set(v.id, nextCol);
-            changed = true;
+    if (centralIds.size > 0) {
+      const queue = [...centralIds];
+      const visited = new Set(centralIds);
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        for (const f of dfd.flows) {
+          if (f.to === curr) {
+            const u = nodeById.get(f.from);
+            if (u && u.type === 'process' && !centralIds.has(u.id) && !visited.has(u.id)) {
+              visited.add(u.id);
+              isUpstream.add(u.id);
+              queue.push(u.id);
+            }
           }
         }
       }
-      if (!changed) break;
+    }
+
+    const procCol = new Map();
+
+    if (centralIds.size === 0) {
+      // Standard topological sort when no central processes exist
+      for (const p of dfd.processes) procCol.set(p.id, 1);
+      for (let iter = 0; iter < dfd.processes.length; iter++) {
+        let changed = false;
+        for (const f of dfd.flows) {
+          const u = nodeById.get(f.from);
+          const v = nodeById.get(f.to);
+          if (u && v && u.type === 'process' && v.type === 'process') {
+            const nextCol = procCol.get(u.id) + 1;
+            if (nextCol > procCol.get(v.id) && nextCol <= dfd.processes.length + 1) {
+              procCol.set(v.id, nextCol);
+              changed = true;
+            }
+          }
+        }
+        if (!changed) break;
+      }
+    } else {
+      // 3-Stage Partitioning: Upstream -> Central -> Downstream
+      const upstreamProcs = dfd.processes.filter((p) => isUpstream.has(p.id));
+      const centralProcs = dfd.processes.filter((p) => centralIds.has(p.id));
+      const downstreamProcs = dfd.processes.filter((p) => !centralIds.has(p.id) && !isUpstream.has(p.id));
+
+      // Stage 1: Upstream processes
+      for (const p of upstreamProcs) procCol.set(p.id, 1);
+      for (let iter = 0; iter < upstreamProcs.length; iter++) {
+        let changed = false;
+        for (const f of dfd.flows) {
+          if (isUpstream.has(f.from) && isUpstream.has(f.to)) {
+            const nextCol = procCol.get(f.from) + 1;
+            if (nextCol > procCol.get(f.to)) {
+              procCol.set(f.to, nextCol);
+              changed = true;
+            }
+          }
+        }
+        if (!changed) break;
+      }
+      const maxUpstreamCol = upstreamProcs.reduce((m, p) => Math.max(m, procCol.get(p.id) || 1), 0);
+
+      // Stage 2: Central Transformation (KM) processes
+      const centralStartCol = maxUpstreamCol + 1;
+      for (const p of centralProcs) procCol.set(p.id, centralStartCol);
+      for (let iter = 0; iter < centralProcs.length; iter++) {
+        let changed = false;
+        for (const f of dfd.flows) {
+          if (centralIds.has(f.from) && centralIds.has(f.to)) {
+            const nextCol = procCol.get(f.from) + 1;
+            if (nextCol > procCol.get(f.to)) {
+              procCol.set(f.to, nextCol);
+              changed = true;
+            }
+          }
+        }
+        if (!changed) break;
+      }
+      const maxCentralCol = centralProcs.reduce(
+        (m, p) => Math.max(m, procCol.get(p.id) || centralStartCol),
+        centralStartCol
+      );
+
+      // Stage 3: Downstream processes (strictly after Central Transformation)
+      const downstreamStartCol = maxCentralCol + 1;
+      for (const p of downstreamProcs) procCol.set(p.id, downstreamStartCol);
+      for (let iter = 0; iter < downstreamProcs.length; iter++) {
+        let changed = false;
+        for (const f of dfd.flows) {
+          if (
+            !centralIds.has(f.from) &&
+            !isUpstream.has(f.from) &&
+            !centralIds.has(f.to) &&
+            !isUpstream.has(f.to)
+          ) {
+            const nextCol = procCol.get(f.from) + 1;
+            if (nextCol > procCol.get(f.to)) {
+              procCol.set(f.to, nextCol);
+              changed = true;
+            }
+          }
+        }
+        if (!changed) break;
+      }
     }
 
     const maxProcCol = dfd.processes.reduce((m, p) => Math.max(m, procCol.get(p.id) || 1), 1);
@@ -564,10 +657,73 @@
     for (const ent of dfd.entities) pushBucket(entityCol.get(ent.id), ent);
     for (const p of dfd.processes) pushBucket(procCol.get(p.id), p);
 
-    const colSpacing = 225;
+    const colKeys = Array.from(colBuckets.keys()).sort((a, b) => a - b);
+
+    // Calculate maximum half-width for nodes in each column
+    const colHalfW = new Map();
+    for (const col of colKeys) {
+      const list = colBuckets.get(col) || [];
+      let maxHw = 32;
+      for (const n of list) {
+        if (n.type === 'process') {
+          const r = Math.max(32, Math.min(46, (n.label || '').length * 4.5 + 18));
+          maxHw = Math.max(maxHw, r);
+        } else {
+          const w = Math.max(120, Math.min(210, (n.label || '').length * 7.8 + 24));
+          maxHw = Math.max(maxHw, w / 2);
+        }
+      }
+      colHalfW.set(col, maxHw);
+    }
+
+    // Central Transformation (KM) width requirements
+    const kmTitle = 'Κεντρικός Μετασχηματισμός (ΚΜ)';
+    const kmTitleW = kmTitle.length * 7.2 + 20;
+    const kmTitleH = 20;
+    const minKMW = kmTitleW + 36; // ~258px
+
+    const centralCols = centralIds.size > 0
+      ? dfd.processes.filter((p) => p.isCentral).map((p) => procCol.get(p.id))
+      : [];
+    const minCentralCol = centralCols.length > 0 ? Math.min(...centralCols) : -1;
+    const maxCentralCol = centralCols.length > 0 ? Math.max(...centralCols) : -1;
+    const isSingleColKM = minCentralCol === maxCentralCol && minCentralCol !== -1;
+
+    const kmReachLeft = isSingleColKM ? minKMW / 2 : (colHalfW.get(minCentralCol) || 32) + 32;
+    const kmReachRight = isSingleColKM ? minKMW / 2 : (colHalfW.get(maxCentralCol) || 32) + 32;
+
+    // Calculate column X positions dynamically with guaranteed safe clearance around KM
+    const colToX = new Map();
+    const col0Hw = colHalfW.get(colKeys[0]) || 60;
+    const startColX = Math.max(124, Math.ceil(col0Hw + 36));
+    colToX.set(colKeys[0], startColX);
+
+    for (let i = 0; i < colKeys.length - 1; i++) {
+      const c1 = colKeys[i];
+      const c2 = colKeys[i + 1];
+      const hw1 = colHalfW.get(c1);
+      const hw2 = colHalfW.get(c2);
+
+      let gap = hw1 + hw2 + 80;
+      if (gap < 225) gap = 225;
+
+      // Ensure at least 32px clearance between left neighbor and KM frame
+      if (c2 === minCentralCol) {
+        const needed = hw1 + 32 + kmReachLeft;
+        if (gap < needed) gap = needed;
+      }
+      // Ensure at least 32px clearance between KM frame and right neighbor
+      if (c1 === maxCentralCol) {
+        const needed = kmReachRight + 32 + hw2;
+        if (gap < needed) gap = needed;
+      }
+
+      colToX.set(c2, colToX.get(c1) + gap);
+    }
+
     const rowSpacing = 125;
     const hasTopStores = dfd.stores.length > 0;
-    const hasCentral = dfd.processes.some((p) => p.isCentral);
+    const hasCentral = centralIds.size > 0;
     // Extra headroom when the store lane shares the top with the ΚΜ frame,
     // so the dashed container never touches stores or their flow lines.
     const topMargin = hasTopStores ? (hasCentral ? 172 : 128) : 56;
@@ -580,20 +736,6 @@
     const centerY = topMargin + ((maxRows - 1) * rowSpacing) / 2;
 
     const coords = new Map(); // id -> { cx, cy, w, h, shape }
-    const colKeys = Array.from(colBuckets.keys()).sort((a, b) => a - b);
-    const col0Nodes = colBuckets.get(colKeys[0]) || [];
-    const maxCol0W = col0Nodes.reduce((m, n) => {
-      const w = n.type === 'process'
-        ? Math.max(64, Math.min(92, ((n.label || '').length * 4.5 + 18) * 2))
-        : Math.max(120, Math.min(210, (n.label || '').length * 7.8 + 24));
-      return Math.max(m, w);
-    }, 120);
-    const startColX = Math.max(124, Math.ceil(maxCol0W / 2 + 36));
-
-    const colToX = new Map();
-    colKeys.forEach((col, i) => {
-      colToX.set(col, startColX + i * colSpacing);
-    });
 
     for (const col of colKeys) {
       const list = colBuckets.get(col);
@@ -642,7 +784,7 @@
     }
 
     // Central Transformation (ΚΜ) container box and header.
-    // Bounding box wraps the central processes with generous padding and sits
+    // Bounding box wraps ONLY the central processes with generous padding and sits
     // safely below the store lane with ample headroom above the central circle(s).
     const centralCoords = dfd.processes.filter((p) => p.isCentral).map((p) => coords.get(p.id)).filter(Boolean);
     let kmFrame = null;
@@ -652,27 +794,46 @@
       const cMinY = Math.min(...centralCoords.map((c) => c.cy - c.r));
       const cMaxY = Math.max(...centralCoords.map((c) => c.cy + c.r));
 
-      const kmTitle = 'Κεντρικός Μετασχηματισμός (ΚΜ)';
-      const kmTitleW = kmTitle.length * 7.2 + 20;
-      const kmTitleH = 20;
-
       let minCX = cMinX - 32;
       let maxCX = cMaxX + 32;
-      if (maxCX - minCX < kmTitleW + 28) {
-        const extra = (kmTitleW + 28) - (maxCX - minCX);
+      if (maxCX - minCX < minKMW) {
+        const extra = minKMW - (maxCX - minCX);
         minCX -= extra / 2;
         maxCX += extra / 2;
       }
 
-      // Ample headroom above central processes (at least 50px so M1 is never overlapped)
+      // Safety Clamp: ensure minCX / maxCX never violate clearance to any non-central node
+      for (const [id, c] of coords.entries()) {
+        const node = nodeById.get(id);
+        if (!node || node.isCentral || c.shape === 'store') continue;
+        const halfW = c.shape === 'circle' ? c.r : c.w / 2;
+        if (c.cx < cMinX) {
+          const safeLeft = c.cx + halfW + 16;
+          if (minCX < safeLeft) minCX = safeLeft;
+        } else if (c.cx > cMaxX) {
+          const safeRight = c.cx - halfW - 16;
+          if (maxCX > safeRight) maxCX = safeRight;
+        }
+      }
+
+      // Ensure central processes remain fully enclosed
+      minCX = Math.min(minCX, cMinX - 16);
+      maxCX = Math.max(maxCX, cMaxX + 16);
+
+      // Ample headroom above central processes
       const storeLaneBottom = hasTopStores ? 52 + 19 + 20 : -Infinity;
       let minCY = cMinY - 50;
       if (minCY < storeLaneBottom) minCY = storeLaneBottom;
       const maxCY = cMaxY + 28;
 
-      // Centered on the top border with a solid background badge
+      // Position title badge on top border:
+      // If box is wide enough (multi-column KM), align near top-left with padding so it never
+      // collides with center flows from top stores; if single-column, center it.
       const badgeY = minCY - kmTitleH / 2;
-      const badgeX = (minCX + maxCX) / 2 - kmTitleW / 2;
+      let badgeX = (minCX + maxCX) / 2 - kmTitleW / 2;
+      if (maxCX - minCX >= kmTitleW + 64) {
+        badgeX = minCX + 28;
+      }
 
       kmFrame = {
         minCX,
@@ -744,13 +905,13 @@
           // Flow between store lane and process: gentle arc away from KM header
           nx = 1;
           ny = 0;
-          curveOff = 38;
+          curveOff = 48;
         } else if (maxCy - minCy > rowSpacing * 0.7) {
           nx = 1;
           ny = 0;
           curveOff = 30;
         }
-      } else if (Math.abs(dx) > colSpacing * 1.3) {
+      } else if (Math.abs(dx) > 260) {
         // Multi-column span: find an offset that cleanly clears all intermediate nodes
         const minX = Math.min(cFrom.cx, cTo.cx);
         const maxX = Math.max(cFrom.cx, cTo.cx);

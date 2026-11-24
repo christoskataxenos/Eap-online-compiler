@@ -322,6 +322,73 @@ function testSVGRenderingAndHelpers() {
   console.log('testSVGRenderingAndHelpers passed');
 }
 
+function testUniversalKMFrameIsolationAndNoOverlaps() {
+  for (const [key, code] of Object.entries(PLI11_EXAMPLES)) {
+    const res = Core.compilePLI11(code);
+    const dfd = res.dfd;
+    for (const mode of [{ theme: 'light' }, { theme: 'dark' }, { printMode: true }]) {
+      const svg = Renderer.renderDFDSVG(dfd, mode);
+      assert.ok(svg.startsWith('<svg ') && svg.endsWith('</svg>'), `Invalid SVG for ${key}`);
+
+      const kmMatch = svg.match(/<rect\s+x="([^"]+)"\s+y="([^"]+)"\s+width="([^"]+)"\s+height="([^"]+)"[^>]+stroke-dasharray="6 4"/);
+      const hasCentral = dfd.processes.some((p) => p.isCentral);
+      if (hasCentral && kmMatch) {
+        const km = {
+          left: parseFloat(kmMatch[1]),
+          top: parseFloat(kmMatch[2]),
+          width: parseFloat(kmMatch[3]),
+          height: parseFloat(kmMatch[4]),
+          right: parseFloat(kmMatch[1]) + parseFloat(kmMatch[3]),
+          bottom: parseFloat(kmMatch[2]) + parseFloat(kmMatch[4])
+        };
+
+        // Check central processes are inside KM
+        const centralProcs = dfd.processes.filter((p) => p.isCentral);
+        for (const cp of centralProcs) {
+          const nodeRegex = new RegExp(`<g class="dfd-node">\\s*<circle\\s+cx="([^"]+)"\\s+cy="([^"]+)"\\s+r="([^"]+)"[^>]*/>\\s*<text[^>]*>${cp.label}<\\/text>`);
+          const nodeMatch = nodeRegex.exec(svg);
+          assert.ok(nodeMatch, `Process circle ${cp.label} not found in ${key}`);
+          const cx = parseFloat(nodeMatch[1]);
+          const cy = parseFloat(nodeMatch[2]);
+          const r = parseFloat(nodeMatch[3]);
+          assert.ok(cx - r >= km.left - 1 && cx + r <= km.right + 1, `Central process ${cp.label} not inside KM X bounds in ${key}`);
+          assert.ok(cy - r >= km.top - 1 && cy + r <= km.bottom + 1, `Central process ${cp.label} not inside KM Y bounds in ${key}`);
+        }
+
+        // Check non-central processes are strictly OUTSIDE KM
+        const nonCentralProcs = dfd.processes.filter((p) => !p.isCentral);
+        for (const ncp of nonCentralProcs) {
+          const nodeRegex = new RegExp(`<g class="dfd-node">\\s*<circle\\s+cx="([^"]+)"\\s+cy="([^"]+)"\\s+r="([^"]+)"[^>]*/>\\s*<text[^>]*>${ncp.label}<\\/text>`);
+          const nodeMatch = nodeRegex.exec(svg);
+          assert.ok(nodeMatch, `Non-central process circle ${ncp.label} not found in ${key}`);
+          const cx = parseFloat(nodeMatch[1]);
+          const cy = parseFloat(nodeMatch[2]);
+          const r = parseFloat(nodeMatch[3]);
+          const left = cx - r;
+          const right = cx + r;
+          const top = cy - r;
+          const bottom = cy + r;
+          const overlapsKM = right > km.left && left < km.right && bottom > km.top && top < km.bottom;
+          assert.ok(!overlapsKM, `Non-central process ${ncp.label} OVERLAPS KM frame in ${key}!`);
+        }
+
+        // Check entities are strictly OUTSIDE KM
+        const entityRegex = /<g class="dfd-entity">\s*<rect\s+x="([^"]+)"\s+y="([^"]+)"\s+width="([^"]+)"\s+height="([^"]+)"[^>]*\/>\s*<text[^>]*>([^<]+)<\/text>/g;
+        let em;
+        while ((em = entityRegex.exec(svg)) !== null) {
+          const ex = parseFloat(em[1]);
+          const ey = parseFloat(em[2]);
+          const ew = parseFloat(em[3]);
+          const eh = parseFloat(em[4]);
+          const overlapsKM = ex + ew > km.left && ex < km.right && ey + eh > km.top && ey < km.bottom;
+          assert.ok(!overlapsKM, `Entity ${em[5]} OVERLAPS KM frame in ${key}!`);
+        }
+      }
+    }
+  }
+  console.log('testUniversalKMFrameIsolationAndNoOverlaps passed');
+}
+
 testOfficialExamplesZeroErrors();
 testHomoglyphNormalization();
 testValidatorRules();
@@ -329,4 +396,5 @@ testDDPCountsAndEdgeDirections();
 testDFDSynthesisAndMermaid();
 testReverseDFDBuilderRoundTrip();
 testSVGRenderingAndHelpers();
+testUniversalKMFrameIsolationAndNoOverlaps();
 console.log('All ΠΛΗ11 tests passed!');
