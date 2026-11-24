@@ -1149,4 +1149,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   syntaxHelpButton.addEventListener('click', () => syntaxModal.open());
+
+  if (typeof Common.loadCodeFromHashAsync === 'function') {
+    Common.loadCodeFromHashAsync((shared) => {
+      editor.setValue(shared);
+      updateProgramName();
+    });
+  }
 });

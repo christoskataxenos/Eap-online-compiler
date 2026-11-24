@@ -184,8 +184,55 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Share permalink (LZ-String) + reading code back from the URL hash
+  // Share permalink (Deflate-Raw #z= + LZ-String #code= fallback)
+  // Deflate-Raw shrinks large Greek pseudocode by ~56-65% vs LZ-String so URLs
+  // stay well within the 5,000-char limit of is.gd / v.gd shorteners.
   // ---------------------------------------------------------------------------
+  function bytesToBase64Url(bytes) {
+    let bin = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  function base64UrlToBytes(b64url) {
+    let b64 = String(b64url || '').replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4 !== 0) b64 += '=';
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  async function deflateStringToBase64Url(text) {
+    if (typeof CompressionStream !== 'function' || typeof Response !== 'function') return null;
+    const rawBytes = new TextEncoder().encode(text);
+    const cs = new CompressionStream('deflate-raw');
+    const writer = cs.writable.getWriter();
+    writer.write(rawBytes);
+    writer.close();
+    const compressedBuf = await new Response(cs.readable).arrayBuffer();
+    return bytesToBase64Url(new Uint8Array(compressedBuf));
+  }
+
+  async function inflateBase64UrlToString(b64url) {
+    if (typeof DecompressionStream !== 'function' || typeof Response !== 'function') return null;
+    const compBytes = base64UrlToBytes(b64url);
+    const ds = new DecompressionStream('deflate-raw');
+    const writer = ds.writable.getWriter();
+    writer.write(compBytes);
+    writer.close();
+    const plainBuf = await new Response(ds.readable).arrayBuffer();
+    return new TextDecoder('utf-8').decode(plainBuf);
+  }
+
+  function hasSharedHash() {
+    const hash = typeof window !== 'undefined' && window.location ? window.location.hash : '';
+    return Boolean(hash && (hash.startsWith('#code=') || hash.startsWith('#z=')));
+  }
+
   function loadCodeFromHash() {
     try {
       const lz = typeof LZString !== 'undefined' ? LZString : (typeof window !== 'undefined' ? window.LZString : null);
@@ -198,6 +245,23 @@
       console.warn('Permalink decode error:', e);
     }
     return null;
+  }
+
+  function loadCodeFromHashAsync(onLoaded) {
+    try {
+      const hash = typeof window !== 'undefined' && window.location ? window.location.hash : '';
+      if (hash && hash.startsWith('#z=')) {
+        inflateBase64UrlToString(hash.substring(3))
+          .then((dec) => {
+            if (dec && dec.trim() && typeof onLoaded === 'function') {
+              onLoaded(dec);
+            }
+          })
+          .catch((e) => console.warn('Deflate permalink decode error:', e));
+      }
+    } catch (e) {
+      console.warn('Async permalink decode error:', e);
+    }
   }
 
   function buildShareURL(code) {
@@ -213,6 +277,29 @@
     return url.toString();
   }
 
+  async function buildShareURLAsync(code) {
+    if (typeof window === 'undefined' || !window.location) return null;
+    const fallbackUrl = buildShareURL(code);
+    try {
+      const deflated = await deflateStringToBase64Url(code);
+      if (deflated) {
+        const zUrl = new URL(window.location.href);
+        zUrl.search = '';
+        zUrl.hash = `z=${deflated}`;
+        const zStr = zUrl.toString();
+        if (!fallbackUrl || zStr.length < fallbackUrl.length) {
+          try {
+            window.history.replaceState(null, '', zStr);
+          } catch (e) { /* file:// fallback */ }
+          return zStr;
+        }
+      }
+    } catch (e) {
+      // Fallback to LZString URL
+    }
+    return fallbackUrl;
+  }
+
   async function requestShortUrl(longUrl) {
     if (typeof window === 'undefined' || !window.location) {
       return { ok: false, reason: 'unsupported' };
@@ -223,40 +310,36 @@
       return { ok: false, reason: 'local' };
     }
 
-    // Try is.gd first
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 6000);
-      const res = await fetch('https://is.gd/create.php?format=json&url=' + encodeURIComponent(longUrl), {
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.shorturl) {
-          return { ok: true, shortUrl: data.shorturl };
-        }
-      }
-    } catch (e1) {
-      // is.gd failed or timed out
+    // is.gd / v.gd enforce a strict 5,000-character ceiling on target URLs
+    if (longUrl && longUrl.length > 5000) {
+      return { ok: false, reason: 'too_long' };
     }
 
-    // Fallback to v.gd
-    try {
-      const controller2 = new AbortController();
-      const timer2 = setTimeout(() => controller2.abort(), 6000);
-      const res2 = await fetch('https://v.gd/create.php?format=json&url=' + encodeURIComponent(longUrl), {
-        signal: controller2.signal
-      });
-      clearTimeout(timer2);
-      if (res2.ok) {
-        const data2 = await res2.json();
-        if (data2 && data2.shorturl) {
-          return { ok: true, shortUrl: data2.shorturl };
+    const postBody = new URLSearchParams({ format: 'json', url: longUrl }).toString();
+
+    for (const endpoint of ['https://is.gd/create.php', 'https://v.gd/create.php']) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 7000);
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: postBody,
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.shorturl) {
+            return { ok: true, shortUrl: data.shorturl };
+          }
+          if (data && data.errorcode === 1) {
+            return { ok: false, reason: 'too_long' };
+          }
         }
+      } catch (err) {
+        // Try next endpoint
       }
-    } catch (e2) {
-      // v.gd failed
     }
 
     return { ok: false, reason: 'network' };
@@ -361,6 +444,8 @@
         shortBtn.setAttribute('disabled', 'disabled');
         if (result.reason === 'local') {
           shortStatus.textContent = 'ℹ️ Η συντόμευση λειτουργεί online (μη διαθέσιμη σε localhost / τοπικό αρχείο).';
+        } else if (result.reason === 'too_long') {
+          shortStatus.textContent = 'ℹ️ Ο κώδικας υπερβαίνει το όριο των 5.000 χαρακτήρων των εξωτερικών υπηρεσιών συντόμευσης. Αντιγράψτε τον Μόνιμο Σύνδεσμο παρακάτω (λειτουργεί κανονικά)!';
         } else {
           shortStatus.textContent = '⚠️ Αποτυχία σύνδεσης με την υπηρεσία συντόμευσης. Χρησιμοποιήστε τον μόνιμο σύνδεσμο.';
         }
@@ -377,12 +462,13 @@
       showToast('Δεν υπάρχει κώδικας για κοινοποίηση.');
       return Promise.resolve(null);
     }
-    const fullUrl = buildShareURL(code);
-    if (!fullUrl) {
-      showToast('Η βιβλιοθήκη LZ-String δεν είναι διαθέσιμη.');
-      return Promise.resolve(null);
-    }
-    return showShareModal(code, fullUrl);
+    return buildShareURLAsync(code).then((fullUrl) => {
+      if (!fullUrl) {
+        showToast('Η βιβλιοθήκη συμπίεσης δεν είναι διαθέσιμη.');
+        return null;
+      }
+      return showShareModal(code, fullUrl);
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -630,8 +716,8 @@
       if (v && v.trim()) SettingsManager.set(key, v);
     }
 
-    // Restore on creation
-    const saved = SettingsManager.get(key, null);
+    // Restore on creation ONLY when no shared permalink (#code= / #z=) is in URL
+    const saved = hasSharedHash() ? null : SettingsManager.get(key, null);
     const restored = Boolean(saved && saved.trim());
     if (restored && typeof setValue === 'function') {
       setValue(saved);
@@ -664,8 +750,11 @@
     applyTheme,
     wireThemeToggle,
     updateThemeLinks,
+    hasSharedHash,
     loadCodeFromHash,
+    loadCodeFromHashAsync,
     buildShareURL,
+    buildShareURLAsync,
     shareCode,
     showShareModal,
     saveTextAsFile,

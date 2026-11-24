@@ -1956,6 +1956,12 @@ END_PROCEDURE;</code></pre>
     syntaxModal.open();
   });
 
-  // Initial Compile on Boot
+  // Initial Compile on Boot (+ async #z= deflate permalink support)
   runCompile({ fit: true });
+  if (typeof Common.loadCodeFromHashAsync === 'function') {
+    Common.loadCodeFromHashAsync((shared) => {
+      editor.setValue(shared);
+      runCompile({ fit: true });
+    });
+  }
 });
