@@ -783,6 +783,16 @@
       }
     }
 
+    // Apply user custom drag positions if provided (interactive repositioning)
+    const customPositions = options.positions || {};
+    for (const [id, c] of coords.entries()) {
+      const ov = customPositions[id];
+      if (ov && typeof ov.x === 'number' && typeof ov.y === 'number') {
+        c.cx = Math.round(ov.x);
+        c.cy = Math.round(ov.y);
+      }
+    }
+
     // Central Transformation (ΚΜ) container box and header.
     // Bounding box wraps ONLY the central processes with generous padding and sits
     // safely below the store lane with ample headroom above the central circle(s).
@@ -1061,7 +1071,9 @@
       flowLabelParts.push(renderPillLabel(bestPt.x, bestPt.y, text, pal, 'middle', 11));
     }
 
-    // Calculate Comprehensive Bounding Box across ALL elements
+    // Calculate Comprehensive Bounding Box across ALL elements (with support for custom drag positions)
+    let minX = 0;
+    let minY = 0;
     let maxX = 680;
     let maxY = 260;
 
@@ -1069,24 +1081,32 @@
     for (const c of coords.values()) {
       const halfW = c.shape === 'circle' ? c.r : c.w / 2;
       const halfH = c.shape === 'circle' ? c.r : c.h / 2;
+      minX = Math.min(minX, c.cx - halfW);
+      minY = Math.min(minY, c.cy - halfH);
       maxX = Math.max(maxX, c.cx + halfW);
       maxY = Math.max(maxY, c.cy + halfH);
     }
 
     // 2. KM Frame
     if (kmFrame) {
+      minX = Math.min(minX, kmFrame.minCX, kmFrame.badgeX);
+      minY = Math.min(minY, kmFrame.minCY, kmFrame.badgeY);
       maxX = Math.max(maxX, kmFrame.maxCX, kmFrame.badgeX + kmFrame.titleW);
       maxY = Math.max(maxY, kmFrame.maxCY);
     }
 
     // 3. Flow curves
     for (const fr of flowRenderData) {
+      minX = Math.min(minX, fr.pStart.x, fr.pEnd.x, fr.ctrlX);
+      minY = Math.min(minY, fr.pStart.y, fr.pEnd.y, fr.ctrlY);
       maxX = Math.max(maxX, fr.pStart.x, fr.pEnd.x, fr.ctrlX);
       maxY = Math.max(maxY, fr.pStart.y, fr.pEnd.y, fr.ctrlY);
     }
 
     // 4. Flow labels
     for (const pill of placedPills) {
+      minX = Math.min(minX, pill.left);
+      minY = Math.min(minY, pill.top);
       maxX = Math.max(maxX, pill.right);
       maxY = Math.max(maxY, pill.bottom);
     }
@@ -1096,19 +1116,23 @@
       maxX = Math.max(maxX, 660);
     }
 
-    const totalW = Math.ceil(maxX + 36);
+    const padX = 36;
+    const padY = 28;
+    const viewMinX = Math.min(0, Math.floor(minX - padX));
+    const viewMinY = Math.min(0, Math.floor(minY - padY));
     const legendH = showLegend ? 58 : 10;
-    const totalH = Math.ceil(maxY + legendH + 34);
+    const totalW = Math.max(680, Math.ceil(maxX + padX - viewMinX));
+    const totalH = Math.max(260, Math.ceil(maxY + legendH + padY - viewMinY));
 
     const svgParts = [];
     svgParts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" style="font-family:${escXml(pal.font)}">`,
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewMinX} ${viewMinY} ${totalW} ${totalH}" width="${totalW}" height="${totalH}" style="font-family:${escXml(pal.font)}">`,
       `<defs>`,
       `  <marker id="dfd-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">`,
       `    <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="${pal.edge}" />`,
       `  </marker>`,
       `</defs>`,
-      `<rect width="${totalW}" height="${totalH}" fill="${pal.bg}" />`
+      `<rect x="${viewMinX}" y="${viewMinY}" width="${totalW}" height="${totalH}" fill="${pal.bg}" />`
     );
 
     // Draw Central Transformation (ΚΜ) Frame
@@ -1127,7 +1151,7 @@
       );
     }
 
-    // Draw Nodes
+    // Draw Nodes (interactive draggable elements)
     for (const n of dfd.nodes) {
       const c = coords.get(n.id);
       if (!c) continue;
@@ -1135,7 +1159,7 @@
         const stroke = n.isCentral ? pal.rootStroke : pal.ctrlStroke;
         const fill = n.isCentral ? pal.rootFill : pal.ctrlFill;
         svgParts.push(
-          `<g class="dfd-node">`,
+          `<g class="dfd-node" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
           `  <circle cx="${c.cx.toFixed(1)}" cy="${c.cy.toFixed(1)}" r="${c.r}" fill="${fill}" stroke="${stroke}" stroke-width="${n.isCentral ? 2.4 : 1.8}" />`,
           `  <text x="${c.cx.toFixed(1)}" y="${(c.cy + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${pal.ink}" font-size="13" font-weight="700">${escXml(n.label)}</text>`,
           `</g>`
@@ -1146,7 +1170,7 @@
         const y1 = c.cy - c.h / 2;
         const y2 = c.cy + c.h / 2;
         svgParts.push(
-          `<g class="dfd-store">`,
+          `<g class="dfd-store" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
           `  <rect x="${x1.toFixed(1)}" y="${y1.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" fill="${pal.storeFill}" stroke="none" />`,
           `  <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${pal.storeStroke}" stroke-width="2" />`,
           `  <line x1="${x1.toFixed(1)}" y1="${y2.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${pal.storeStroke}" stroke-width="2" />`,
@@ -1158,7 +1182,7 @@
         const y = c.cy - c.h / 2;
         const dash = n.type === 'unknown_io' ? ' stroke-dasharray="5 3"' : '';
         svgParts.push(
-          `<g class="dfd-entity">`,
+          `<g class="dfd-entity" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
           `  <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" rx="3" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.7"${dash} />`,
           `  <text x="${c.cx.toFixed(1)}" y="${(c.cy + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${pal.ink}" font-size="12" font-weight="700">${escXml(n.label)}</text>`,
           `</g>`
@@ -1169,7 +1193,7 @@
     svgParts.push(...flowLabelParts);
 
     if (showLegend) {
-      const ly = totalH - 30;
+      const ly = Math.max(maxY + 32, viewMinY + totalH - 30);
       svgParts.push(
         `<g class="dfd-legend" font-size="11" fill="${pal.muted}">`,
         `  <circle cx="28" cy="${ly - 2}" r="9" fill="${pal.ctrlFill}" stroke="${pal.ctrlStroke}" stroke-width="1.5" />`,

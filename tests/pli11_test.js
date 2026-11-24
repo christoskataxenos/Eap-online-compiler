@@ -345,7 +345,7 @@ function testUniversalKMFrameIsolationAndNoOverlaps() {
         // Check central processes are inside KM
         const centralProcs = dfd.processes.filter((p) => p.isCentral);
         for (const cp of centralProcs) {
-          const nodeRegex = new RegExp(`<g class="dfd-node">\\s*<circle\\s+cx="([^"]+)"\\s+cy="([^"]+)"\\s+r="([^"]+)"[^>]*/>\\s*<text[^>]*>${cp.label}<\\/text>`);
+          const nodeRegex = new RegExp(`<g class="dfd-node"[^>]*>\\s*<circle\\s+cx="([^"]+)"\\s+cy="([^"]+)"\\s+r="([^"]+)"[^>]*/>\\s*<text[^>]*>${cp.label}<\\/text>`);
           const nodeMatch = nodeRegex.exec(svg);
           assert.ok(nodeMatch, `Process circle ${cp.label} not found in ${key}`);
           const cx = parseFloat(nodeMatch[1]);
@@ -358,7 +358,7 @@ function testUniversalKMFrameIsolationAndNoOverlaps() {
         // Check non-central processes are strictly OUTSIDE KM
         const nonCentralProcs = dfd.processes.filter((p) => !p.isCentral);
         for (const ncp of nonCentralProcs) {
-          const nodeRegex = new RegExp(`<g class="dfd-node">\\s*<circle\\s+cx="([^"]+)"\\s+cy="([^"]+)"\\s+r="([^"]+)"[^>]*/>\\s*<text[^>]*>${ncp.label}<\\/text>`);
+          const nodeRegex = new RegExp(`<g class="dfd-node"[^>]*>\\s*<circle\\s+cx="([^"]+)"\\s+cy="([^"]+)"\\s+r="([^"]+)"[^>]*/>\\s*<text[^>]*>${ncp.label}<\\/text>`);
           const nodeMatch = nodeRegex.exec(svg);
           assert.ok(nodeMatch, `Non-central process circle ${ncp.label} not found in ${key}`);
           const cx = parseFloat(nodeMatch[1]);
@@ -373,7 +373,7 @@ function testUniversalKMFrameIsolationAndNoOverlaps() {
         }
 
         // Check entities are strictly OUTSIDE KM
-        const entityRegex = /<g class="dfd-entity">\s*<rect\s+x="([^"]+)"\s+y="([^"]+)"\s+width="([^"]+)"\s+height="([^"]+)"[^>]*\/>\s*<text[^>]*>([^<]+)<\/text>/g;
+        const entityRegex = /<g class="dfd-entity"[^>]*>\s*<rect\s+x="([^"]+)"\s+y="([^"]+)"\s+width="([^"]+)"\s+height="([^"]+)"[^>]*\/>\s*<text[^>]*>([^<]+)<\/text>/g;
         let em;
         while ((em = entityRegex.exec(svg)) !== null) {
           const ex = parseFloat(em[1]);
@@ -432,6 +432,36 @@ ${PLI11_EXAMPLES.GE1_2023_2024}
   console.log('testDirectivesAndDFDSync passed');
 }
 
+function testDFDCustomPositionsAndDragSupport() {
+  const code = PLI11_EXAMPLES.GE1_2023_2024;
+  const compiled = Core.compilePLI11(code);
+  const dfd = compiled.dfd;
+
+  // Render with default layout
+  const defaultSvg = Renderer.renderDFDSVG(dfd);
+  assert.ok(defaultSvg.includes('data-node-id="P_M3"'));
+  assert.ok(defaultSvg.includes('cursor: grab;'));
+
+  // Now render with custom positions moving M3
+  const customPositions = {
+    P_M3: { x: 550, y: 320 }
+  };
+  const customSvg = Renderer.renderDFDSVG(dfd, { positions: customPositions });
+
+  // Verify that M3 position has been updated exactly
+  assert.ok(customSvg.includes('data-node-id="P_M3" data-x="550.0" data-y="320.0"'));
+
+  // Verify that KM frame wrapped around M3's updated position (x: 550)
+  const kmRegex = /<rect\s+x="([^"]+)"\s+y="([^"]+)"\s+width="([^"]+)"\s+height="([^"]+)"[^>]*stroke-dasharray="6 4"/;
+  const kmMatch = kmRegex.exec(customSvg);
+  assert.ok(kmMatch, 'KM frame rect found with custom positions');
+  const kmLeft = parseFloat(kmMatch[1]);
+  const kmRight = kmLeft + parseFloat(kmMatch[3]);
+  assert.ok(kmLeft <= 550 && kmRight >= 550, 'KM frame wraps around repositioned central process M3');
+
+  console.log('testDFDCustomPositionsAndDragSupport passed');
+}
+
 testOfficialExamplesZeroErrors();
 testHomoglyphNormalization();
 testValidatorRules();
@@ -441,4 +471,5 @@ testReverseDFDBuilderRoundTrip();
 testSVGRenderingAndHelpers();
 testUniversalKMFrameIsolationAndNoOverlaps();
 testDirectivesAndDFDSync();
+testDFDCustomPositionsAndDragSupport();
 console.log('All ΠΛΗ11 tests passed!');

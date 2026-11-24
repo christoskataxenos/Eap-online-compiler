@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const dfdZoomOut = document.getElementById('dfd-zoom-out');
   const dfdZoomIn = document.getElementById('dfd-zoom-in');
   const dfdZoomFit = document.getElementById('dfd-zoom-fit');
+  const dfdAutoLayout = document.getElementById('dfd-auto-layout');
   const dfdZoomLabel = document.getElementById('dfd-zoom-label');
   const dfdPrintBtn = document.getElementById('dfd-print-btn');
   const dfdExportSvg = document.getElementById('dfd-export-svg');
@@ -164,6 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (PLI11_EXAMPLES && PLI11_EXAMPLES[id]) {
         stopAutoTrace();
         resetTraceState();
+        customDFDPositions = {};
         editor.setValue(PLI11_EXAMPLES[id]);
         runCompile();
         if (id === 'OE1_TRAPS_DEMO') {
@@ -210,6 +212,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const ddpPanZoom = Viewport.createPanZoom(ddpViewport, ddpCanvas, ddpZoomLabel);
   const dfdPanZoom = Viewport.createPanZoom(dfdViewport, dfdCanvas, dfdZoomLabel);
 
+  // Free interactive dragging for DFD nodes
+  let customDFDPositions = {};
+  const dfdBoxDrag = {
+    active: false,
+    nodeId: null,
+    startClientX: 0,
+    startClientY: 0,
+    startBoxX: 0,
+    startBoxY: 0,
+    rafPending: false
+  };
+
+  window.addEventListener('mousemove', (e) => {
+    if (!dfdBoxDrag.active) return;
+    const scale = (dfdPanZoom && dfdPanZoom.state && dfdPanZoom.state.scale) || 1;
+    const dx = (e.clientX - dfdBoxDrag.startClientX) / scale;
+    const dy = (e.clientY - dfdBoxDrag.startClientY) / scale;
+    const snappedX = Math.round((dfdBoxDrag.startBoxX + dx) / 8) * 8;
+    const snappedY = Math.round((dfdBoxDrag.startBoxY + dy) / 8) * 8;
+    customDFDPositions[dfdBoxDrag.nodeId] = { x: snappedX, y: snappedY };
+    if (!dfdBoxDrag.rafPending) {
+      dfdBoxDrag.rafPending = true;
+      requestAnimationFrame(() => {
+        dfdBoxDrag.rafPending = false;
+        renderDFDView(false);
+      });
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (dfdBoxDrag.active) dfdBoxDrag.active = false;
+  });
+
   ddpZoomIn.addEventListener('click', () => ddpPanZoom.zoomIn());
   ddpZoomOut.addEventListener('click', () => ddpPanZoom.zoomOut());
   ddpZoomFit.addEventListener('click', () => ddpPanZoom.fit());
@@ -217,6 +252,13 @@ document.addEventListener('DOMContentLoaded', () => {
   dfdZoomIn.addEventListener('click', () => dfdPanZoom.zoomIn());
   dfdZoomOut.addEventListener('click', () => dfdPanZoom.zoomOut());
   dfdZoomFit.addEventListener('click', () => dfdPanZoom.fit());
+  if (dfdAutoLayout) {
+    dfdAutoLayout.addEventListener('click', () => {
+      customDFDPositions = {};
+      renderDFDView(true);
+      showToast('Η αυτόματη διάταξη του ΔΡΔ επαναφέρθηκε.');
+    });
+  }
 
   ddpPrintBtn.addEventListener('click', () => {
     ddpPrintMode = !ddpPrintMode;
@@ -255,7 +297,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentCompiled) return;
     const svg = Renderer.renderDFDSVG(currentCompiled.dfd, {
       printMode: dfdPrintMode,
-      theme: getCurrentTheme()
+      theme: getCurrentTheme(),
+      positions: customDFDPositions
     });
     Renderer.downloadSVG(svg, 'eap-pli11-drd.svg');
     showToast('Το ΔΡΔ εξήχθη ως SVG!');
@@ -265,7 +308,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!currentCompiled) return;
     const svg = Renderer.renderDFDSVG(currentCompiled.dfd, {
       printMode: dfdPrintMode,
-      theme: getCurrentTheme()
+      theme: getCurrentTheme(),
+      positions: customDFDPositions
     });
     Renderer.downloadPNG(svg, 'eap-pli11-drd.png', 2)
       .then(() => showToast('Το ΔΡΔ εξήχθη ως PNG (2x)!'))
@@ -338,13 +382,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function bindInteractiveDFDNodes() {
+    dfdCanvas.querySelectorAll('.dfd-node, .dfd-store, .dfd-entity').forEach((g) => {
+      g.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const nid = g.getAttribute('data-node-id');
+        const bx = parseFloat(g.getAttribute('data-x')) || 0;
+        const by = parseFloat(g.getAttribute('data-y')) || 0;
+        dfdBoxDrag.active = true;
+        dfdBoxDrag.nodeId = nid;
+        dfdBoxDrag.startClientX = e.clientX;
+        dfdBoxDrag.startClientY = e.clientY;
+        dfdBoxDrag.startBoxX = bx;
+        dfdBoxDrag.startBoxY = by;
+      });
+    });
+  }
+
   function renderDFDView(fitAfter = false) {
     if (!currentCompiled) return;
     dfdInfoBar.hidden = !currentCompiled.dfd.hasGenericIO;
     dfdCanvas.innerHTML = Renderer.renderDFDSVG(currentCompiled.dfd, {
       printMode: dfdPrintMode,
-      theme: getCurrentTheme()
+      theme: getCurrentTheme(),
+      positions: customDFDPositions
     });
+    bindInteractiveDFDNodes();
     if (fitAfter) {
       requestAnimationFrame(() => dfdPanZoom.fit());
     }
@@ -818,6 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
   clearButton.addEventListener('click', () => {
     stopAutoTrace();
     resetTraceState();
+    customDFDPositions = {};
     editor.setValue('');
     runCompile({ fit: true });
     editor.focus();
@@ -1162,51 +1228,261 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // SYNTAX HELP MODAL (ΠΛΗ11)
+  // SMART CONTEXT-AWARE HELP MODAL (ΠΛΗ11)
   // ---------------------------------------------------------------------------
   const SYNTAX_HELP_BODY = `
-      <h4>1. Δομή Διαδικασίας (PROCEDURE) &amp; Παράμετροι</h4>
+    <div class="help-context-banner" id="pli11-help-banner">
+      <span>💡 Εστίαση βάσει κέρσορα:</span>
+      <span class="help-context-tag" id="pli11-help-tag">Βασική Δομή &amp; Μονάδες</span>
+    </div>
+
+    <div class="help-tabs" id="pli11-help-tabs">
+      <button type="button" class="help-tab-btn active" data-target="help-tab-structure">📑 1. Δομή &amp; Μονάδες</button>
+      <button type="button" class="help-tab-btn" data-target="help-tab-flows">🔄 2. Ροές &amp; Παράμετροι</button>
+      <button type="button" class="help-tab-btn" data-target="help-tab-km-kd">🎯 3. ΚΜ &amp; ΚΔ (CASE)</button>
+      <button type="button" class="help-tab-btn" data-target="help-tab-directives">⚡ 4. Directives (@KM)</button>
+      <button type="button" class="help-tab-btn" data-target="help-tab-rules">⚠️ 5. Κανόνες ΕΑΠ (E01-E11)</button>
+    </div>
+
+    <!-- TAB 1: Βασική Δομή & Υπομονάδες -->
+    <div class="help-tab-pane active" id="help-tab-structure">
+      <p style="margin-top:0;">Κάθε πρόγραμμα ΠΛΗ11 οργανώνεται σε διαδικασίες (<code>PROCEDURE ... END_PROCEDURE;</code>) με 1-προς-1 αντιστοιχία προς τα ορθογώνια του ΔΔΠ και τους κύκλους του ΔΡΔ.</p>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Κύρια Μονάδα / Ρίζα (Exec_*)</span>
+          <button type="button" class="help-insert-btn" data-snippet="PROCEDURE EXEC_ROOT
+  LOCAL VAR A, B, C;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ A, B, C;
+  CALL GET_A(A);
+  CALL CALC_M1(A, B);
+  CALL PUT_B(B);
+END_PROCEDURE;">+ Εισαγωγή</button>
+        </div>
+        <pre><code>PROCEDURE EXEC_ROOT
+  LOCAL VAR A, B, C;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ A, B, C;
+  CALL GET_A(A);
+  CALL CALC_M1(A, B);
+  CALL PUT_B(B);
+END_PROCEDURE;</code></pre>
+      </div>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Υπομονάδα Υπολογισμού (Calc_*)</span>
+          <button type="button" class="help-insert-btn" data-snippet="PROCEDURE CALC_M1(A: IN, B: IN/OUT)
+  Υπολόγισε το B βάσει του A;
+END_PROCEDURE;">+ Εισαγωγή</button>
+        </div>
+        <pre><code>PROCEDURE CALC_M1(A: IN, B: IN/OUT)
+  Υπολόγισε το B βάσει του A;
+END_PROCEDURE;</code></pre>
+      </div>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Υπομονάδα Εισόδου (Get_*) &amp; Εξόδου (Put_*)</span>
+          <button type="button" class="help-insert-btn" data-snippet="PROCEDURE GET_A(A: IN/OUT)
+  Διάβασε το A από την Πηγή 1;
+END_PROCEDURE;
+
+PROCEDURE PUT_B(B: IN)
+  Εμφάνισε το B στον Αποδέκτη 1;
+END_PROCEDURE;">+ Εισαγωγή</button>
+        </div>
+        <pre><code>PROCEDURE GET_A(A: IN/OUT)
+  Διάβασε το A από την Πηγή 1;
+END_PROCEDURE;
+
+PROCEDURE PUT_B(B: IN)
+  Εμφάνισε το B στον Αποδέκτη 1;
+END_PROCEDURE;</code></pre>
+      </div>
+    </div>
+
+    <!-- TAB 2: Ροές Δεδομένων & Παράμετροι -->
+    <div class="help-tab-pane" id="help-tab-flows">
+      <p style="margin-top:0;"><strong>Κατεύθυνση Παραμέτρων:</strong></p>
       <ul>
-        <li><strong>Ρίζα (Κεντρικός Μετασχηματισμός / ΚΔ):</strong> Χωρίς παραμέτρους επικεφαλίδας.<br><code>PROCEDURE EXEC_M3_M4_M5 ... END_PROCEDURE;</code></li>
-        <li><strong>Παράμετροι Υπομονάδων:</strong> Χρήση <code>: IN</code> για είσοδο και <code>: IN/OUT</code> για έξοδο (ή παλαιότερα <code>: OUT</code>).<br><code>PROCEDURE CALC_M1(A: IN, Γ, Κ: IN/OUT)</code></li>
-        <li><strong>Μονάδες Λήψης / Εξόδου:</strong><br>
-          <code>PROCEDURE GET_Δ(Δ: IN/OUT)</code> &rarr; <code>Διάβασε το Δ από την Αποθήκη 3;</code><br>
-          <code>PROCEDURE PUT_Π(Π: IN)</code> &rarr; <code>ΕΜΦΑΝΙΣΕ το Π στον Αποδέκτη 1;</code>
-        </li>
+        <li><code>: IN</code> &rarr; Δεδομένα εισόδου (βέλος από καλούντα προς καλούμενο στο ΔΔΠ).</li>
+        <li><code>: IN/OUT</code> &rarr; Δεδομένα εξόδου ή τροποποίησης (βέλος από καλούμενο προς καλούντα).</li>
+        <li><strong>Κανόνας ΕΑΠ:</strong> Παράμετροι που δηλώνονται στην επικεφαλίδα <code>(...)</code> <strong>ΔΕΝ</strong> ξαναδηλώνονται στο <code>LOCAL VAR</code> και <strong>ΔΕΝ</strong> αρχικοποιούνται με <code>ΑΡΧΙΚΟΠΟΙΗΣΕ</code>.</li>
       </ul>
 
-      <h4>2. Οι 6 Χρυσοί Κανόνες Ελέγχου (ΟΕ1 &amp; ΓΕ1)</h4>
-      <ol>
-        <li><strong>1-προς-1 αντιστοιχία ΔΔΠ &harr; PROCEDURE:</strong> Κάθε μονάδα του ΔΔΠ αντιστοιχεί σε μία PROCEDURE.</li>
-        <li><strong>Ποτέ επαναδήλωση παραμέτρου:</strong> Ό,τι δηλώνεται στην επικεφαλίδα <code>(...)</code> ΑΠΑΓΟΡΕΥΕΤΑΙ να ξαναδηλωθεί στο <code>LOCAL VAR</code> ή να αρχικοποιηθεί με <code>ΑΡΧΙΚΟΠΟΙΗΣΕ</code>.</li>
-        <li><strong>Αρχικοποίηση όλων των LOCAL VAR:</strong> Σε κάθε μονάδα ελέγχου (<code>Exec_*</code>), όλες οι τοπικές μεταβλητές αρχικοποιούνται με <code>ΑΡΧΙΚΟΠΟΙΗΣΕ</code>, ακόμη κι αν γεμίζουν από κλήσεις <code>CALL</code>.</li>
-        <li><strong>Ιεραρχία Top-Down:</strong> Η ρίζα δεν έχει παραμέτρους και καμία υπομονάδα δεν καλεί τον γονέα της.</li>
-        <li><strong>Σωστή κατεύθυνση &amp; πλήθος παραμέτρων:</strong> Οι <code>Get_*</code> έχουν <code>IN/OUT</code>, οι <code>Put_*</code> έχουν <code>IN</code>, και τα <code>CALL</code> ταιριάζουν σε πλήθος και σειρά.</li>
-        <li><strong>Σειρά εξάρτησης δεδομένων:</strong> Πρώτα <code>Get_*</code> / ανάντη <code>Exec_*</code>, μετά <code>Calc_*</code>, τέλος <code>Put_*</code> / κατάντη <code>Exec_*</code>.</li>
-      </ol>
-
-      <h4>3. Κέντρο Δοσοληψιών (CASE) &amp; Δομές Ελέγχου</h4>
-      <pre><code>PROCEDURE EXEC_M3
-  LOCAL VAR Γ, Θ, flag, Ε1, Ε2, Ε3;
-  ΑΡΧΙΚΟΠΟΙΗΣΕ Γ, Θ, flag, Ε1, Ε2, Ε3;
-  CALL EXEC_M1(Γ);
-  CALL EXEC_M2(Θ);
-  CALL CALC_M3(Γ, Θ, flag);
-  CASE flag OF
-    (Ε1): CALL EXEC_M4(Ε1);
-    (Ε2): CALL EXEC_M6(Ε2);
-    (Ε3): CALL EXEC_M5(Ε3);
-  END_CASE;
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Ροή με Αποθήκη Δεδομένων (Data Store)</span>
+          <button type="button" class="help-insert-btn" data-snippet="PROCEDURE GET_RECORD(R: IN/OUT)
+  Διάβασε το R από την Αποθήκη Αρχείο_Πελατών;
+END_PROCEDURE;">+ Εισαγωγή</button>
+        </div>
+        <pre><code>PROCEDURE GET_RECORD(R: IN/OUT)
+  Διάβασε το R από την Αποθήκη Αρχείο_Πελατών;
 END_PROCEDURE;</code></pre>
-      <p>Επιπλέον υποστηρίζονται <code>IF ... THEN ... [ELSE ...] END_IF</code>, <code>WHILE ... DO ... END_WHILE</code>, <code>REPEAT ... UNTIL ...</code> και <code>FOR ... FROM ... TO ... STEP ... DO ... END_FOR</code>.</p>
+      </div>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Σημαία Ελέγχου (Control Flag) στο ΔΔΠ</span>
+          <button type="button" class="help-insert-btn" data-snippet="PROCEDURE CALC_CHECK(A: IN, status: IN/OUT)
+  LOCAL VAR temp;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ temp;
+  Αν A > 0 τότε status = true αλλιώς status = false;
+END_PROCEDURE;">+ Εισαγωγή</button>
+        </div>
+        <pre><code>PROCEDURE CALC_CHECK(A: IN, status: IN/OUT)
+  /* Μεταβλητή τύπου flag / status σχεδιάζεται με μαύρο κύκλο (●) στο ΔΔΠ */
+  Αν A > 0 τότε status = true αλλιώς status = false;
+END_PROCEDURE;</code></pre>
+      </div>
+    </div>
+
+    <!-- TAB 3: ΚΜ & ΚΔ (CASE) -->
+    <div class="help-tab-pane" id="help-tab-km-kd">
+      <p style="margin-top:0;"><strong>Κεντρικός Μετασχηματισμός (ΚΜ) vs Κέντρο Δοσοληψιών (ΚΔ):</strong></p>
+      <ul>
+        <li><strong>Κεντρικός Μετασχηματισμός (ΚΜ):</strong> Οι υπολογιστικές μονάδες (π.χ. <code>Calc_M3</code>, <code>Calc_M4</code>) που πραγματοποιούν τον ουσιαστικό μετασχηματισμό των εισερχόμενων δεδομένων σε εξερχόμενα. Περιβάλλονται από διακεκομμένο πλαίσιο στο ΔΡΔ.</li>
+        <li><strong>Κέντρο Δοσοληψιών (ΚΔ):</strong> Μονάδα που λαμβάνει δοσοληψία (τύπο ενέργειας / flag) και δρομολογεί την εκτέλεση μέσω <code>CASE ... OF</code>.</li>
+      </ul>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Πρότυπο Κέντρου Δοσοληψιών (CASE flag OF)</span>
+          <button type="button" class="help-insert-btn" data-snippet="PROCEDURE EXEC_TRANSACTION
+  LOCAL VAR εντολή, δεδομένα, flag, αποτέλεσμα;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ εντολή, δεδομένα, flag, αποτέλεσμα;
+  CALL GET_TRANSACTION(εντολή, δεδομένα);
+  CALL CALC_IDENTIFY(εντολή, flag);
+  CASE flag OF
+    (ΤΥΠΟΣ_Α): CALL EXEC_ACTION_A(δεδομένα, αποτέλεσμα);
+    (ΤΥΠΟΣ_Β): CALL EXEC_ACTION_B(δεδομένα, αποτέλεσμα);
+    (ΤΥΠΟΣ_Γ): CALL EXEC_ACTION_C(δεδομένα, αποτέλεσμα);
+  END_CASE;
+  CALL PUT_RESULT(αποτέλεσμα);
+END_PROCEDURE;">+ Εισαγωγή</button>
+        </div>
+        <pre><code>PROCEDURE EXEC_TRANSACTION
+  LOCAL VAR εντολή, δεδομένα, flag, αποτέλεσμα;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ εντολή, δεδομένα, flag, αποτέλεσμα;
+  CALL GET_TRANSACTION(εντολή, δεδομένα);
+  CALL CALC_IDENTIFY(εντολή, flag);
+  CASE flag OF
+    (ΤΥΠΟΣ_Α): CALL EXEC_ACTION_A(δεδομένα, αποτέλεσμα);
+    (ΤΥΠΟΣ_Β): CALL EXEC_ACTION_B(δεδομένα, αποτέλεσμα);
+    (ΤΥΠΟΣ_Γ): CALL EXEC_ACTION_C(δεδομένα, αποτέλεσμα);
+  END_CASE;
+  CALL PUT_RESULT(αποτέλεσμα);
+END_PROCEDURE;</code></pre>
+      </div>
+    </div>
+
+    <!-- TAB 4: In-Code Directives -->
+    <div class="help-tab-pane" id="help-tab-directives">
+      <p style="margin-top:0;">Μπορείτε να ρυθμίσετε τη συμπεριφορά του compiler και του ΔΡΔ renderer μέσω ειδικών σχολίων στην αρχή του ψευδοκώδικα:</p>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Μπλοκ Directives ΕΑΠ</span>
+          <button type="button" class="help-insert-btn" data-snippet="/* @KM: M3, M4 */
+/* @MODE: KM */
+/* @MERGE_SOURCES: false */
+/* @MERGE_SINKS: false */">+ Εισαγωγή</button>
+        </div>
+        <pre><code>/* @KM: M3, M4 */          -> Ορίζει ρητά τις μονάδες του Κεντρικού Μετασχηματισμού
+/* @MODE: KM */            -> Επιλέγει λειτουργία ΚΜ (ή @MODE: TC για Κέντρο Δοσοληψιών)
+/* @MERGE_SOURCES: false */ -> Διατηρεί ξεχωριστές τις πηγές εισόδου στο ΔΡΔ
+/* @MERGE_SINKS: false */   -> Διατηρεί ξεχωριστούς τους αποδέκτες εξόδου στο ΔΡΔ
+/* @HIDE_FLOW: flag */     -> Αποκρύπτει δευτερεύουσα ροή δεδομένων από το ΔΡΔ</code></pre>
+      </div>
+    </div>
+
+    <!-- TAB 5: Κανόνες ΕΑΠ (E01-E11) -->
+    <div class="help-tab-pane" id="help-tab-rules">
+      <p style="margin-top:0;">Οι 11 επίσημοι κανόνες ελέγχου ορθότητας του ΕΑΠ (ΟΕ1 / ΓΕ1):</p>
+      <ol style="padding-left:18px; margin-bottom:0; font-size:0.88rem; line-height:1.55;">
+        <li><strong>E01:</strong> 1-προς-1 αντιστοιχία ΔΔΠ &harr; PROCEDURE (κάθε ορθογώνιο είναι ξεχωριστή διαδικασία).</li>
+        <li><strong>E02:</strong> Απαγόρευση επαναδήλωσης παραμέτρων στο <code>LOCAL VAR</code>.</li>
+        <li><strong>E03:</strong> Υποχρεωτική αρχικοποίηση (<code>ΑΡΧΙΚΟΠΟΙΗΣΕ</code>) όλων των τοπικών μεταβλητών στις <code>Exec_*</code>.</li>
+        <li><strong>E04:</strong> Απαγόρευση αρχικοποίησης παραμέτρων εισόδου/εξόδου.</li>
+        <li><strong>E05:</strong> Ιεραρχία Top-Down (η ρίζα δεν έχει παραμέτρους επικεφαλίδας).</li>
+        <li><strong>E06:</strong> Ακυκλική ιεραρχία (καμία υπομονάδα δεν καλεί τον γονέα της).</li>
+        <li><strong>E07:</strong> Σωστή κατεύθυνση παραμέτρων (<code>Get_*</code> με <code>IN/OUT</code>, <code>Put_*</code> με <code>IN</code>).</li>
+        <li><strong>E08:</strong> Ταύτιση πλήθους &amp; σειράς παραμέτρων στους ορισμούς και στις κλήσεις <code>CALL</code>.</li>
+        <li><strong>E09:</strong> Σειρά ροής δεδομένων: πρώτα είσοδοι <code>Get_*</code>, μετά υπολογισμοί <code>Calc_*</code>, τέλος έξοδοι <code>Put_*</code>.</li>
+        <li><strong>E10:</strong> Καθαρά ονόματα υπομονάδων κατά σύμβαση ΕΑΠ (<code>Exec_*</code>, <code>Calc_*</code>, <code>Get_*</code>, <code>Put_*</code>).</li>
+        <li><strong>E11:</strong> Συνέπεια ΔΡΔ: κάθε διαδικασία χωρίς κλήσεις αντιστοιχεί σε Μετασχηματισμό στο ΔΡΔ.</li>
+      </ol>
+    </div>
   `;
 
   const syntaxModal = Common.createModal({
     id: 'pli11-syntax-modal',
-    title: 'Οδηγός Σύνταξης & Κανόνων ΕΑΠ (ΠΛΗ11)',
+    title: 'Οδηγός Ψευδοκώδικα & Κανόνων ΕΑΠ (ΠΛΗ11)',
     bodyHTML: SYNTAX_HELP_BODY
   });
-  syntaxHelpButton.addEventListener('click', () => syntaxModal.open());
+
+  function detectActiveContext() {
+    const cur = editor.getCursor();
+    const line = editor.getLine(cur.line) || '';
+    const full = editor.getValue();
+
+    if (/(@KM|@MODE|@ALIAS|@MERGE|@HIDE)/i.test(line) || /(@KM|@MODE|@ALIAS)/i.test(full.slice(0, 300))) {
+      return { tab: 'help-tab-directives', label: 'In-Code Directives (@KM)' };
+    }
+    if (/(CASE|END_CASE|\bflag\b|δοσοληψ)/i.test(line)) {
+      return { tab: 'help-tab-km-kd', label: 'ΚΜ & Κέντρο Δοσοληψιών (CASE)' };
+    }
+    if (/(GET_|PUT_|:\s*IN|:\s*IN\/OUT|Διάβασε|Εμφάνισε|Γράψε|Πηγή|Αποθήκη)/i.test(line)) {
+      return { tab: 'help-tab-flows', label: 'Ροές Δεδομένων & Παράμετροι (IN, IN/OUT)' };
+    }
+    if (currentCompiled && currentCompiled.validation && currentCompiled.validation.diagnostics.some((d) => d.severity === 'error' && d.line === cur.line + 1)) {
+      return { tab: 'help-tab-rules', label: 'Κανόνες ΕΑΠ (E01–E11) & Σφάλματα' };
+    }
+    return { tab: 'help-tab-structure', label: 'Βασική Δομή & Μονάδες (PROCEDURE)' };
+  }
+
+  function switchHelpTab(tabTarget) {
+    if (!syntaxModal || !syntaxModal.body) return;
+    syntaxModal.body.querySelectorAll('.help-tab-btn').forEach((b) => {
+      b.classList.toggle('active', b.getAttribute('data-target') === tabTarget);
+    });
+    syntaxModal.body.querySelectorAll('.help-tab-pane').forEach((p) => {
+      p.classList.toggle('active', p.id === tabTarget);
+    });
+  }
+
+  if (syntaxModal && syntaxModal.body) {
+    // Bind Tab switching
+    syntaxModal.body.querySelectorAll('.help-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => switchHelpTab(btn.getAttribute('data-target')));
+    });
+
+    // Bind Snippet insertion into CodeMirror
+    syntaxModal.body.querySelectorAll('.help-insert-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const snippet = btn.getAttribute('data-snippet');
+        if (snippet && editor) {
+          const doc = editor.getDoc();
+          const cur = doc.getCursor();
+          doc.replaceRange('\n' + snippet + '\n', cur);
+          syntaxModal.close();
+          editor.focus();
+          runCompile({ fit: false });
+          showToast('Το πρότυπο εισήχθη στον ψευδοκώδικα!');
+        }
+      });
+    });
+  }
+
+  syntaxHelpButton.addEventListener('click', () => {
+    const ctx = detectActiveContext();
+    const tag = syntaxModal.body ? syntaxModal.body.querySelector('#pli11-help-tag') : null;
+    if (tag) tag.textContent = ctx.label;
+    switchHelpTab(ctx.tab);
+    syntaxModal.open();
+  });
 
   // Initial Compile on Boot
   runCompile({ fit: true });

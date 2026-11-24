@@ -1165,6 +1165,147 @@
   white-space: pre;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Interactive & Draggable DFD Nodes */
+/* -------------------------------------------------------------------------- */
+.dfd-node, .dfd-store, .dfd-entity {
+  cursor: grab;
+  user-select: none;
+}
+.dfd-node:active, .dfd-store:active, .dfd-entity:active {
+  cursor: grabbing;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Smart Context-Aware Help Modal & Tabs (ΠΛΗ11) */
+/* -------------------------------------------------------------------------- */
+#pli11-syntax-modal .modal-content,
+#pli11-classes-syntax-modal .modal-content {
+  max-width: 760px !important;
+  width: 95% !important;
+  max-height: 88vh !important;
+  display: flex;
+  flex-direction: column;
+}
+
+#pli11-syntax-modal .modal-body,
+#pli11-classes-syntax-modal .modal-body {
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.help-context-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.help-context-banner .help-context-tag {
+  background: var(--accent);
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+}
+
+.help-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--panel-header-border);
+  margin-bottom: 14px;
+  padding-bottom: 2px;
+}
+
+.help-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  color: var(--text-color);
+  font-size: 0.84rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.help-tab-btn:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--accent);
+}
+
+.help-tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.help-tab-pane {
+  display: none;
+}
+
+.help-tab-pane.active {
+  display: block;
+}
+
+.help-snippet-container {
+  margin: 12px 0;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.help-snippet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--panel-header-bg) 90%, transparent);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.help-snippet-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.help-insert-btn {
+  padding: 3px 9px;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: 1px solid var(--button-bg);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.help-insert-btn:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+.help-snippet-container pre {
+  margin: 0;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 @media (max-width: 900px) {
   .pli11-page header {
     flex-wrap: wrap;

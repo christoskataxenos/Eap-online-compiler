@@ -1255,48 +1255,221 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---------------------------------------------------------------------------
-  // SYNTAX HELP MODAL
+  // SMART CONTEXT-AWARE HELP MODAL (ΔΙΑΓΡΑΜΜΑΤΑ ΚΛΑΣΕΩΝ ΠΛΗ11)
   // ---------------------------------------------------------------------------
   const SYNTAX_HELP_BODY = `
-      <h4>1. Δήλωση Κλάσης (Επίσημη σύνταξη ΕΑΠ - ΟΣΣ2 Διαφ. 8)</h4>
-      <pre><code>ΚΛΑΣΗ Φορτηγό ΕΠΕΚΤΕΙΝΕΙ Όχημα
+    <div class="help-context-banner" id="pli11-classes-help-banner">
+      <span>💡 Εστίαση βάσει κέρσορα:</span>
+      <span class="help-context-tag" id="pli11-classes-help-tag">Δήλωση Κλάσης &amp; Πεδία</span>
+    </div>
+
+    <div class="help-tabs" id="pli11-classes-help-tabs">
+      <button type="button" class="help-tab-btn active" data-target="help-tab-class-decl">🏛️ 1. Δήλωση Κλάσης</button>
+      <button type="button" class="help-tab-btn" data-target="help-tab-class-rel">🔗 2. Σχέσεις &amp; Σύνθεση</button>
+      <button type="button" class="help-tab-btn" data-target="help-tab-class-mult">🔢 3. Πληθικότητες &amp; Συσχέτιση</button>
+      <button type="button" class="help-tab-btn" data-target="help-tab-class-rules">⚠️ 4. Κανόνες ΕΑΠ (C01-C06)</button>
+    </div>
+
+    <!-- TAB 1: Δήλωση Κλάσης -->
+    <div class="help-tab-pane active" id="help-tab-class-decl">
+      <p style="margin-top:0;"><strong>Δήλωση Κλάσης κατά ΕΑΠ (ΟΣΣ2 &amp; ΓΕ1):</strong></p>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Πλήρης Κλάση με Ορατότητες &amp; Τύπους (ΟΣΣ2)</span>
+          <button type="button" class="help-insert-btn" data-snippet="ΚΛΑΣΗ Όχημα
   ΚΑΤΗΓΟΡΗΜΑΤΑ
-    PRIVATE ΑριθμόςΑξόνων: INTEGER;
+    PRIVATE ΑριθμόςΚυκλοφορίας: STRING;
+    PROTECTED Ιδιοκτήτης: STRING;
   ΜΕΘΟΔΟΙ
-    PUBLIC ΔΗΜΙΟΥΡΓΟΣ(ΑριθμόςΚυκλοφορίας, ΑριθμόςΑξόνων);
+    PUBLIC ΔΗΜΙΟΥΡΓΟΣ(ΑριθμόςΚυκλοφορίας);
+    PUBLIC ΕκτύπωσεΣτοιχεία();
+ΤΕΛΟΣ">+ Εισαγωγή</button>
+        </div>
+        <pre><code>ΚΛΑΣΗ Όχημα
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    PRIVATE ΑριθμόςΚυκλοφορίας: STRING;
+    PROTECTED Ιδιοκτήτης: STRING;
+  ΜΕΘΟΔΟΙ
+    PUBLIC ΔΗΜΙΟΥΡΓΟΣ(ΑριθμόςΚυκλοφορίας);
+    PUBLIC ΕκτύπωσεΣτοιχεία();
 ΤΕΛΟΣ</code></pre>
-      <ul>
-        <li>Στις ΓΕ1 (π.χ. 2025–26) μπορείτε να παραλείπετε ορατότητες και τύπους: π.χ. <code>κωδικός;</code> και να ενεργοποιείτε <strong>Χωρίς Ορατότητες / Μεθόδους</strong>.</li>
-        <li>Υποστηρίζονται πολλαπλά κατηγορήματα στην ίδια γραμμή (π.χ. <code>PRIVATE Χ, Υ: INTEGER;</code>) και πολυσύλλαβα ελληνικά ονόματα κλάσεων με κενά.</li>
-      </ul>
+      </div>
 
-      <h4>2. Σχέσεις Κλάσεων (ενότητα <code>ΣΧΕΣΕΙΣ</code>)</h4>
-      <ul>
-        <li><strong>Απλή Συσχέτιση:</strong> <code>Πελάτης (1) -- (0..*) Αποστολή : πραγματοποιεί</code></li>
-        <li><strong>Συναρμογή (Aggregation, λευκός ρόμβος &#9671;--):</strong> <code>Αποστολή (1) &lt;&gt;-- (1..*) Πακέτο</code> (ή <code>o--</code>)</li>
-        <li><strong>Σύνθεση (Composition, μαύρος ρόμβος &#9670;--):</strong> <code>Αίτηση (1) *-- (1..*) Μήνυμα</code></li>
-        <li><strong>Κληρονομικότητα (&#9651;--):</strong> με <code>ΕΠΕΚΤΕΙΝΕΙ</code> στην κλάση ή <code>Ιδιώτης --|&gt; Πελάτης</code> / <code>Πελάτης &lt;|-- Ιδιώτης</code></li>
-        <li><strong>Κλάση Συσχέτισης:</strong> προσθέστε <code>:: ΌνομαΚλάσης</code> στο τέλος, π.χ. <code>Σπουδαστής (1..*) -- (0..*) Εξέταση : συμμετέχει :: Βαθμολογία</code></li>
-        <li><strong>Εξάρτηση:</strong> <code>ΚλάσηΑ ..&gt; ΚλάσηΒ : χρησιμοποιεί</code></li>
-      </ul>
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Υποκλάση με Κληρονομικότητα (ΕΠΕΚΤΕΙΝΕΙ)</span>
+          <button type="button" class="help-insert-btn" data-snippet="ΚΛΑΣΗ Φορτηγό ΕΠΕΚΤΕΙΝΕΙ Όχημα
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    PRIVATE ΩφέλιμοΦορτίο: REAL;
+  ΜΕΘΟΔΟΙ
+    PUBLIC ΔΗΜΙΟΥΡΓΟΣ(ΑριθμόςΚυκλοφορίας, ΩφέλιμοΦορτίο);
+ΤΕΛΟΣ">+ Εισαγωγή</button>
+        </div>
+        <pre><code>ΚΛΑΣΗ Φορτηγό ΕΠΕΚΤΕΙΝΕΙ Όχημα
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    PRIVATE ΩφέλιμοΦορτίο: REAL;
+  ΜΕΘΟΔΟΙ
+    PUBLIC ΔΗΜΙΟΥΡΓΟΣ(ΑριθμόςΚυκλοφορίας, ΩφέλιμοΦορτίο);
+ΤΕΛΟΣ</code></pre>
+      </div>
 
-      <h4>3. Οι 6 Έλεγχοι Μεθοδολογίας ΕΑΠ (Validator)</h4>
-      <ol>
-        <li>Καθαροί ορισμοί <code>ΚΛΑΣΗ ... ΤΕΛΟΣ</code> χωρίς διπλές δηλώσεις ή αδήλωτες κλάσεις.</li>
-        <li>Ακυκλική ιεραρχία κληρονομικότητας χωρίς επανάληψη κληρονομημένων πεδίων στην υποκλάση.</li>
-        <li>Έγκυρες πληθικότητες σε όλα τα άκρα συσχετίσεων (<code>1</code>, <code>0..1</code>, <code>1..*</code>, <code>0..*</code>, <code>*</code>, <code>7..15</code>).</li>
-        <li>Περιγραφικά ονόματα (ρήματα) στις απλές συσχετίσεις.</li>
-        <li>Συνεκτικότητα διαγράμματος χωρίς απομονωμένες κλάσεις.</li>
-        <li>Ενθυλάκωση κατά ΟΣΣ2 (προειδοποίηση για <code>PUBLIC</code> κατηγορήματα).</li>
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Απλοποιημένη Μορφή (ΓΕ1 2025-26)</span>
+          <button type="button" class="help-insert-btn" data-snippet="ΚΛΑΣΗ Πελάτης
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    κωδικός;
+    όνομα;
+    τηλέφωνο;
+ΤΕΛΟΣ">+ Εισαγωγή</button>
+        </div>
+        <pre><code>ΚΛΑΣΗ Πελάτης
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    κωδικός;
+    όνομα;
+    τηλέφωνο;
+ΤΕΛΟΣ</code></pre>
+      </div>
+    </div>
+
+    <!-- TAB 2: Σχέσεις Κλάσεων -->
+    <div class="help-tab-pane" id="help-tab-class-rel">
+      <p style="margin-top:0;">Όλες οι σχέσεις δηλώνονται κάτω από την επικεφαλίδα <code>ΣΧΕΣΕΙΣ</code>:</p>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Μπλοκ Σχέσεων (Συσχέτιση, Συναρμογή, Σύνθεση, Εξάρτηση)</span>
+          <button type="button" class="help-insert-btn" data-snippet="ΣΧΕΣΕΙΣ
+  /* Απλή Συσχέτιση */
+  Πελάτης (1) -- (0..*) Παραγγελία : πραγματοποιεί
+
+  /* Συναρμογή / Aggregation (λευκός ρόμβος) */
+  Παραγγελία (1) <>-- (1..*) ΓραμμήΠαραγγελίας : περιλαμβάνει
+
+  /* Σύνθεση / Composition (μαύρος ρόμβος) */
+  Κτίριο (1) *-- (1..*) Δωμάτιο : αποτελείται_από
+
+  /* Εξάρτηση / Dependency (διακεκομμένο βέλος) */
+  Τιμολόγιο ..> Εκτυπωτής : χρησιμοποιεί">+ Εισαγωγή</button>
+        </div>
+        <pre><code>ΣΧΕΣΕΙΣ
+  /* Απλή Συσχέτιση */
+  Πελάτης (1) -- (0..*) Παραγγελία : πραγματοποιεί
+
+  /* Συναρμογή / Aggregation (λευκός ρόμβος) */
+  Παραγγελία (1) <>-- (1..*) ΓραμμήΠαραγγελίας : περιλαμβάνει
+
+  /* Σύνθεση / Composition (μαύρος ρόμβος) */
+  Κτίριο (1) *-- (1..*) Δωμάτιο : αποτελείται_από
+
+  /* Εξάρτηση / Dependency (διακεκομμένο βέλος) */
+  Τιμολόγιο ..> Εκτυπωτής : χρησιμοποιεί</code></pre>
+      </div>
+    </div>
+
+    <!-- TAB 3: Πληθικότητες & Κλάσεις Συσχέτισης -->
+    <div class="help-tab-pane" id="help-tab-class-mult">
+      <p style="margin-top:0;"><strong>Επίσημες Πληθικότητες ΕΑΠ:</strong> <code>(1)</code>, <code>(0..1)</code>, <code>(1..*)</code>, <code>(0..*)</code>, <code>(*)</code> ή αριθμητικά εύρη όπως <code>(1..5)</code>.</p>
+
+      <div class="help-snippet-container">
+        <div class="help-snippet-header">
+          <span class="help-snippet-title">Συσχέτιση Πολλά-προς-Πολλά με Κλάση Συσχέτισης (::)</span>
+          <button type="button" class="help-insert-btn" data-snippet="ΚΛΑΣΗ Φοιτητής
+ΤΕΛΟΣ
+
+ΚΛΑΣΗ Μάθημα
+ΤΕΛΟΣ
+
+ΚΛΑΣΗ Βαθμολογία
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    βαθμός;
+    ημερομηνία;
+ΤΕΛΟΣ
+
+ΣΧΕΣΕΙΣ
+  Φοιτητής (1..*) -- (0..*) Μάθημα : εγγράφεται :: Βαθμολογία">+ Εισαγωγή</button>
+        </div>
+        <pre><code>/* Η Κλάση Συσχέτισης συνδέεται με διακεκομμένη γραμμή στη σχέση */
+Φοιτητής (1..*) -- (0..*) Μάθημα : εγγράφεται :: Βαθμολογία</code></pre>
+      </div>
+    </div>
+
+    <!-- TAB 4: Κανόνες ΕΑΠ (C01-C06) -->
+    <div class="help-tab-pane" id="help-tab-class-rules">
+      <p style="margin-top:0;">Οι 6 επίσημοι έλεγχοι ποιότητας και μεθοδολογίας ΕΑΠ:</p>
+      <ol style="padding-left:18px; margin-bottom:0; font-size:0.88rem; line-height:1.55;">
+        <li><strong>C01:</strong> Αδήλωτες κλάσεις στις σχέσεις (κάθε κλάση πρέπει να ορίζεται με <code>ΚΛΑΣΗ ... ΤΕΛΟΣ</code>).</li>
+        <li><strong>C02:</strong> Διπλοτυπίες ονομάτων κλάσεων.</li>
+        <li><strong>C03:</strong> Ακυκλική κληρονομικότητα (απαγορεύεται κλάση να κληρονομεί από τον εαυτό της ή κυκλικά).</li>
+        <li><strong>C04:</strong> Απαγόρευση επανάληψης κληρονομημένων κατηγορημάτων στην υποκλάση.</li>
+        <li><strong>C05:</strong> Έγκυρες πληθικότητες σε όλα τα άκρα συσχετίσεων.</li>
+        <li><strong>C06:</strong> Περιγραφικά ονόματα (ρήματα) στις απλές συσχετίσεις (π.χ. <code>: πραγματοποιεί</code>).</li>
       </ol>
+    </div>
   `;
 
   const syntaxModal = Common.createModal({
     id: 'pli11-classes-syntax-modal',
-    title: 'Οδηγός Σύνταξης Διαγραμμάτων Κλάσεων (ΠΛΗ11)',
+    title: 'Οδηγός Ψευδοκώδικα Διαγραμμάτων Κλάσεων (ΠΛΗ11)',
     bodyHTML: SYNTAX_HELP_BODY
   });
-  syntaxHelpButton.addEventListener('click', () => syntaxModal.open());
+
+  function detectClassContext() {
+    const cur = editor.getCursor();
+    const line = editor.getLine(cur.line) || '';
+
+    if (/(--|<>--|\*--|<#>--|\.\.>|ΣΧΕΣΕΙΣ)/i.test(line)) {
+      return { tab: 'help-tab-class-rel', label: 'Σχέσεις: Συσχέτιση, Συναρμογή, Σύνθεση' };
+    }
+    if (/(::|\(\s*1\s*\)|\(\s*0\.\.1\s*\)|\(\s*1\.\.\*\s*\)|\(\s*0\.\.\*\s*\))/i.test(line)) {
+      return { tab: 'help-tab-class-mult', label: 'Πληθικότητες & Κλάσεις Συσχέτισης' };
+    }
+    if (currentCompiled && currentCompiled.validation && currentCompiled.validation.diagnostics.some((d) => d.severity === 'error')) {
+      return { tab: 'help-tab-class-rules', label: 'Κανόνες ΕΑΠ (C01–C06) & Έλεγχος' };
+    }
+    return { tab: 'help-tab-class-decl', label: 'Δήλωση Κλάσης & Πεδία' };
+  }
+
+  function switchClassHelpTab(tabTarget) {
+    if (!syntaxModal || !syntaxModal.body) return;
+    syntaxModal.body.querySelectorAll('.help-tab-btn').forEach((b) => {
+      b.classList.toggle('active', b.getAttribute('data-target') === tabTarget);
+    });
+    syntaxModal.body.querySelectorAll('.help-tab-pane').forEach((p) => {
+      p.classList.toggle('active', p.id === tabTarget);
+    });
+  }
+
+  if (syntaxModal && syntaxModal.body) {
+    syntaxModal.body.querySelectorAll('.help-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => switchClassHelpTab(btn.getAttribute('data-target')));
+    });
+
+    syntaxModal.body.querySelectorAll('.help-insert-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const snippet = btn.getAttribute('data-snippet');
+        if (snippet && editor) {
+          const doc = editor.getDoc();
+          const cur = doc.getCursor();
+          doc.replaceRange('\n' + snippet + '\n', cur);
+          syntaxModal.close();
+          editor.focus();
+          runCompile({ fit: false });
+          showToast('Το πρότυπο κλάσεων εισήχθη στον κώδικα!');
+        }
+      });
+    });
+  }
+
+  syntaxHelpButton.addEventListener('click', () => {
+    const ctx = detectClassContext();
+    const tag = syntaxModal.body ? syntaxModal.body.querySelector('#pli11-classes-help-tag') : null;
+    if (tag) tag.textContent = ctx.label;
+    switchClassHelpTab(ctx.tab);
+    syntaxModal.open();
+  });
 
   // Initial Compile on Boot
   runCompile({ fit: true });
