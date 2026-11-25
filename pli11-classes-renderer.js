@@ -504,7 +504,24 @@
     return idA < idB ? `${idA}|${idB}` : `${idB}|${idA}`;
   }
 
-  function choosePorts(boxA, boxB, offsetPx = 0) {
+  function getPortSide(boxA, boxB) {
+    const cxA = boxA.x + boxA.w / 2;
+    const cyA = boxA.y + boxA.h / 2;
+    const cxB = boxB.x + boxB.w / 2;
+    const cyB = boxB.y + boxB.h / 2;
+    const dx = cxB - cxA;
+    const dy = cyB - cyA;
+    const avgW = (boxA.w + boxB.w) / 2;
+    const avgH = (boxA.h + boxB.h) / 2;
+    const horizontal = Math.abs(dx) / Math.max(1, avgW) >= Math.abs(dy) / Math.max(1, avgH);
+    if (horizontal) {
+      return { sideA: dx >= 0 ? "R" : "L", sideB: dx >= 0 ? "L" : "R" };
+    } else {
+      return { sideA: dy >= 0 ? "B" : "T", sideB: dy >= 0 ? "T" : "B" };
+    }
+  }
+
+  function choosePorts(boxA, boxB, offsetA = 0, offsetB = 0) {
     const cxA = boxA.x + boxA.w / 2;
     const cyA = boxA.y + boxA.h / 2;
     const cxB = boxB.x + boxB.w / 2;
@@ -520,8 +537,8 @@
 
     if (horizontal) {
       const goingRight = dx >= 0;
-      const yA = clampPort(cyA + offsetPx, boxA.y + 16, boxA.y + boxA.h - 16);
-      const yB = clampPort(cyB + offsetPx, boxB.y + 16, boxB.y + boxB.h - 16);
+      const yA = clampPort(cyA + offsetA, boxA.y + 16, boxA.y + boxA.h - 16);
+      const yB = clampPort(cyB + (offsetB !== undefined ? offsetB : offsetA), boxB.y + 16, boxB.y + boxB.h - 16);
       return {
         p1: { x: goingRight ? boxA.x + boxA.w : boxA.x, y: yA },
         p2: { x: goingRight ? boxB.x : boxB.x + boxB.w, y: yB },
@@ -532,8 +549,8 @@
     }
 
     const goingDown = dy >= 0;
-    const xA = clampPort(cxA + offsetPx, boxA.x + 20, boxA.x + boxA.w - 20);
-    const xB = clampPort(cxB + offsetPx, boxB.x + 20, boxB.x + boxB.w - 20);
+    const xA = clampPort(cxA + offsetA, boxA.x + 20, boxA.x + boxA.w - 20);
+    const xB = clampPort(cxB + (offsetB !== undefined ? offsetB : offsetA), boxB.x + 20, boxB.x + boxB.w - 20);
     return {
       p1: { x: xA, y: goingDown ? boxA.y + boxA.h : boxA.y },
       p2: { x: xB, y: goingDown ? boxB.y : boxB.y + boxB.h },
@@ -751,16 +768,22 @@
       }
     }
 
-    // Layer 2: Non-inheritance relations (count parallel edges per class pair so ports separate cleanly)
+    // Layer 2: Non-inheritance relations (count port attachments per box side so ports separate cleanly)
     const nonInhRels = relations.filter((r) => r.kind !== 'inheritance');
-    const pairTotals = new Map();
-    const pairSeen = new Map();
+    const sideTotals = new Map();
+    const sideSeen = new Map();
     for (const rel of nonInhRels) {
       const fId = rel.fromId || idByKey.get(canonicalKey(rel.from));
       const tId = rel.toId || idByKey.get(canonicalKey(rel.to));
-      if (!fId || !tId) continue;
-      const pk = pairKey(fId, tId);
-      pairTotals.set(pk, (pairTotals.get(pk) || 0) + 1);
+      if (!fId || !tId || fId === tId) continue;
+      const b1 = boxes.get(fId);
+      const b2 = boxes.get(tId);
+      if (!b1 || !b2) continue;
+      const sides = getPortSide(b1, b2);
+      const k1 = `${fId}:${sides.sideA}`;
+      const k2 = `${tId}:${sides.sideB}`;
+      sideTotals.set(k1, (sideTotals.get(k1) || 0) + 1);
+      sideTotals.set(k2, (sideTotals.get(k2) || 0) + 1);
     }
 
     for (const rel of nonInhRels) {
@@ -787,13 +810,20 @@
         continue;
       }
 
-      const pk = pairKey(fId, tId);
-      const count = pairTotals.get(pk) || 1;
-      const seenIdx = pairSeen.get(pk) || 0;
-      pairSeen.set(pk, seenIdx + 1);
-      const offsetPx = count > 1 ? (seenIdx - (count - 1) / 2) * 26 : 0;
+      const sides = getPortSide(b1, b2);
+      const k1 = `${fId}:${sides.sideA}`;
+      const k2 = `${tId}:${sides.sideB}`;
+      const count1 = sideTotals.get(k1) || 1;
+      const idx1 = sideSeen.get(k1) || 0;
+      sideSeen.set(k1, idx1 + 1);
+      const offsetA = count1 > 1 ? (idx1 - (count1 - 1) / 2) * 32 : 0;
 
-      const ports = choosePorts(b1, b2, offsetPx);
+      const count2 = sideTotals.get(k2) || 1;
+      const idx2 = sideSeen.get(k2) || 0;
+      sideSeen.set(k2, idx2 + 1);
+      const offsetB = count2 > 1 ? (idx2 - (count2 - 1) / 2) * 32 : 0;
+
+      const ports = choosePorts(b1, b2, offsetA, offsetB);
       const startTrim = (rel.kind === 'aggregation' || rel.kind === 'composition') ? 16 : 0;
       const endTrim = rel.kind === 'dependency' ? 3 : 0;
       const poly = buildOrthogonalPolyline(ports.p1, ports.p2, ports.axis, startTrim, endTrim);
