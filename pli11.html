@@ -31,6 +31,11 @@
       </nav>
     </div>
     <div class="header-right">
+      <div class="pane-focus-group" role="group" aria-label="Εμφάνιση πλαισίων εργασίας">
+        <button id="focus-both-btn" class="pane-focus-btn active" type="button" title="Εμφάνιση Κώδικα &amp; Διαγραμμάτων/Builder μαζί">Και τα 2</button>
+        <button id="focus-code-btn" class="pane-focus-btn" type="button" title="Εμφάνιση μόνο Κώδικα σε όλο το παράθυρο">Κώδικας</button>
+        <button id="focus-output-btn" class="pane-focus-btn" type="button" title="Εμφάνιση μόνο Διαγραμμάτων / Builder σε όλο το παράθυρο">Διάγρ. / Builder</button>
+      </div>
       <button id="layout-toggle" class="layout-toggle-btn" type="button" title="Εναλλαγή διάταξης: Left/Right ή Up/Down">
         <span class="layout-icon">◫</span> <span class="layout-text">Side-by-Side</span>
       </button>
@@ -53,6 +58,7 @@
               <select id="example-selector" title="Παραδείγματα ύλης ΠΛΗ11">
                 <option value="" disabled selected>Παραδείγματα (ΠΛΗ11)...</option>
               </select>
+              <button id="wrap-button" class="action-btn" type="button" title="Αναδίπλωση μεγάλων γραμμών κώδικα ώστε να φαίνονται όλες χωρίς οριζόντιο scroll">Wrap</button>
               <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
               <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με τον κώδικα">Share</button>
             </div>
@@ -122,7 +128,9 @@
             <button class="tab-btn" data-tab="tab-mermaid">Mermaid</button>
             <button class="tab-btn" data-tab="tab-builder">ΔΡΔ Builder</button>
           </div>
-          <div class="tab-actions"></div>
+          <div class="tab-actions">
+            <button id="fullscreen-output-btn" class="tool-mini-btn" type="button" title="Μεγιστοποίηση διαγραμμάτων / Builder σε πλήρη οθόνη (Esc για έξοδο)">⛶ Μεγιστοποίηση</button>
+          </div>
         </div>
 
         <!-- Tab 1: ΔΔΠ (Structure Chart) -->
@@ -258,29 +266,40 @@
           </div>
         </div>
 
-        <!-- Tab 4: Mermaid Code & Preview (Editable & Exportable) -->
+        <!-- Tab 4: Mermaid Code & Preview (Editable, Resizable & Pan/Zoom) -->
         <div class="tab-pane" id="tab-mermaid">
           <div class="diagram-toolbar">
             <div class="diagram-toolbar-group">
-              <button class="tool-mini-btn active" id="mermaid-mode-ddp">ΔΔΠ (flowchart TD)</button>
-              <button class="tool-mini-btn" id="mermaid-mode-dfd">ΔΡΔ (flowchart LR)</button>
-              <span id="mermaid-edit-status" class="pli11-stat-pill" style="font-size:0.7rem; padding:0.15rem 0.45rem;">Αυτόματο</span>
+              <button class="tool-mini-btn active" id="mermaid-mode-ddp">ΔΔΠ (TD)</button>
+              <button class="tool-mini-btn" id="mermaid-mode-dfd">ΔΡΔ (LR)</button>
+              <button class="tool-mini-btn active" id="mermaid-toggle-code-btn" type="button" title="Εμφάνιση / απόκρυψη πλαισίου κώδικα Mermaid για περισσότερο χώρο στο διάγραμμα">Κώδικας ▾</button>
+              <span id="mermaid-edit-status" class="pli11-stat-pill" style="font-size:0.7rem; padding:0.12rem 0.42rem;">Αυτόματο</span>
             </div>
             <div class="diagram-toolbar-group">
-              <button class="tool-mini-btn" id="mermaid-rerender-btn" title="Ανανέωση προεπισκόπησης από τον κώδικα Mermaid">Ανανέωση Preview</button>
-              <button class="tool-mini-btn" id="mermaid-reset-btn" title="Επαναφορά Mermaid από τον κύριο Ψευδοκώδικα">Επαναφορά από Κώδικα</button>
-              <button class="tool-mini-btn" id="mermaid-copy-png" title="Αντιγραφή Mermaid ως εικόνα PNG στο πρόχειρο για άμεσο Ctrl+V στο Word">Αντιγραφή PNG (Word)</button>
-              <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης">Export PNG</button>
-              <button class="tool-mini-btn" id="mermaid-export-svg" title="Λήψη του Mermaid διαγράμματος ως αρχείο SVG">Export SVG</button>
+              <button class="tool-mini-btn" id="mermaid-zoom-out" type="button" title="Σμίκρυνση">-</button>
+              <span class="zoom-readout" id="mermaid-zoom-label">100%</span>
+              <button class="tool-mini-btn" id="mermaid-zoom-in" type="button" title="Μεγέθυνση">+</button>
+              <button class="tool-mini-btn" id="mermaid-zoom-fit" type="button" title="Προσαρμογή ολόκληρου του διαγράμματος στο παράθυρο">Fit</button>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="mermaid-rerender-btn" title="Ανανέωση προεπισκόπησης από τον κώδικα Mermaid">Ανανέωση</button>
+              <button class="tool-mini-btn" id="mermaid-reset-btn" title="Επαναφορά Mermaid από τον κύριο Ψευδοκώδικα">Επαναφορά</button>
+              <button class="tool-mini-btn" id="mermaid-copy-png" title="Αντιγραφή Mermaid ως εικόνα PNG στο πρόχειρο για άμεσο Ctrl+V στο Word">Αντιγραφή PNG</button>
+              <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης">PNG</button>
+              <button class="tool-mini-btn" id="mermaid-export-svg" title="Λήψη του Mermaid διαγράμματος ως αρχείο SVG">SVG</button>
               <button class="tool-mini-btn" id="mermaid-copy-code-btn" title="Αντιγραφή κώδικα Mermaid στο πρόχειρο">Αντιγραφή Κώδικα</button>
             </div>
           </div>
 
-          <div class="mermaid-split">
-            <div class="mermaid-editor-wrap">
+          <div class="mermaid-split" id="mermaid-split">
+            <div class="mermaid-editor-wrap" id="mermaid-editor-wrap">
               <textarea id="mermaid-code-view" class="mermaid-code-editor" spellcheck="false" placeholder="Κώδικας Mermaid flowchart... Μπορείτε να τον επεξεργαστείτε απευθείας!"></textarea>
             </div>
-            <div class="mermaid-preview-box" id="mermaid-preview-host"></div>
+            <div class="resizer mermaid-resizer" id="mermaid-resizer" title="Σύρετε για αλλαγή ύψους κώδικα/προεπισκόπησης • Διπλό κλικ για επαναφορά"></div>
+            <div class="diagram-viewport mermaid-viewport" id="mermaid-viewport">
+              <div class="diagram-canvas" id="mermaid-preview-host"></div>
+              <div class="diagram-hint">Σύρετε για μετακίνηση &bull; Ροδέλα για zoom &bull; Διπλό κλικ για Fit</div>
+            </div>
           </div>
         </div>
 
@@ -294,7 +313,7 @@
                   <option value="" disabled selected>Επιλέξτε έτοιμο ΔΡΔ...</option>
                 </select>
               </div>
-              <div class="builder-field" style="max-width: 210px;">
+              <div class="builder-field" style="max-width: 240px;">
                 <label for="dfd-mode-select">Τύπος Κέντρου:</label>
                 <select id="dfd-mode-select" class="builder-select" aria-label="Τύπος κέντρου (ΚΜ, ΚΔ ή Χωρίς ΚΜ)">
                   <option value="KM">Κεντρικός Μετασχηματισμός (ΚΜ)</option>
@@ -302,7 +321,7 @@
                   <option value="NONE">Χωρίς Περίγραμμα (Απλό ΔΡΔ)</option>
                 </select>
               </div>
-              <div class="builder-field" style="max-width: 220px;">
+              <div class="builder-field" style="max-width: 240px;">
                 <label for="dfd-central-input">Κεντρικός/οί Μετασχηματισμός/οί:</label>
                 <input type="text" id="dfd-central-input" class="builder-input" value="M3, M4, M5" placeholder="π.χ. M3, M4, M5">
               </div>
@@ -313,32 +332,34 @@
                 <span style="font-size:0.78rem; font-weight:700; color:var(--header-text);">Ροές Δεδομένων ΔΡΔ</span>
                 <button type="button" class="tool-mini-btn" id="dfd-add-flow-btn">+ Προσθήκη Ροής</button>
               </div>
-              <table class="builder-flows-table">
-                <thead>
-                  <tr>
-                    <th style="width:18%;">Τύπος Πηγής</th>
-                    <th style="width:20%;">Από</th>
-                    <th style="width:18%;">Τύπος Στόχου</th>
-                    <th style="width:20%;">Προς</th>
-                    <th style="width:18%;">Δεδομένα</th>
-                    <th style="width:6%;"></th>
-                  </tr>
-                </thead>
-                <tbody id="dfd-flows-tbody"></tbody>
-              </table>
+              <div class="builder-table-wrap">
+                <table class="builder-flows-table">
+                  <thead>
+                    <tr>
+                      <th style="width:18%;">Τύπος Πηγής</th>
+                      <th style="width:20%;">Από</th>
+                      <th style="width:18%;">Τύπος Στόχου</th>
+                      <th style="width:20%;">Προς</th>
+                      <th style="width:19%;">Δεδομένα</th>
+                      <th style="width:5%;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="dfd-flows-tbody"></tbody>
+                </table>
+              </div>
             </div>
 
             <div class="builder-field">
               <label for="dfd-dsl-input">Κειμενική Περιγραφή ΔΡΔ (αμφίδρομος συγχρονισμός):</label>
               <textarea id="dfd-dsl-input" class="builder-textarea" spellcheck="false"></textarea>
             </div>
+          </div>
 
-            <div class="builder-row" style="justify-content:space-between; align-items:center;">
-              <button type="button" class="tool-mini-btn" id="dfd-load-from-compiler-btn" title="Φόρτωση του παραγόμενου ΔΡΔ από τον τρέχοντα ψευδοκώδικα">⟳ Φόρτωση από Κώδικα</button>
-              <div style="display:flex; gap:8px;">
-                <button type="button" class="tool-mini-btn" id="dfd-preview-builder-btn" title="Προεπισκόπηση &amp; Εξαγωγή του προσαρμοσμένου ΔΡΔ χωρίς αλλαγή ψευδοκώδικα">Προεπισκόπηση στο ΔΡΔ</button>
-                <button type="button" class="builder-primary-btn" id="dfd-build-btn">Παραγωγή ΔΔΠ &amp; Ψευδοκώδικα</button>
-              </div>
+          <div class="builder-actions-bar">
+            <button type="button" class="tool-mini-btn" id="dfd-load-from-compiler-btn" title="Φόρτωση του παραγόμενου ΔΡΔ από τον τρέχοντα ψευδοκώδικα">⟳ Φόρτωση από Κώδικα</button>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <button type="button" class="tool-mini-btn" id="dfd-preview-builder-btn" title="Προεπισκόπηση &amp; Εξαγωγή του προσαρμοσμένου ΔΡΔ χωρίς αλλαγή ψευδοκώδικα">Προεπισκόπηση στο ΔΡΔ</button>
+              <button type="button" class="builder-primary-btn" id="dfd-build-btn">Παραγωγή ΔΔΠ &amp; Ψευδοκώδικα</button>
             </div>
           </div>
         </div>

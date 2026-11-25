@@ -705,7 +705,7 @@
       for (let k = 0; k < tokList.length; k++) {
         const t = tokList[k];
         if (t.type !== 'WORD') continue;
-        if (LOGICAL_NOISE_WORDS.has(t.norm)) continue;
+        if (LOGICAL_NOISE_WORDS.has(t.norm) && tokList.length > 1) continue;
         // Skip method calls after DOT like LIST.eof
         if (k > 0 && tokList[k - 1].type === 'DOT') continue;
         recordIdent(t.value, t.plain);

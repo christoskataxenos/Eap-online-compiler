@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const editorMount = document.getElementById('code-editor-mount');
   const clsSummaryBadge = document.getElementById('cls-summary-badge');
   const exampleSelector = document.getElementById('example-selector');
+  const wrapButton = document.getElementById('wrap-button');
   const formatButton = document.getElementById('format-button');
   const shareButton = document.getElementById('share-button');
 
@@ -80,7 +81,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const officialPseudocodeView = document.getElementById('official-pseudocode-view');
 
   // DOM References - Mermaid
+  const mermaidToggleCodeBtn = document.getElementById('mermaid-toggle-code-btn');
+  const mermaidZoomOut = document.getElementById('mermaid-zoom-out');
+  const mermaidZoomIn = document.getElementById('mermaid-zoom-in');
+  const mermaidZoomFit = document.getElementById('mermaid-zoom-fit');
+  const mermaidZoomLabel = document.getElementById('mermaid-zoom-label');
   const mermaidRerenderBtn = document.getElementById('mermaid-rerender-btn');
+  const mermaidSplit = document.getElementById('mermaid-split');
+  const mermaidEditorWrap = document.getElementById('mermaid-editor-wrap');
+  const mermaidResizer = document.getElementById('mermaid-resizer');
+  const mermaidViewport = document.getElementById('mermaid-viewport');
   const mermaidCodeView = document.getElementById('mermaid-code-view');
   const mermaidPreviewHost = document.getElementById('mermaid-preview-host');
 
@@ -114,12 +124,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sharedCode) initialCode = sharedCode;
 
   const isDarkInitial = Common.getTheme() === 'dark';
+  let lineWrapEnabled = SettingsManager.get('pli11ClassesLineWrap', 'true') !== 'false';
 
   const editor = CodeMirror(editorMount, {
     value: initialCode,
     mode: 'eap-pli11-classes',
     theme: isDarkInitial ? 'dracula' : 'default',
     lineNumbers: true,
+    lineWrapping: lineWrapEnabled,
     matchBrackets: true,
     autoCloseBrackets: true,
     styleActiveLine: true,
@@ -170,6 +182,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  if (wrapButton) {
+    wrapButton.classList.toggle('active', lineWrapEnabled);
+    wrapButton.addEventListener('click', () => {
+      lineWrapEnabled = !lineWrapEnabled;
+      SettingsManager.set('pli11ClassesLineWrap', lineWrapEnabled ? 'true' : 'false');
+      wrapButton.classList.toggle('active', lineWrapEnabled);
+      editor.setOption('lineWrapping', lineWrapEnabled);
+      editor.refresh();
+      showToast(lineWrapEnabled ? 'Αναδίπλωση γραμμών: Ενεργή' : 'Αναδίπλωση γραμμών: Ανενεργή');
+    });
+  }
+
+  if (typeof ResizeObserver === 'function' && editorMount && editorMount.parentElement) {
+    let cmRaf = 0;
+    const cmRo = new ResizeObserver(() => {
+      if (cmRaf) cancelAnimationFrame(cmRaf);
+      cmRaf = requestAnimationFrame(() => {
+        cmRaf = 0;
+        editor.refresh();
+      });
+    });
+    cmRo.observe(editorMount.parentElement);
+  }
+
   // ---------------------------------------------------------------------------
   // TABS LOGIC
   // ---------------------------------------------------------------------------
@@ -177,11 +213,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (copyPseudocodeBtn) copyPseudocodeBtn.hidden = tabId !== 'tab-pseudocode';
     if (copyMermaidBtn) copyMermaidBtn.hidden = tabId !== 'tab-mermaid';
 
-    if (tabId === 'tab-diagram') panZoom.fit(false);
+    if (tabId === 'tab-diagram') requestAnimationFrame(() => panZoom.fit(false));
     if (tabId === 'tab-builder' && builderDirty) {
       loadCompiledIntoBuilder();
     }
-    if (tabId === 'tab-mermaid') renderMermaidPreview();
+    if (tabId === 'tab-mermaid') {
+      renderMermaidPreview({ fit: false });
+      requestAnimationFrame(() => mermaidPanZoom.fit(false));
+    }
   });
 
   function switchTab(tabId) {
@@ -193,11 +232,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   // Shared pan/zoom engine (mouse + touch + wheel) — exposes .state for box drag
   const panZoom = Viewport.createPanZoom(clsViewport, clsCanvas, clsZoomLabel, {
-    minScale: 0.22,
-    maxScale: 2.6,
-    fitMin: 0.25,
-    fitMax: 1.15
+    minScale: 0.05,
+    maxScale: 4.0,
+    fitMin: 0.05,
+    fitMax: 1.25
   });
+  const mermaidPanZoom = Viewport.createPanZoom(mermaidViewport, mermaidPreviewHost, mermaidZoomLabel);
   const boxDrag = { active: false, classId: null, startClientX: 0, startClientY: 0, startBoxX: 0, startBoxY: 0, rafPending: false };
 
   window.addEventListener('mousemove', (e) => {
@@ -254,6 +294,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function jumpToLine(lineNum) {
     if (!lineNum || lineNum < 1) return;
+    if (document.body.classList.contains('output-fullscreen')) {
+      setOutputFullscreen(false);
+    }
+    if (typeof setPaneFocus === 'function' && currentPaneFocus === 'output') {
+      setPaneFocus('both');
+    }
     const target = Math.min(lineNum - 1, editor.lineCount() - 1);
     editor.focus();
     editor.setCursor({ line: target, ch: 0 });
@@ -428,6 +474,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const code = (mermaidCodeView.value || '').trim();
     if (!code) {
       if (mermaidPreviewHost) mermaidPreviewHost.innerHTML = '<div class="mermaid-offline-note">Κενός κώδικας Mermaid.</div>';
+      mermaidPanZoom.reset();
       return;
     }
 
@@ -440,6 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Ο κώδικας <code>classDiagram</code> παραπάνω είναι πλήρως επεξεργάσιμος και έτοιμος για αντιγραφή, ενώ το <strong>Διάγραμμα Κλάσεων SVG</strong> και ο <strong>ΕΑΠ Ψευδοκώδικας</strong> λειτουργούν 100% offline.
           </div>`;
       }
+      mermaidPanZoom.reset();
       return;
     }
 
@@ -453,14 +501,83 @@ document.addEventListener('DOMContentLoaded', () => {
       mermaidRenderCounter++;
       const id = `pli11_cls_mmd_${mermaidRenderCounter}`;
       const { svg } = await window.mermaid.render(id, code);
-      if (mermaidPreviewHost) mermaidPreviewHost.innerHTML = svg;
+      if (mermaidPreviewHost) {
+        mermaidPreviewHost.innerHTML = svg;
+        const svgEl = mermaidPreviewHost.querySelector('svg');
+        if (svgEl) {
+          const vb = svgEl.getAttribute('viewBox');
+          if (vb) {
+            const parts = vb.trim().split(/[\s,]+/).map(Number);
+            if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+              svgEl.setAttribute('width', String(Math.ceil(parts[2])));
+              svgEl.setAttribute('height', String(Math.ceil(parts[3])));
+            }
+          }
+          svgEl.style.maxWidth = 'none';
+          svgEl.style.height = 'auto';
+        }
+        if (opts.fit !== false || mermaidPanZoom.state.autoFitted || mermaidPanZoom.state.pendingFit) {
+          requestAnimationFrame(() => mermaidPanZoom.fit(false));
+        } else {
+          mermaidPanZoom.applyTransform();
+        }
+      }
     } catch (err) {
       if (mermaidPreviewHost) {
         mermaidPreviewHost.innerHTML = `<div class="mermaid-offline-note" style="color:var(--term-error); border-color:var(--term-error);">
           <strong>Σφάλμα σύνταξης Mermaid:</strong><br>${escapeHTML(err.message || String(err))}
         </div>`;
       }
+      mermaidPanZoom.reset();
     }
+  }
+
+  if (mermaidZoomIn) mermaidZoomIn.addEventListener('click', () => mermaidPanZoom.zoomIn());
+  if (mermaidZoomOut) mermaidZoomOut.addEventListener('click', () => mermaidPanZoom.zoomOut());
+  if (mermaidZoomFit) mermaidZoomFit.addEventListener('click', () => mermaidPanZoom.fit(false));
+
+  let mermaidCodeCollapsed = SettingsManager.get('pli11ClsMermaidCodeCollapsed', 'false') === 'true';
+  function applyMermaidCodeCollapse(collapsed) {
+    mermaidCodeCollapsed = collapsed;
+    SettingsManager.set('pli11ClsMermaidCodeCollapsed', collapsed ? 'true' : 'false');
+    if (mermaidSplit) mermaidSplit.classList.toggle('code-collapsed', collapsed);
+    if (mermaidToggleCodeBtn) {
+      mermaidToggleCodeBtn.classList.toggle('active', !collapsed);
+      mermaidToggleCodeBtn.textContent = collapsed ? 'Κώδικας ▸' : 'Κώδικας ▾';
+    }
+    requestAnimationFrame(() => mermaidPanZoom.fit(false));
+  }
+  if (mermaidToggleCodeBtn) {
+    applyMermaidCodeCollapse(mermaidCodeCollapsed);
+    mermaidToggleCodeBtn.addEventListener('click', () => applyMermaidCodeCollapse(!mermaidCodeCollapsed));
+  }
+  if (mermaidEditorWrap) {
+    const savedMmdH = SettingsManager.get('pli11ClsMermaidEditorPct', '30%');
+    mermaidEditorWrap.style.height = savedMmdH;
+  }
+  if (mermaidResizer && mermaidSplit && mermaidEditorWrap) {
+    Viewport.attachDrag(mermaidResizer, {
+      getCursor: () => 'row-resize',
+      onMove: (e) => {
+        const rect = mermaidSplit.getBoundingClientRect();
+        const newH = e.clientY - rect.top;
+        const minH = 68;
+        const maxH = Math.max(minH + 20, rect.height - 120);
+        if (newH >= minH && newH <= maxH) {
+          const pct = ((newH / rect.height) * 100).toFixed(1) + '%';
+          mermaidEditorWrap.style.height = pct;
+        }
+      },
+      onEnd: () => {
+        SettingsManager.set('pli11ClsMermaidEditorPct', mermaidEditorWrap.style.height);
+        mermaidPanZoom.fit(false);
+      },
+      onDblClick: () => {
+        mermaidEditorWrap.style.height = '30%';
+        SettingsManager.set('pli11ClsMermaidEditorPct', '30%');
+        mermaidPanZoom.fit(false);
+      }
+    });
   }
 
   if (mermaidCodeView) {
@@ -469,7 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateMermaidStatusBadge();
       clearTimeout(mermaidDebounceTimer);
       mermaidDebounceTimer = setTimeout(() => {
-        renderMermaidPreview();
+        renderMermaidPreview({ fit: false });
       }, 350);
     });
 
@@ -483,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mermaidIsUserEdited = true;
         updateMermaidStatusBadge();
         clearTimeout(mermaidDebounceTimer);
-        mermaidDebounceTimer = setTimeout(() => renderMermaidPreview(), 350);
+        mermaidDebounceTimer = setTimeout(() => renderMermaidPreview({ fit: false }), 350);
       }
     });
   }
@@ -1088,15 +1205,75 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // LAYOUT MANAGER & DUAL-AXIS RESIZER (Left/Right Split vs Up/Down Stacked)
+  // LAYOUT MANAGER, PANE FOCUS, FULLSCREEN & DUAL-AXIS RESIZER
   // ---------------------------------------------------------------------------
   const container = document.querySelector('.container');
   const paneLeft = document.getElementById('pane-left');
+  const paneRight = document.getElementById('pane-right');
   const layoutToggle = document.getElementById('layout-toggle');
+  const focusBothBtn = document.getElementById('focus-both-btn');
+  const focusCodeBtn = document.getElementById('focus-code-btn');
+  const focusOutputBtn = document.getElementById('focus-output-btn');
+  const fullscreenOutputBtn = document.getElementById('fullscreen-output-btn');
 
   let currentLayout = SettingsManager.get('pli11ClassesLayout', 'split');
+  let currentPaneFocus = 'both';
 
-  function applyLayout(mode, animate = false) {
+  function refreshAllViewports() {
+    requestAnimationFrame(() => {
+      editor.refresh();
+      panZoom.fit(false);
+      mermaidPanZoom.fit(false);
+    });
+  }
+
+  function setPaneFocus(mode) {
+    if (!container) return;
+    currentPaneFocus = mode;
+    container.classList.toggle('collapse-left', mode === 'output');
+    container.classList.toggle('collapse-right', mode === 'code');
+    if (focusBothBtn) focusBothBtn.classList.toggle('active', mode === 'both');
+    if (focusCodeBtn) focusCodeBtn.classList.toggle('active', mode === 'code');
+    if (focusOutputBtn) focusOutputBtn.classList.toggle('active', mode === 'output');
+    refreshAllViewports();
+  }
+
+  if (focusBothBtn) focusBothBtn.addEventListener('click', () => setPaneFocus('both'));
+  if (focusCodeBtn) focusCodeBtn.addEventListener('click', () => setPaneFocus('code'));
+  if (focusOutputBtn) focusOutputBtn.addEventListener('click', () => setPaneFocus('output'));
+
+  function setOutputFullscreen(active) {
+    document.body.classList.toggle('output-fullscreen', active);
+    if (fullscreenOutputBtn) {
+      fullscreenOutputBtn.classList.toggle('active', active);
+      fullscreenOutputBtn.textContent = active ? '✕ Έξοδος' : '⛶ Μεγιστοποίηση';
+      fullscreenOutputBtn.title = active
+        ? 'Έξοδος από πλήρη οθόνη (Esc)'
+        : 'Μεγιστοποίηση διαγραμμάτων / Builder σε πλήρη οθόνη (Esc για έξοδο)';
+    }
+    refreshAllViewports();
+  }
+
+  if (fullscreenOutputBtn) {
+    fullscreenOutputBtn.addEventListener('click', () => {
+      setOutputFullscreen(!document.body.classList.contains('output-fullscreen'));
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('output-fullscreen')) {
+      const openModal = document.querySelector('.modal-overlay[style*="flex"]');
+      if (!openModal) setOutputFullscreen(false);
+    }
+  });
+
+  function clampPercent(raw, fallbackPct, minPct = 20, maxPct = 80) {
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return fallbackPct + '%';
+    return Math.min(maxPct, Math.max(minPct, n)).toFixed(1) + '%';
+  }
+
+  function applyLayout(mode) {
     if (!container) return;
     currentLayout = mode;
     SettingsManager.set('pli11ClassesLayout', mode);
@@ -1109,12 +1286,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (dragHandle) {
         dragHandle.classList.remove('resizer-col');
-        dragHandle.title = 'Σύρετε για αλλαγή ύψους • Διπλό κλικ για επαναφορά';
+        dragHandle.title = 'Σύρετε για αλλαγή ύψους • Διπλό κλικ για επαναφορά (50/50)';
       }
       if (paneLeft) paneLeft.style.width = '';
-      if (outputContainer) {
-        const savedHeight = SettingsManager.get('pli11ClassesOutputHeight', '52vh');
-        outputContainer.style.height = savedHeight;
+      if (outputContainer) outputContainer.style.height = '';
+      if (paneRight) {
+        paneRight.style.height = clampPercent(SettingsManager.get('pli11ClassesPaneBottomPct', '54%'), 54, 22, 82);
       }
     } else {
       container.classList.remove('layout-stacked');
@@ -1124,23 +1301,23 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (dragHandle) {
         dragHandle.classList.add('resizer-col');
-        dragHandle.title = 'Σύρετε για αλλαγή πλάτους • Διπλό κλικ για επαναφορά (50/50)';
+        dragHandle.title = 'Σύρετε για αλλαγή πλάτους • Διπλό κλικ για επαναφορά (45/55)';
       }
       if (outputContainer) outputContainer.style.height = '';
-      const savedWidth = SettingsManager.get('pli11ClassesSplitWidth', '46%');
-      if (paneLeft) paneLeft.style.width = savedWidth;
+      if (paneRight) paneRight.style.height = '';
+      if (paneLeft) {
+        paneLeft.style.width = clampPercent(SettingsManager.get('pli11ClassesSplitWidth', '44%'), 44, 18, 80);
+      }
     }
 
-    setTimeout(() => {
-      editor.refresh();
-      panZoom.fit(false);
-    }, 60);
+    if (currentPaneFocus !== 'both') setPaneFocus('both');
+    else refreshAllViewports();
   }
 
   if (layoutToggle) {
     layoutToggle.addEventListener('click', () => {
       const nextMode = currentLayout === 'split' ? 'stacked' : 'split';
-      applyLayout(nextMode, true);
+      applyLayout(nextMode);
       showToast(nextMode === 'split' ? 'Διάταξη: Side-by-Side (Left / Right)' : 'Διάταξη: Up / Down (Stacked)');
     });
   }
@@ -1155,15 +1332,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isStacked) {
           const newHeight = containerRect.bottom - e.clientY;
-          const maxHeight = containerRect.height * 0.85;
-          if (newHeight > 140 && newHeight < maxHeight && outputContainer) {
-            outputContainer.style.height = newHeight + 'px';
+          const minHeight = 140;
+          const maxHeight = Math.max(minHeight + 20, containerRect.height - 120);
+          if (newHeight >= minHeight && newHeight <= maxHeight && paneRight) {
+            const pct = ((newHeight / containerRect.height) * 100).toFixed(1) + '%';
+            paneRight.style.height = pct;
             editor.refresh();
           }
         } else {
           const newWidth = e.clientX - containerRect.left;
-          const minWidth = 280;
-          const maxWidth = containerRect.width - 340;
+          const minWidth = 220;
+          const maxWidth = Math.max(minWidth + 20, containerRect.width - 240);
           if (newWidth >= minWidth && newWidth <= maxWidth && paneLeft) {
             const pct = ((newWidth / containerRect.width) * 100).toFixed(1) + '%';
             paneLeft.style.width = pct;
@@ -1173,26 +1352,24 @@ document.addEventListener('DOMContentLoaded', () => {
       },
       onEnd: () => {
         const isStacked = container && container.classList.contains('layout-stacked');
-        if (isStacked && outputContainer) {
-          SettingsManager.set('pli11ClassesOutputHeight', outputContainer.style.height);
+        if (isStacked && paneRight) {
+          SettingsManager.set('pli11ClassesPaneBottomPct', paneRight.style.height);
         } else if (paneLeft) {
           SettingsManager.set('pli11ClassesSplitWidth', paneLeft.style.width);
         }
-        editor.refresh();
-        panZoom.fit(false);
+        refreshAllViewports();
       },
       // Double-click to reset split/stack
       onDblClick: () => {
         const isStacked = container && container.classList.contains('layout-stacked');
-        if (isStacked && outputContainer) {
-          outputContainer.style.height = '50vh';
-          SettingsManager.set('pli11ClassesOutputHeight', '50vh');
+        if (isStacked && paneRight) {
+          paneRight.style.height = '52%';
+          SettingsManager.set('pli11ClassesPaneBottomPct', '52%');
         } else if (paneLeft) {
-          paneLeft.style.width = '48%';
-          SettingsManager.set('pli11ClassesSplitWidth', '48%');
+          paneLeft.style.width = '45%';
+          SettingsManager.set('pli11ClassesSplitWidth', '45%');
         }
-        editor.refresh();
-        panZoom.fit(false);
+        refreshAllViewports();
         showToast('Επαναφορά μεγέθους διαχωριστικού');
       }
     });

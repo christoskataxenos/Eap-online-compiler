@@ -31,6 +31,11 @@
       </nav>
     </div>
     <div class="header-right">
+      <div class="pane-focus-group" role="group" aria-label="Εμφάνιση πλαισίων εργασίας">
+        <button id="focus-both-btn" class="pane-focus-btn active" type="button" title="Εμφάνιση Κώδικα &amp; Διαγραμμάτων/Builder μαζί">Και τα 2</button>
+        <button id="focus-code-btn" class="pane-focus-btn" type="button" title="Εμφάνιση μόνο Κώδικα σε όλο το παράθυρο">Κώδικας</button>
+        <button id="focus-output-btn" class="pane-focus-btn" type="button" title="Εμφάνιση μόνο Διαγραμμάτων / Builder σε όλο το παράθυρο">Διάγρ. / Builder</button>
+      </div>
       <button id="layout-toggle" class="layout-toggle-btn" type="button" title="Εναλλαγή διάταξης: Left/Right ή Up/Down">
         <span class="layout-icon">◫</span> <span class="layout-text">Side-by-Side</span>
       </button>
@@ -53,6 +58,7 @@
               <select id="example-selector" title="Παραδείγματα Διαγραμμάτων Κλάσεων ΠΛΗ11">
                 <option value="" disabled selected>Παραδείγματα (Κλάσεις ΠΛΗ11)...</option>
               </select>
+              <button id="wrap-button" class="action-btn" type="button" title="Αναδίπλωση μεγάλων γραμμών κώδικα ώστε να φαίνονται όλες χωρίς οριζόντιο scroll">Wrap</button>
               <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
               <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με το διάγραμμα">Share</button>
             </div>
@@ -117,6 +123,7 @@
           </div>
           <div class="tab-actions">
             <button id="copy-pseudocode-btn" class="tab-action-btn" hidden title="Αντιγραφή ΕΑΠ Ψευδοκώδικα (ΟΣΣ2 Διαφ. 8)">Αντιγραφή Ψευδοκώδικα</button>
+            <button id="fullscreen-output-btn" class="tool-mini-btn" type="button" title="Μεγιστοποίηση διαγραμμάτων / Builder σε πλήρη οθόνη (Esc για έξοδο)">⛶ Μεγιστοποίηση</button>
           </div>
         </div>
 
@@ -247,27 +254,38 @@
           <pre class="cls-pseudocode-box"><code id="official-pseudocode-view"></code></pre>
         </div>
 
-        <!-- Tab 5: Mermaid ClassDiagram Code & Preview (Editable & Exportable) -->
+        <!-- Tab 5: Mermaid ClassDiagram Code & Preview (Editable, Resizable & Pan/Zoom) -->
         <div class="tab-pane" id="tab-mermaid">
           <div class="diagram-toolbar">
             <div class="diagram-toolbar-group">
-              <span style="font-size:0.75rem; font-weight:700; color:var(--header-text);">Mermaid Editor &amp; Preview</span>
-              <span id="mermaid-edit-status" class="pli11-stat-pill" style="font-size:0.7rem; padding:0.15rem 0.45rem;">Αυτόματο</span>
+              <span style="font-size:0.74rem; font-weight:700; color:var(--header-text);">Mermaid</span>
+              <button class="tool-mini-btn active" id="mermaid-toggle-code-btn" type="button" title="Εμφάνιση / απόκρυψη πλαισίου κώδικα Mermaid για περισσότερο χώρο στο διάγραμμα">Κώδικας ▾</button>
+              <span id="mermaid-edit-status" class="pli11-stat-pill" style="font-size:0.7rem; padding:0.12rem 0.42rem;">Αυτόματο</span>
             </div>
             <div class="diagram-toolbar-group">
-              <button class="tool-mini-btn" id="mermaid-rerender-btn" title="Ανανέωση προεπισκόπησης από τον κώδικα Mermaid">Ανανέωση Preview</button>
-              <button class="tool-mini-btn" id="mermaid-reset-btn" title="Επαναφορά Mermaid από τον κύριο Ψευδοκώδικα">Επαναφορά από Κώδικα</button>
-              <button class="tool-mini-btn" id="mermaid-export-svg" title="Λήψη του Mermaid διαγράμματος ως αρχείο SVG">Export SVG</button>
-              <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης για Word">Export PNG</button>
+              <button class="tool-mini-btn" id="mermaid-zoom-out" type="button" title="Σμίκρυνση">-</button>
+              <span class="zoom-readout" id="mermaid-zoom-label">100%</span>
+              <button class="tool-mini-btn" id="mermaid-zoom-in" type="button" title="Μεγέθυνση">+</button>
+              <button class="tool-mini-btn" id="mermaid-zoom-fit" type="button" title="Προσαρμογή ολόκληρου του διαγράμματος στο παράθυρο">Fit</button>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button class="tool-mini-btn" id="mermaid-rerender-btn" title="Ανανέωση προεπισκόπησης από τον κώδικα Mermaid">Ανανέωση</button>
+              <button class="tool-mini-btn" id="mermaid-reset-btn" title="Επαναφορά Mermaid από τον κύριο Ψευδοκώδικα">Επαναφορά</button>
+              <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης για Word">PNG</button>
+              <button class="tool-mini-btn" id="mermaid-export-svg" title="Λήψη του Mermaid διαγράμματος ως αρχείο SVG">SVG</button>
               <button class="tool-mini-btn" id="mermaid-copy-code-btn" title="Αντιγραφή κώδικα Mermaid στο πρόχειρο">Αντιγραφή Κώδικα</button>
             </div>
           </div>
 
-          <div class="mermaid-split">
-            <div class="mermaid-editor-wrap">
+          <div class="mermaid-split" id="mermaid-split">
+            <div class="mermaid-editor-wrap" id="mermaid-editor-wrap">
               <textarea id="mermaid-code-view" class="mermaid-code-editor" spellcheck="false" placeholder="Κώδικας Mermaid classDiagram... Μπορείτε να τον επεξεργαστείτε απευθείας!"></textarea>
             </div>
-            <div class="mermaid-preview-box" id="mermaid-preview-host"></div>
+            <div class="resizer mermaid-resizer" id="mermaid-resizer" title="Σύρετε για αλλαγή ύψους κώδικα/προεπισκόπησης • Διπλό κλικ για επαναφορά"></div>
+            <div class="diagram-viewport mermaid-viewport" id="mermaid-viewport">
+              <div class="diagram-canvas" id="mermaid-preview-host"></div>
+              <div class="diagram-hint">Σύρετε για μετακίνηση &bull; Ροδέλα για zoom &bull; Διπλό κλικ για Fit</div>
+            </div>
           </div>
         </div>
       </div>
