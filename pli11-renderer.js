@@ -271,38 +271,66 @@
   }
 
   // ---------------------------------------------------------------------------
-  // 1. ΔΔΠ (STRUCTURE CHART) SVG RENDERER
+  // 1. ΔΔΠ (STRUCTURE CHART) SVG RENDERER — OFFICIAL EAP TEXTBOOK LAYOUT
+  //    • Strict 1-row-per-depth hierarchy (zero staggered rows, zero crossings)
+  //    • Wide spanning Root Header Bar so Level-1 call arrows drop 90° vertically
+  //    • Sub-controllers (Exec_Mi) align vertically over their Calc_Mi module
+  //    • Crisp call arrowheads (↓) and clean borderless couple labels (○→ / ●→)
   // ---------------------------------------------------------------------------
+  function formatDDPCoupleLines(items) {
+    if (!items || items.length === 0) return [];
+    const names = items.map((x) => String(x.name || '').trim()).filter(Boolean);
+    if (names.length === 0) return [];
+    const allShort = names.every((n) => n.length <= 2);
+    if (allShort) {
+      if (names.length <= 5) return [names.join(',')];
+      const chunks = [];
+      for (let i = 0; i < names.length; i += 4) {
+        chunks.push(names.slice(i, i + 4).join(','));
+      }
+      return chunks;
+    }
+    return splitTextIntoLines(names.join(', '), 16);
+  }
+
+  function estimateLinesWidth(lines, fontSize = 11.5) {
+    if (!lines || lines.length === 0) return 0;
+    const maxLen = Math.max(...lines.map((l) => l.length), 0);
+    return Math.ceil(maxLen * (fontSize * 0.61) + 4);
+  }
+
   function renderDDPSVG(model, options = {}) {
     const pal = getPalette(options);
+    const isPrint = Boolean(options.printMode);
     const activeNodeId = options.activeNodeId || null;
     const activeEdgeId = options.activeEdgeId || null;
-    const showLegend = options.showLegend !== false && !options.tightCrop;
+    const showLegend = options.showLegend !== false && !options.tightCrop && !isPrint;
 
     if (!model || !model.nodes || model.nodes.length === 0) {
       return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240" width="680" height="240" style="font-family:${escXml(pal.font)}">
-        <rect width="680" height="240" fill="${pal.bg}" rx="8"/>
+        <rect width="680" height="240" fill="${pal.bg}" rx="4"/>
         <text x="340" y="115" text-anchor="middle" fill="${pal.muted}" font-size="14" font-weight="600">Γράψτε ψευδοκώδικα ΠΛΗ11 (PROCEDURE ... END_PROCEDURE) για να παραχθεί το ΔΔΠ.</text>
       </svg>`;
     }
 
-    const boxH = 50;
-    const totalNodes = model.nodes.length;
-    const hGap = totalNodes >= 12 ? 34 : 46;
-    const vGap = 148;
+    const baseBoxH = 52;
+    const baseHGap = model.nodes.length >= 12 ? 20 : 26;
+    const coupleFontSize = 11.5;
 
+    const nodeById = new Map();
     const nodeDims = new Map();
     const nodeLines = new Map();
     for (const n of model.nodes) {
+      nodeById.set(n.id, n);
       const lines = splitTextIntoLines(n.name || '', 18);
       nodeLines.set(n.id, lines);
       const maxLen = Math.max(...lines.map((l) => l.length), 1);
-      const w = Math.max(128, maxLen * 8.6 + 26);
-      const h = Math.max(boxH, lines.length * 17 + (n.isStub ? 24 : 18));
+      const w = Math.max(90, Math.ceil(maxLen * 7.8 + 20));
+      const h = Math.max(baseBoxH, lines.length * 16 + (n.isStub ? 22 : 18));
       nodeDims.set(n.id, { w, h });
     }
 
-    // Build spanning forest from root (plus any orphan component roots)
+    // Build spanning forest from root (preserving exact left-to-right CALL order)
     const childrenByParent = new Map();
     for (const n of model.nodes) childrenByParent.set(n.id, []);
     for (const e of model.edges) {
@@ -313,6 +341,7 @@
 
     const placedInTree = new Set();
     const treeChildren = new Map();
+    const treeParentEdge = new Map();
     for (const n of model.nodes) treeChildren.set(n.id, []);
 
     function buildSpanningTree(rootId) {
@@ -325,6 +354,7 @@
           if (!placedInTree.has(e.to)) {
             placedInTree.add(e.to);
             treeChildren.get(cur).push(e.to);
+            treeParentEdge.set(e.to, e);
             q.push(e.to);
           }
         }
@@ -349,152 +379,195 @@
       }
     }
 
-    // Compute subtree widths bottom-up (interleaving 2-tier leaves & wrapping ultra-wide subtree rows)
-    const subtreeWidths = new Map();
-    const subtreeHeights = new Map();
-    function isLeafTree(id) {
-      return (treeChildren.get(id) || []).length === 0;
+    // Pre-compute couple label extents per tree edge so sibling spacing never collides
+    function getEdgeSideExtents(childId, leanHint = 0) {
+      const e = treeParentEdge.get(childId);
+      if (!e) return { leftW: 0, rightW: 0, maxLines: 0, hasDecor: false };
+      const inLines = formatDDPCoupleLines(e.inputs);
+      const outLines = formatDDPCoupleLines(e.outputs);
+      const flagLines = formatDDPCoupleLines(e.controlFlags);
+      const hasDown = inLines.length > 0;
+      const hasUp = outLines.length > 0 || flagLines.length > 0;
+      const inW = hasDown ? estimateLinesWidth(inLines, coupleFontSize) + 18 : 0;
+      const upW = hasUp
+        ? Math.max(estimateLinesWidth(outLines, coupleFontSize), estimateLinesWidth(flagLines, coupleFontSize)) + 18
+        : 0;
+      const maxLines = Math.max(
+        inLines.length,
+        outLines.length + (flagLines.length > 0 ? flagLines.length + 1 : 0),
+        e.conditional && e.conditional.type === 'CASE' && e.conditional.label ? 1 : 0
+      );
+      const hasDecor = Boolean(e.conditional || e.loop);
+
+      if (hasDown && hasUp) {
+        return { leftW: inW, rightW: upW, maxLines, hasDecor };
+      }
+      const singleW = hasDown ? inW : upW;
+      if (leanHint > 0) {
+        return { leftW: 4, rightW: singleW, maxLines, hasDecor };
+      }
+      return { leftW: singleW, rightW: 4, maxLines, hasDecor };
     }
 
-    const MAX_ROW_WIDTH = 1650;
+    // Track max box height & vertical call-gap needed at each depth level
+    const depthMaxBoxH = new Map();
+    const depthVGap = new Map();
 
-    function partitionChildRows(ch) {
-      const hasCompositeChildren = ch.some((cid) => !isLeafTree(cid));
-      if (!hasCompositeChildren || ch.length < 3) return [ch];
-      const totalSingleRow = ch.reduce((acc, cid, idx) => acc + subtreeWidths.get(cid) + (idx > 0 ? hGap : 0), 0);
-      if (totalSingleRow <= MAX_ROW_WIDTH) return [ch];
-
-      const rows = [];
-      let curRow = [];
-      let curW = 0;
-      for (const cid of ch) {
-        const cw = subtreeWidths.get(cid);
-        const added = curRow.length === 0 ? cw : cw + hGap + 64; // +64 central trunk alley
-        if (curRow.length > 0 && (curW + added > MAX_ROW_WIDTH || curRow.length >= 2)) {
-          rows.push(curRow);
-          curRow = [cid];
-          curW = cw;
-        } else {
-          curRow.push(cid);
-          curW += added;
-        }
-      }
-      if (curRow.length > 0) rows.push(curRow);
-      return rows;
-    }
-
-    function calcWidth(id) {
-      const ch = treeChildren.get(id) || [];
-      const selfDim = nodeDims.get(id);
-      if (ch.length === 0) {
-        subtreeWidths.set(id, selfDim.w);
-        subtreeHeights.set(id, selfDim.h);
-        return selfDim.w;
-      }
-
-      for (const cid of ch) calcWidth(cid);
-
-      const allLeaves = ch.every(isLeafTree);
-      if (allLeaves && ch.length >= 5) {
-        // Interleaved 2-tier zipper layout: guarantees >=28px horizontal gap on same tier & >=40px vertical gap
-        let span = subtreeWidths.get(ch[0]);
-        for (let i = 1; i < ch.length; i++) {
-          const prevW = subtreeWidths.get(ch[i - 1]);
-          const curW = subtreeWidths.get(ch[i]);
-          const step = Math.ceil((prevW + curW) / 4 + 18);
-          span += step - prevW / 2 + curW / 2;
-        }
-        const total = Math.max(selfDim.w, Math.ceil(span));
-        subtreeWidths.set(id, total);
-        subtreeHeights.set(id, selfDim.h + vGap + 98 + 68);
-        return total;
-      }
-
-      const rows = partitionChildRows(ch);
-      let maxRowW = selfDim.w;
-      let totalH = selfDim.h;
-      for (let rIdx = 0; rIdx < rows.length; rIdx++) {
-        const row = rows[rIdx];
-        const alley = rows.length > 1 && row.length >= 2 ? 72 : 0;
-        let rw = alley;
-        let rh = 0;
-        for (let i = 0; i < row.length; i++) {
-          rw += subtreeWidths.get(row[i]);
-          if (i > 0) rw += hGap;
-          rh = Math.max(rh, subtreeHeights.get(row[i]) || boxH);
-        }
-        maxRowW = Math.max(maxRowW, rw);
-        totalH += (rIdx === 0 ? vGap : 110) + rh;
-      }
-      subtreeWidths.set(id, maxRowW);
-      subtreeHeights.set(id, totalH);
-      return maxRowW;
-    }
-    for (const r of componentRoots) calcWidth(r);
-
-    // Assign coordinates
-    const coords = new Map();
-    function assignCoords(id, leftX, topY, depth) {
-      const subW = subtreeWidths.get(id);
+    // Bottom-up tidy tree layout with EAP sub-controller alignment
+    const relXMap = new Map(); // nodeId -> x offset relative to its parent's cx (for root: 0)
+    function computeSubtree(id, depth, leanHint = 0) {
       const dim = nodeDims.get(id);
-      const cx = leftX + subW / 2;
-      const cy = topY + dim.h / 2;
-      coords.set(id, {
-        cx,
-        cy,
-        x: cx - dim.w / 2,
-        y: cy - dim.h / 2,
-        w: dim.w,
-        h: dim.h,
-        depth
+      depthMaxBoxH.set(depth, Math.max(depthMaxBoxH.get(depth) || baseBoxH, dim.h));
+
+      const edgeExt = getEdgeSideExtents(id, leanHint);
+      if (depth > 0) {
+        const extraLines = Math.max(0, edgeExt.maxLines - 1) * 14;
+        const extraDecor = edgeExt.hasDecor ? 16 : 0;
+        const neededGap = 80 + extraLines + extraDecor;
+        depthVGap.set(depth - 1, Math.max(depthVGap.get(depth - 1) || 80, neededGap));
+      }
+
+      const ch = treeChildren.get(id) || [];
+      const selfLeft = -Math.max(dim.w / 2, edgeExt.leftW);
+      const selfRight = Math.max(dim.w / 2, edgeExt.rightW);
+
+      if (ch.length === 0) {
+        return {
+          leftBound: selfLeft,
+          rightBound: selfRight,
+          minBoxLeft: -dim.w / 2,
+          maxBoxRight: dim.w / 2
+        };
+      }
+
+      // Determine lean hints for children so diagonal outer couples reserve space on the correct side
+      const childSubs = ch.map((cid, idx) => {
+        let childLean = 0;
+        if (depth >= 1 && ch.length >= 2) {
+          if (idx === 0) childLean = -1;
+          else if (idx === ch.length - 1) childLean = 1;
+        }
+        return computeSubtree(cid, depth + 1, childLean);
       });
 
-      const ch = treeChildren.get(id) || [];
-      if (ch.length === 0) return;
-
-      const allLeaves = ch.every(isLeafTree);
-      if (allLeaves && ch.length >= 5) {
-        const w0 = subtreeWidths.get(ch[0]);
-        const relCenters = [w0 / 2];
-        for (let i = 1; i < ch.length; i++) {
-          const prevW = subtreeWidths.get(ch[i - 1]);
-          const curW = subtreeWidths.get(ch[i]);
-          const step = Math.ceil((prevW + curW) / 4 + 18);
-          relCenters.push(relCenters[i - 1] + step);
-        }
-        const totalSpan = relCenters[ch.length - 1] + subtreeWidths.get(ch[ch.length - 1]) / 2;
-        const startLeft = cx - totalSpan / 2;
-        const childBaseTopY = topY + vGap;
-        for (let i = 0; i < ch.length; i++) {
-          const tierOffset = (i % 2 === 1) ? 98 : 0;
-          const cw = subtreeWidths.get(ch[i]);
-          const childCx = startLeft + relCenters[i];
-          assignCoords(ch[i], childCx - cw / 2, childBaseTopY + tierOffset, depth + 1);
-        }
-        return;
+      const centers = [0];
+      for (let i = 1; i < ch.length; i++) {
+        const prev = childSubs[i - 1];
+        const cur = childSubs[i];
+        centers.push(centers[i - 1] + prev.rightBound - cur.leftBound + baseHGap);
       }
 
-      const rows = partitionChildRows(ch);
-      let rowTopY = topY + vGap;
-      for (let rIdx = 0; rIdx < rows.length; rIdx++) {
-        const row = rows[rIdx];
-        const alley = rows.length > 1 && row.length >= 2 ? 72 : 0;
-        let rowTotalW = alley;
-        let rowMaxH = 0;
-        for (let i = 0; i < row.length; i++) {
-          rowTotalW += subtreeWidths.get(row[i]);
-          if (i > 0) rowTotalW += hGap;
-          rowMaxH = Math.max(rowMaxH, subtreeHeights.get(row[i]) || boxH);
+      // EAP alignment of parent controller above its children:
+      // • 2-child sub-controller [Get, Calc] or [Calc, Put]: align directly above Calc (vertical ↓ arrow on Calc!)
+      // • 3-child sub-controller: align directly above middle child
+      // • Otherwise: center above first..last child centers
+      let anchorX = (centers[0] + centers[ch.length - 1]) / 2;
+      if (depth >= 1 && ch.length === 2) {
+        const n0 = nodeById.get(ch[0]);
+        const n1 = nodeById.get(ch[1]);
+        const c0Leaf = (treeChildren.get(ch[0]) || []).length === 0;
+        const c1Leaf = (treeChildren.get(ch[1]) || []).length === 0;
+        if (c0Leaf && c1Leaf && n0 && n1) {
+          if (n1.role === 'CALC' && n0.role !== 'CALC') anchorX = centers[1];
+          else if (n0.role === 'CALC' && n1.role !== 'CALC') anchorX = centers[0];
         }
-        let curX = cx - rowTotalW / 2;
-        const midSplit = Math.ceil(row.length / 2);
-        for (let i = 0; i < row.length; i++) {
-          if (alley > 0 && i === midSplit) curX += alley;
-          const childId = row[i];
-          assignCoords(childId, curX, rowTopY, depth + 1 + rIdx);
-          curX += subtreeWidths.get(childId) + hGap;
+      } else if (depth >= 1 && ch.length === 3) {
+        const allKidsLeaves = ch.every((cid) => (treeChildren.get(cid) || []).length === 0);
+        if (allKidsLeaves) anchorX = centers[1];
+      }
+
+      let minLeft = selfLeft;
+      let maxRight = selfRight;
+      let minBoxLeft = -dim.w / 2;
+      let maxBoxRight = dim.w / 2;
+
+      for (let i = 0; i < ch.length; i++) {
+        const relCx = centers[i] - anchorX;
+        relXMap.set(ch[i], relCx);
+        minLeft = Math.min(minLeft, relCx + childSubs[i].leftBound);
+        maxRight = Math.max(maxRight, relCx + childSubs[i].rightBound);
+        minBoxLeft = Math.min(minBoxLeft, relCx + childSubs[i].minBoxLeft);
+        maxBoxRight = Math.max(maxBoxRight, relCx + childSubs[i].maxBoxRight);
+      }
+
+      return {
+        leftBound: minLeft,
+        rightBound: maxRight,
+        minBoxLeft,
+        maxBoxRight
+      };
+    }
+
+    const rootSubtrees = new Map();
+    for (const rId of componentRoots) {
+      relXMap.set(rId, 0);
+      rootSubtrees.set(rId, computeSubtree(rId, 0, 0));
+    }
+
+    // Compute exact Y top coordinate for every depth level
+    const maxDepth = Math.max(...Array.from(depthMaxBoxH.keys()), 0);
+    const depthTopY = new Map();
+    let runningY = 44;
+    for (let d = 0; d <= maxDepth; d++) {
+      depthTopY.set(d, runningY);
+      const bh = depthMaxBoxH.get(d) || baseBoxH;
+      const vg = depthVGap.get(d) || 80;
+      runningY += bh + vg;
+    }
+
+    // Assign absolute coordinates top-down
+    const coords = new Map();
+    function materializeCoords(id, absCx, depth, compSub) {
+      const dim = nodeDims.get(id);
+      const levelH = depthMaxBoxH.get(depth) || dim.h;
+      const topY = depthTopY.get(depth) || 44;
+      const ch = treeChildren.get(id) || [];
+
+      let boxX = absCx - dim.w / 2;
+      let boxW = dim.w;
+
+      // Official EAP Wide Header Bar for Root Control (depth 0 with >= 3 direct children,
+      // or any dispatcher with >= 6 direct children)
+      if (options.wideRootBar !== false && ((depth === 0 && ch.length >= 3) || ch.length >= 6)) {
+        if (depth === 0 && compSub) {
+          const spanLeft = absCx + compSub.minBoxLeft;
+          const spanRight = absCx + compSub.maxBoxRight;
+          if (spanRight - spanLeft > dim.w) {
+            boxX = spanLeft;
+            boxW = spanRight - spanLeft;
+          }
+        } else if (ch.length >= 6) {
+          const firstCx = absCx + (relXMap.get(ch[0]) || 0);
+          const lastCx = absCx + (relXMap.get(ch[ch.length - 1]) || 0);
+          const firstW = nodeDims.get(ch[0]).w;
+          const lastW = nodeDims.get(ch[ch.length - 1]).w;
+          const spanLeft = firstCx - firstW / 2;
+          const spanRight = lastCx + lastW / 2;
+          if (spanRight - spanLeft > dim.w) {
+            boxX = spanLeft;
+            boxW = spanRight - spanLeft;
+          }
         }
-        rowTopY += rowMaxH + 110;
+      }
+
+      const boxCx = boxX + boxW / 2;
+      const boxCy = topY + levelH / 2;
+
+      coords.set(id, {
+        cx: boxCx,
+        anchorCx: absCx,
+        cy: boxCy,
+        x: boxX,
+        y: topY,
+        w: boxW,
+        h: levelH,
+        depth,
+        isWideBar: boxW > dim.w + 8
+      });
+
+      for (const cid of ch) {
+        const childCx = absCx + (relXMap.get(cid) || 0);
+        materializeCoords(cid, childCx, depth + 1, null);
       }
     }
 
@@ -502,10 +575,12 @@
     const compRanges = [];
     for (let i = 0; i < componentRoots.length; i++) {
       const rId = componentRoots[i];
-      const w = subtreeWidths.get(rId);
-      assignCoords(rId, cursorX, 48, 0);
-      compRanges.push({ rootId: rId, startX: cursorX, width: w });
-      cursorX += w + 84;
+      const sub = rootSubtrees.get(rId);
+      const width = sub.rightBound - sub.leftBound;
+      const rootAbsCx = cursorX - sub.leftBound;
+      materializeCoords(rId, rootAbsCx, 0, sub);
+      compRanges.push({ rootId: rId, startX: cursorX, width });
+      cursorX += width + 84;
     }
 
     // Apply optional interactive custom positions on DDP nodes
@@ -520,22 +595,48 @@
       }
     }
 
+    const edgeStrokeDefault = isPrint ? '#000000' : pal.edge;
+    const inkColor = isPrint ? '#000000' : pal.ink;
+
     const edgeParts = [];
     const edgeLabelLayers = [];
-    const pillBounds = [];
+    const labelBounds = [];
 
-    function trackPillLabel(x, y, text, anchor, fontSize) {
-      const lines = splitTextIntoLines(text, 18);
-      const res = renderPillLabelWithBounds(x, y, text, pal, anchor, fontSize, lines, 0, false);
-      edgeLabelLayers.push(res.svg);
-      pillBounds.push(res.bounds);
+    function renderCleanCoupleLabel(x, y, lines, anchor, fontSize = coupleFontSize) {
+      if (!lines || lines.length === 0) return;
+      const w = estimateLinesWidth(lines, fontSize);
+      const lineSpacing = fontSize + 3;
+      const h = lines.length * lineSpacing;
+      const left = anchor === 'end' ? x - w : (anchor === 'start' ? x : x - w / 2);
+      const top = y - h / 2;
+
+      const svg = renderMultilineText(lines, x, y, {
+        fontSize,
+        fontWeight: '600',
+        fill: inkColor,
+        anchor,
+        lineHeight: lineSpacing,
+        haloStroke: pal.bg,
+        haloWidth: 4.2
+      });
+      edgeLabelLayers.push(`<g pointer-events="none" class="ddp-couple-label">${svg}</g>`);
+      labelBounds.push({ left, right: left + w, top, bottom: top + h, w, h });
     }
 
-    // Draw Edges & Staggered Couples
+    // Count parallel calls between identical (from, to) pairs
+    const pairTotals = new Map();
+    const pairSeen = new Map();
+    for (const e of model.edges) {
+      const k = `${e.from}->${e.to}`;
+      pairTotals.set(k, (pairTotals.get(k) || 0) + 1);
+    }
+
+    // Draw Call Edges (with ↓ arrowheads) & EAP Couples (○→ / ●→)
     for (const parentNode of model.nodes) {
       const edges = childrenByParent.get(parentNode.id) || [];
       if (edges.length === 0) continue;
       const pPos = coords.get(parentNode.id);
+      if (!pPos) continue;
 
       const sortedEdges = [...edges].sort((a, b) => {
         const ca = coords.get(a.to);
@@ -543,38 +644,56 @@
         return (ca ? ca.cx : 0) - (cb ? cb.cx : 0);
       });
 
-      const attachSpan = Math.min(pPos.w * 0.76, (sortedEdges.length - 1) * 20);
       for (let idx = 0; idx < sortedEdges.length; idx++) {
         const e = sortedEdges[idx];
         const cPos = coords.get(e.to);
         if (!cPos) continue;
 
-        const frac = sortedEdges.length === 1 ? 0 : (idx / (sortedEdges.length - 1)) - 0.5;
-        const x1 = pPos.cx + frac * attachSpan;
+        const pairKey = `${e.from}->${e.to}`;
+        const pTotal = pairTotals.get(pairKey) || 1;
+        const pIdx = pairSeen.get(pairKey) || 0;
+        pairSeen.set(pairKey, pIdx + 1);
+        const dupShift = pTotal > 1 ? (pIdx - (pTotal - 1) / 2) * 16 : 0;
+
+        // Compute parent attachment X1:
+        // • If child.cx sits inside parent's horizontal span (e.g. wide Root bar, or aligned Calc under Exec_Mi):
+        //   drop 100% straight vertically (x1 === x2)!
+        // • Otherwise: intersect ray from (pPos.cx, pPos.cy) -> (cPos.cx, cPos.y) with parent bottom border.
         const y1 = pPos.y + pPos.h;
-        const x2 = cPos.cx;
         const y2 = cPos.y;
+        const targetX = cPos.cx + dupShift;
+        let x1;
+        const innerPad = Math.min(14, pPos.w * 0.16);
+        if (Math.abs(targetX - pPos.cx) <= 2) {
+          x1 = targetX;
+        } else if (pPos.isWideBar && targetX >= pPos.x + innerPad && targetX <= pPos.x + pPos.w - innerPad) {
+          x1 = targetX;
+        } else {
+          const rayDy = Math.max(20, y2 - pPos.cy);
+          const rayX = pPos.cx + (targetX - pPos.cx) * ((pPos.h / 2) / rayDy);
+          x1 = Math.max(pPos.x + 8, Math.min(pPos.x + pPos.w - 8, rayX));
+        }
+        const x2 = targetX;
 
         const isEdgeActive = activeEdgeId === e.id;
-        const strokeColor = isEdgeActive ? pal.activeStroke : pal.edge;
-        const strokeW = isEdgeActive ? 2.8 : 1.75;
+        const strokeColor = isEdgeActive ? pal.activeStroke : edgeStrokeDefault;
+        const strokeW = isEdgeActive ? 2.5 : 1.5;
+        const callMarker = isEdgeActive ? 'url(#eap-call-arrow-active)' : 'url(#eap-call-arrow)';
 
         const isNormalDown = y2 > y1 + 12;
-        // Stagger couple attachment t along adjacent edges so wide parameter labels never collide
-        const tCouple = sortedEdges.length >= 3 ? (idx % 2 === 0 ? 0.42 : 0.62) : 0.50;
-        let midX = x1 + (x2 - x1) * tCouple;
-        let midY = y1 + (y2 - y1) * tCouple;
+        let midX = (x1 + x2) / 2;
+        let midY = (y1 + y2) / 2 + ((e.conditional || e.loop) ? 5 : 0);
 
         if (isNormalDown) {
           edgeParts.push(
-            `<line class="ddp-edge" data-edge-id="${escXml(e.id)}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${strokeColor}" stroke-width="${strokeW}" />`
+            `<line class="ddp-edge" data-edge-id="${escXml(e.id)}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${strokeColor}" stroke-width="${strokeW}" marker-end="${callMarker}" />`
           );
         } else {
-          const detourX = Math.max(x1, x2) + 74;
+          const detourX = Math.max(x1, x2) + 68;
           edgeParts.push(
-            `<path class="ddp-edge" data-edge-id="${escXml(e.id)}" d="M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${detourX.toFixed(1)} ${(y1 + 40).toFixed(1)}, ${detourX.toFixed(1)} ${(y2 - 40).toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="5 3" />`
+            `<path class="ddp-edge" data-edge-id="${escXml(e.id)}" d="M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${detourX.toFixed(1)} ${(y1 + 38).toFixed(1)}, ${detourX.toFixed(1)} ${(y2 - 38).toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="5 3" marker-end="${callMarker}" />`
           );
-          midX = detourX - 18;
+          midX = detourX - 16;
           midY = (y1 + y2) / 2;
         }
 
@@ -583,86 +702,107 @@
         const len = Math.hypot(dx, dy) || 1;
         const ux = dx / len;
         const uy = dy / len;
-        let nx = -uy;
-        let ny = ux;
-        if (nx < 0) { nx = -nx; ny = -ny; }
+        // Left & right unit normals (for downward edges uy > 0, so leftN.x < 0 and rightN.x > 0)
+        const leftNx = -uy;
+        const leftNy = ux;
+        const rightNx = uy;
+        const rightNy = -ux;
 
         if (e.conditional && isNormalDown) {
-          const dcx = x1 + ux * 9;
-          const dcy = y1 + uy * 9;
-          const rD = 5.8;
+          const dcx = x1 + ux * 7;
+          const dcy = y1 + uy * 7;
+          const rD = 5.5;
           const pts = [
             `${dcx.toFixed(1)},${(dcy - rD).toFixed(1)}`,
             `${(dcx + rD).toFixed(1)},${dcy.toFixed(1)}`,
             `${dcx.toFixed(1)},${(dcy + rD).toFixed(1)}`,
             `${(dcx - rD).toFixed(1)},${dcy.toFixed(1)}`
           ].join(' ');
-          edgeParts.push(`<polygon points="${pts}" fill="${pal.bg}" stroke="${strokeColor}" stroke-width="1.6" />`);
+          edgeParts.push(`<polygon points="${pts}" fill="${pal.bg}" stroke="${strokeColor}" stroke-width="1.5" />`);
           if (e.conditional.type === 'CASE' && e.conditional.label) {
-            const bx = x1 + ux * 22 + nx * 12;
-            const by = y1 + uy * 22 + ny * 12;
-            trackPillLabel(bx, by, e.conditional.label, 'start', 11);
+            const bx = x1 + ux * 16 + rightNx * 8;
+            const by = y1 + uy * 16 + rightNy * 8;
+            renderCleanCoupleLabel(bx, by, [`(${e.conditional.label})`], 'start', 10.5);
           }
         }
 
         if (e.loop && isNormalDown) {
-          const lcx = x1 + ux * 24;
-          const lcy = y1 + uy * 24;
+          const lcx = x1 + ux * 18;
+          const lcy = y1 + uy * 18;
           edgeParts.push(
-            `<path d="M ${(lcx - 13).toFixed(1)} ${(lcy + 3).toFixed(1)} A 13 8 0 1 1 ${(lcx + 12).toFixed(1)} ${(lcy + 3).toFixed(1)}" fill="none" stroke="${strokeColor}" stroke-width="1.6" marker-end="url(#eap-couple-arrow)" />`
+            `<path d="M ${(lcx - 12).toFixed(1)} ${(lcy + 3).toFixed(1)} A 12 7 0 1 1 ${(lcx + 11).toFixed(1)} ${(lcy + 3).toFixed(1)}" fill="none" stroke="${strokeColor}" stroke-width="1.5" marker-end="url(#eap-couple-arrow)" />`
           );
         }
 
-        const coupleColor = isEdgeActive ? pal.activeStroke : pal.ink;
+        if (!isNormalDown) continue;
+
+        const coupleColor = isEdgeActive ? pal.activeStroke : inkColor;
         const arrowMarker = isEdgeActive ? 'url(#eap-couple-arrow-active)' : 'url(#eap-couple-arrow)';
-        const arrowHalf = 14;
+        const arrowHalf = Math.min(13, Math.max(9, (len - 22) * 0.24));
+        const perpDist = 9.5;
+        const lblGap = 6;
 
-        if (e.inputs.length > 0 && isNormalDown) {
-          const off = -11;
-          const ax = midX + nx * off;
-          const ay = midY + ny * off;
-          const sx = ax - ux * arrowHalf;
-          const sy = ay - uy * arrowHalf;
-          const ex = ax + ux * arrowHalf;
-          const ey = ay + uy * arrowHalf;
+        const inLines = formatDDPCoupleLines(e.inputs);
+        const outLines = formatDDPCoupleLines(e.outputs);
+        const flagLines = formatDDPCoupleLines(e.controlFlags);
+        const hasDown = inLines.length > 0;
+        const hasUp = outLines.length > 0 || flagLines.length > 0;
+
+        function drawCouple(cxBase, cyBase, side, dirDown, isFlag, lines) {
+          const nx = side === 'left' ? leftNx : rightNx;
+          const ny = side === 'left' ? leftNy : rightNy;
+          const anchor = side === 'left' ? 'end' : 'start';
+          const ax = cxBase + nx * perpDist;
+          const ay = cyBase + ny * perpDist;
+          const sx = dirDown ? ax - ux * arrowHalf : ax + ux * arrowHalf;
+          const sy = dirDown ? ay - uy * arrowHalf : ay + uy * arrowHalf;
+          const ex = dirDown ? ax + ux * arrowHalf : ax - ux * arrowHalf;
+          const ey = dirDown ? ay + uy * arrowHalf : ay - uy * arrowHalf;
+
           edgeParts.push(
-            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.5" marker-end="${arrowMarker}" />`,
-            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.6" fill="${pal.bg}" stroke="${coupleColor}" stroke-width="1.5" />`
+            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.35" marker-end="${arrowMarker}" />`,
+            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.1" fill="${isFlag ? coupleColor : pal.bg}" stroke="${coupleColor}" stroke-width="1.35" />`
           );
-          const lblText = e.inputs.map((x) => x.name).join(', ');
-          trackPillLabel(ax + nx * -10, ay + ny * -10, lblText, 'end', 12);
+
+          const lx = ax + nx * lblGap + (side === 'left' ? -1.5 : 1.5);
+          const ly = ay + ny * lblGap;
+          renderCleanCoupleLabel(lx, ly, lines, anchor, coupleFontSize);
         }
 
-        if (e.outputs.length > 0 && isNormalDown) {
-          const off = 11;
-          const ax = midX + nx * off;
-          const ay = midY + ny * off;
-          const sx = ax + ux * arrowHalf;
-          const sy = ay + uy * arrowHalf;
-          const ex = ax - ux * arrowHalf;
-          const ey = ay - uy * arrowHalf;
-          edgeParts.push(
-            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.5" marker-end="${arrowMarker}" />`,
-            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.6" fill="${pal.bg}" stroke="${coupleColor}" stroke-width="1.5" />`
-          );
-          const lblText = e.outputs.map((x) => x.name).join(', ');
-          trackPillLabel(ax + nx * 10, ay + ny * 10, lblText, 'start', 12);
-        }
-
-        if (e.controlFlags.length > 0 && isNormalDown) {
-          const off = e.outputs.length > 0 ? 25 : 11;
-          const ax = midX + nx * off;
-          const ay = midY + ny * off;
-          const sx = ax + ux * arrowHalf;
-          const sy = ay + uy * arrowHalf;
-          const ex = ax - ux * arrowHalf;
-          const ey = ay - uy * arrowHalf;
-          edgeParts.push(
-            `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="${coupleColor}" stroke-width="1.5" marker-end="${arrowMarker}" />`,
-            `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="3.8" fill="${coupleColor}" stroke="${coupleColor}" stroke-width="1.2" />`
-          );
-          const lblText = e.controlFlags.map((x) => x.name).join(', ');
-          trackPillLabel(ax + nx * 10, ay + ny * 10, lblText, 'start', 12);
+        // Official EAP couple side rule:
+        // • Dual couples (both input ↓ and output ↑): input on LEFT, output/flag on RIGHT.
+        // • Single couple: on upper-RIGHT if edge leans right (dx > 6), else on LEFT.
+        if (hasDown && hasUp) {
+          drawCouple(midX, midY, 'left', true, false, inLines);
+          if (outLines.length > 0 && flagLines.length > 0) {
+            const topMidX = x1 + dx * 0.36;
+            const topMidY = y1 + dy * 0.36;
+            const botMidX = x1 + dx * 0.68;
+            const botMidY = y1 + dy * 0.68;
+            drawCouple(topMidX, topMidY, 'right', false, false, outLines);
+            drawCouple(botMidX, botMidY, 'right', false, true, flagLines);
+          } else if (outLines.length > 0) {
+            drawCouple(midX, midY, 'right', false, false, outLines);
+          } else {
+            drawCouple(midX, midY, 'right', false, true, flagLines);
+          }
+        } else if (hasDown) {
+          const side = dx > 6 ? 'right' : 'left';
+          drawCouple(midX, midY, side, true, false, inLines);
+        } else if (hasUp) {
+          const side = dx > 6 ? 'right' : 'left';
+          if (outLines.length > 0 && flagLines.length > 0) {
+            const topMidX = x1 + dx * 0.36;
+            const topMidY = y1 + dy * 0.36;
+            const botMidX = x1 + dx * 0.68;
+            const botMidY = y1 + dy * 0.68;
+            drawCouple(topMidX, topMidY, side, false, false, outLines);
+            drawCouple(botMidX, botMidY, side, false, true, flagLines);
+          } else if (outLines.length > 0) {
+            drawCouple(midX, midY, side, false, false, outLines);
+          } else {
+            drawCouple(midX, midY, side, false, true, flagLines);
+          }
         }
       }
     }
@@ -677,27 +817,33 @@
       minY = Math.min(minY, pos.y);
       maxY = Math.max(maxY, pos.y + pos.h);
     }
-    for (const b of pillBounds) {
+    for (const b of labelBounds) {
       minX = Math.min(minX, b.left);
       maxX = Math.max(maxX, b.right);
       minY = Math.min(minY, b.top);
       maxY = Math.max(maxY, b.bottom);
     }
 
-    const padX = options.paddingX || options.padding || (options.tightCrop ? 20 : 32);
-    const padY = options.paddingY || options.padding || (options.tightCrop ? 18 : 26);
-    const legendH = showLegend ? 46 : 8;
+    const padX = options.paddingX || options.padding || (options.tightCrop ? 18 : 28);
+    const padY = options.paddingY || options.padding || (options.tightCrop ? 16 : 24);
+    const legendH = showLegend ? 44 : 8;
     const vp = computeCanvasViewport(minX, minY, maxX, maxY, padX, padY, legendH, options);
 
     const svgParts = [];
     svgParts.push(
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vp.viewMinX} ${vp.viewMinY} ${vp.viewW} ${vp.viewH}" width="${vp.svgW}" height="${vp.svgH}" style="font-family:${escXml(pal.font)}">`,
       `<defs>`,
-      `  <marker id="eap-couple-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.8" markerHeight="6.8" orient="auto-start-reverse">`,
-      `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.ink}" />`,
+      `  <marker id="eap-call-arrow" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">`,
+      `    <path d="M 0 1.2 L 9.5 5 L 0 8.8 z" fill="${edgeStrokeDefault}" />`,
       `  </marker>`,
-      `  <marker id="eap-couple-arrow-active" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.8" markerHeight="6.8" orient="auto-start-reverse">`,
-      `    <path d="M 0 1 L 9 5 L 0 9 z" fill="${pal.activeStroke}" />`,
+      `  <marker id="eap-call-arrow-active" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto">`,
+      `    <path d="M 0 1.2 L 9.5 5 L 0 8.8 z" fill="${pal.activeStroke}" />`,
+      `  </marker>`,
+      `  <marker id="eap-couple-arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse">`,
+      `    <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="${inkColor}" />`,
+      `  </marker>`,
+      `  <marker id="eap-couple-arrow-active" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse">`,
+      `    <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="${pal.activeStroke}" />`,
       `  </marker>`,
       `</defs>`,
       `<rect x="${vp.viewMinX}" y="${vp.viewMinY}" width="${vp.viewW}" height="${vp.viewH}" fill="${pal.bg}" />`
@@ -721,19 +867,22 @@
       const st = roleStyle(n.role, pal);
       const isActive = activeNodeId === n.id;
       const dash = n.isStub ? ' stroke-dasharray="5 3"' : '';
+      const boxFill = isPrint ? '#ffffff' : st.fill;
+      const boxStroke = isActive ? pal.activeStroke : (isPrint ? '#000000' : st.stroke);
+      const boxStrokeW = isActive ? 2.4 : (isPrint ? 1.5 : st.sw);
       const activeOutline = isActive
-        ? `<rect x="${(pos.x - 4).toFixed(1)}" y="${(pos.y - 4).toFixed(1)}" width="${(pos.w + 8).toFixed(1)}" height="${(pos.h + 8).toFixed(1)}" rx="7" fill="none" stroke="${pal.activeStroke}" stroke-width="2.5" />`
+        ? `<rect x="${(pos.x - 4).toFixed(1)}" y="${(pos.y - 4).toFixed(1)}" width="${(pos.w + 8).toFixed(1)}" height="${(pos.h + 8).toFixed(1)}" rx="2" fill="none" stroke="${pal.activeStroke}" stroke-width="2.4" />`
         : '';
 
       const lines = nodeLines.get(n.id) || [n.name];
       const textCy = n.isStub ? pos.cy - 5 : pos.cy;
-      const fSize = lines.length > 2 ? 12 : (lines.length === 2 ? 13 : 13.5);
+      const fSize = lines.length > 2 ? 11.5 : (lines.length === 2 ? 12.5 : 13);
 
       svgParts.push(
         `<g class="ddp-node" data-node-id="${escXml(n.id)}" data-line="${n.startLine}" data-x="${pos.cx.toFixed(1)}" data-y="${pos.cy.toFixed(1)}" style="cursor:pointer">`,
         activeOutline,
-        `  <rect x="${pos.x.toFixed(1)}" y="${pos.y.toFixed(1)}" width="${pos.w.toFixed(1)}" height="${pos.h.toFixed(1)}" rx="4" fill="${st.fill}" stroke="${isActive ? pal.activeStroke : st.stroke}" stroke-width="${isActive ? 2.5 : st.sw}"${dash} />`,
-        renderMultilineText(lines, pos.cx, textCy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
+        `  <rect x="${pos.x.toFixed(1)}" y="${pos.y.toFixed(1)}" width="${pos.w.toFixed(1)}" height="${pos.h.toFixed(1)}" rx="0" fill="${boxFill}" stroke="${boxStroke}" stroke-width="${boxStrokeW}"${dash} />`,
+        renderMultilineText(lines, pos.cx, textCy, { fontSize: fSize, fontWeight: '700', fill: inkColor }),
         n.isStub
           ? `  <text x="${pos.cx.toFixed(1)}" y="${(pos.y + pos.h - 6).toFixed(1)}" text-anchor="middle" fill="${pal.muted}" font-size="9.5">stub</text>`
           : '',
@@ -744,19 +893,19 @@
     svgParts.push(...edgeLabelLayers);
 
     if (showLegend) {
-      const ly = maxY + 32;
+      const ly = maxY + 30;
       const lx = minX;
       svgParts.push(
         `<g class="ddp-legend" font-size="11.5" fill="${pal.muted}">`,
-        `  <line x1="${lx}" y1="${ly}" x2="${lx + 22}" y2="${ly}" stroke="${pal.ink}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
-        `  <circle cx="${lx}" cy="${ly}" r="3.2" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.4" />`,
+        `  <line x1="${lx}" y1="${ly}" x2="${lx + 22}" y2="${ly}" stroke="${inkColor}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
+        `  <circle cx="${lx}" cy="${ly}" r="3.1" fill="${pal.bg}" stroke="${inkColor}" stroke-width="1.4" />`,
         `  <text x="${lx + 30}" y="${ly + 4}">Ζεύγος δεδομένων (IN/OUT)</text>`,
-        `  <line x1="${lx + 205}" y1="${ly}" x2="${lx + 227}" y2="${ly}" stroke="${pal.ink}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
-        `  <circle cx="${lx + 205}" cy="${ly}" r="3.2" fill="${pal.ink}" />`,
+        `  <line x1="${lx + 205}" y1="${ly}" x2="${lx + 227}" y2="${ly}" stroke="${inkColor}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
+        `  <circle cx="${lx + 205}" cy="${ly}" r="3.1" fill="${inkColor}" />`,
         `  <text x="${lx + 235}" y="${ly + 4}">Σημαία ελέγχου (flag)</text>`,
-        `  <polygon points="${lx + 385},${ly - 5} ${lx + 390},${ly} ${lx + 385},${ly + 5} ${lx + 380},${ly}" fill="${pal.bg}" stroke="${pal.ink}" stroke-width="1.4" />`,
+        `  <polygon points="${lx + 385},${ly - 5} ${lx + 390},${ly} ${lx + 385},${ly + 5} ${lx + 380},${ly}" fill="${pal.bg}" stroke="${inkColor}" stroke-width="1.4" />`,
         `  <text x="${lx + 398}" y="${ly + 4}">Επιλογή (IF/CASE)</text>`,
-        `  <path d="M ${lx + 515} ${ly + 3} A 9 6 0 1 1 ${lx + 533} ${ly + 3}" fill="none" stroke="${pal.ink}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
+        `  <path d="M ${lx + 515} ${ly + 3} A 9 6 0 1 1 ${lx + 533} ${ly + 3}" fill="none" stroke="${inkColor}" stroke-width="1.4" marker-end="url(#eap-couple-arrow)" />`,
         `  <text x="${lx + 541}" y="${ly + 4}">Επανάληψη (Loop)</text>`,
         `</g>`
       );

@@ -816,6 +816,134 @@ PROCEDURE PUT_Ε(Ε: IN) ΕΜΦΑΝΙΣΕ το Ε στην εξωτερική ο
   console.log('testSequentialProvenanceAndVerticalEAPLayout passed');
 }
 
+function testOfficialEAPStructureChartLayout() {
+  // 1. Official GE1 2025-26 Full solution (Image 2 benchmark)
+  const full = Core.compilePLI11(PLI11_EXAMPLES.GE1_2025_2026_FULL);
+  const svg = Renderer.renderDDPSVG(full.model, { printMode: true, tightCrop: true });
+
+  // Parse all module rectangles
+  const nodeRe = /<g class="ddp-node" data-node-id="([^"]+)"[^>]*>\s*<rect x="([0-9.-]+)" y="([0-9.-]+)" width="([0-9.]+)" height="([0-9.]+)"/g;
+  const boxes = new Map();
+  let m;
+  while ((m = nodeRe.exec(svg)) !== null) {
+    const x = parseFloat(m[2]);
+    const y = parseFloat(m[3]);
+    const w = parseFloat(m[4]);
+    const h = parseFloat(m[5]);
+    boxes.set(m[1], { id: m[1], x, y, w, h, cx: x + w / 2, cy: y + h / 2 });
+  }
+
+  const idOf = (name) => full.model.nodeMap.get(Core.normalizeId(name)).id;
+  const rootBox = boxes.get(idOf('EXEC_M3_M4_M5'));
+  assert.ok(rootBox, 'Root box EXEC_M3_M4_M5 must exist');
+
+  // All 9 direct children of EXEC_M3_M4_M5 must sit on the EXACT same Y level in CALL order
+  const level1Names = [
+    'EXEC_M1', 'EXEC_M2', 'GET_Δ', 'CALC_M4',
+    'CALC_M3', 'CALC_M5', 'PUT_Π', 'PUT_Μ', 'EXEC_M6'
+  ];
+  const level1Boxes = level1Names.map((n) => boxes.get(idOf(n)));
+  assert.ok(level1Boxes.every(Boolean), 'All 9 Level-1 modules must exist');
+  for (let i = 1; i < level1Boxes.length; i++) {
+    assert.strictEqual(level1Boxes[i].y, level1Boxes[0].y, 'All Level-1 siblings must share exact Y coordinate');
+    assert.ok(level1Boxes[i - 1].x + level1Boxes[i - 1].w < level1Boxes[i].x, 'Level-1 siblings must be strictly ordered left-to-right without overlap');
+  }
+
+  // Root wide bar spans from leftmost box (Get_Α) to rightmost box (Put_Ο)
+  const getA = boxes.get(idOf('GET_Α'));
+  const putO = boxes.get(idOf('PUT_Ο'));
+  assert.ok(Math.abs(rootBox.x - getA.x) < 1, 'Root bar left edge should align with leftmost module Get_Α');
+  assert.ok(Math.abs((rootBox.x + rootBox.w) - (putO.x + putO.w)) < 1, 'Root bar right edge should align with rightmost module Put_Ο');
+
+  // Sub-controllers align vertically directly above their Calc module (EAP textbook pattern)
+  assert.ok(Math.abs(boxes.get(idOf('EXEC_M1')).cx - boxes.get(idOf('CALC_M1')).cx) < 1, 'Exec_M1 should sit directly above Calc_M1');
+  assert.ok(Math.abs(boxes.get(idOf('EXEC_M2')).cx - boxes.get(idOf('CALC_M2')).cx) < 1, 'Exec_M2 should sit directly above Calc_M2');
+  assert.ok(Math.abs(boxes.get(idOf('EXEC_M6')).cx - boxes.get(idOf('CALC_M6')).cx) < 1, 'Exec_M6 should sit directly above Calc_M6');
+
+  // Every call line from Root to Level-1 children must be 100% vertical (x1 === x2) and carry call arrowhead
+  const edgeRe = /<line class="ddp-edge" data-edge-id="([^"]+)" x1="([0-9.-]+)" y1="([0-9.-]+)" x2="([0-9.-]+)" y2="([0-9.-]+)"[^>]*marker-end="url\(#eap-call-arrow\)"/g;
+  const edges = [];
+  while ((m = edgeRe.exec(svg)) !== null) {
+    edges.push({
+      id: m[1],
+      x1: parseFloat(m[2]),
+      y1: parseFloat(m[3]),
+      x2: parseFloat(m[4]),
+      y2: parseFloat(m[5])
+    });
+  }
+  assert.strictEqual(edges.length, full.model.edges.length, 'Every call edge must render with eap-call-arrow marker');
+  const rootEdges = edges.filter((e) => e.id.startsWith(`E_${idOf('EXEC_M3_M4_M5')}_`));
+  assert.strictEqual(rootEdges.length, 9);
+  for (const re of rootEdges) {
+    assert.ok(Math.abs(re.x1 - re.x2) < 0.5, `Root call edge ${re.id} must be 90-deg vertical (${re.x1} vs ${re.x2})`);
+  }
+
+  // 2. Verify zero edge crossings on wide 8-branch Composite KM (Image 1 regression test)
+  const wide8Code = `
+PROCEDURE Exec_M3_M4_M5
+  LOCAL VAR Γ, Ι, Σ, Η, Ο, Ν, Φ, Υ, Κ, Μ, Τ;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ Γ, Ι, Σ, Η, Ο, Ν, Φ, Υ, Κ, Μ, Τ;
+  CALL Exec_M1(Γ, Ι);
+  CALL Exec_M2(Σ, Η);
+  CALL Calc_M3(Η, Ο, Ν, Φ);
+  CALL Calc_M4(Ι, Σ, Ο, Υ, Κ);
+  CALL Calc_M6(Κ, Ν, Μ);
+  CALL Calc_M5(Γ, Υ, Μ, Τ);
+  CALL Exec_M7(Φ);
+  CALL Exec_M8(Τ);
+END_PROCEDURE;
+PROCEDURE Exec_M1(Γ, Ι: IN/OUT) LOCAL VAR Α, Β; ΑΡΧΙΚΟΠΟΙΗΣΕ Α, Β; CALL Get_A(Α); CALL Get_B(Β); CALL Calc_M1(Α, Β, Γ, Ι); END_PROCEDURE;
+PROCEDURE Exec_M2(Σ, Η: IN/OUT) LOCAL VAR Θ; ΑΡΧΙΚΟΠΟΙΗΣΕ Θ; CALL Get_Θ(Θ); CALL Calc_M2(Θ, Σ, Η); END_PROCEDURE;
+PROCEDURE Exec_M7(Φ: IN) LOCAL VAR Π; ΑΡΧΙΚΟΠΟΙΗΣΕ Π; CALL Calc_M7(Φ, Π); CALL Put_Π(Π); END_PROCEDURE;
+PROCEDURE Exec_M8(Τ: IN) LOCAL VAR Δ, Ζ, Χ; ΑΡΧΙΚΟΠΟΙΗΣΕ Δ, Ζ, Χ; CALL Get_Δ(Δ); CALL Calc_M8(Τ, Δ, Ζ, Χ); CALL Put_Ζ(Ζ); CALL Put_Χ(Χ); END_PROCEDURE;
+PROCEDURE Get_A(Α: IN/OUT) Διάβασε Α; END_PROCEDURE;
+PROCEDURE Get_B(Β: IN/OUT) Διάβασε Β; END_PROCEDURE;
+PROCEDURE Calc_M1(Α, Β: IN, Γ, Ι: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE Get_Θ(Θ: IN/OUT) Διάβασε Θ; END_PROCEDURE;
+PROCEDURE Calc_M2(Θ: IN, Σ, Η: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE Calc_M3(Η: IN, Ο, Ν, Φ: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE Calc_M4(Ι, Σ, Ο: IN, Υ, Κ: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE Calc_M6(Κ, Ν: IN, Μ: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE Calc_M5(Γ, Υ, Μ: IN, Τ: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE Calc_M7(Φ: IN, Π: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE Put_Π(Π: IN) Εμφάνισε Π; END_PROCEDURE;
+PROCEDURE Get_Δ(Δ: IN/OUT) Διάβασε Δ; END_PROCEDURE;
+PROCEDURE Calc_M8(Τ, Δ: IN, Ζ, Χ: IN/OUT) Υπολόγισε; END_PROCEDURE;
+PROCEDURE Put_Ζ(Ζ: IN) Εμφάνισε Ζ; END_PROCEDURE;
+PROCEDURE Put_Χ(Χ: IN) Εμφάνισε Χ; END_PROCEDURE;`;
+
+  const wideRes = Core.compilePLI11(wide8Code);
+  const wideSvg = Renderer.renderDDPSVG(wideRes.model, { printMode: true });
+  const segs = [];
+  edgeRe.lastIndex = 0;
+  while ((m = edgeRe.exec(wideSvg)) !== null) {
+    segs.push({
+      id: m[1],
+      x1: parseFloat(m[2]),
+      y1: parseFloat(m[3]),
+      x2: parseFloat(m[4]),
+      y2: parseFloat(m[5])
+    });
+  }
+  assert.strictEqual(segs.length, 19);
+
+  function segmentsProperlyCross(a, b) {
+    // Ignore shared endpoints
+    if (Math.hypot(a.x1 - b.x1, a.y1 - b.y1) < 2 || Math.hypot(a.x2 - b.x2, a.y2 - b.y2) < 2) return false;
+    const ccw = (px, py, qx, qy, rx, ry) => (ry - py) * (qx - px) > (qy - py) * (rx - px);
+    return (ccw(a.x1, a.y1, b.x1, b.y1, b.x2, b.y2) !== ccw(a.x2, a.y2, b.x1, b.y1, b.x2, b.y2)) &&
+           (ccw(a.x1, a.y1, a.x2, a.y2, b.x1, b.y1) !== ccw(a.x1, a.y1, a.x2, a.y2, b.x2, b.y2));
+  }
+  for (let i = 0; i < segs.length; i++) {
+    for (let j = i + 1; j < segs.length; j++) {
+      assert.ok(!segmentsProperlyCross(segs[i], segs[j]), `DDP edges ${segs[i].id} and ${segs[j].id} must NEVER cross!`);
+    }
+  }
+
+  console.log('testOfficialEAPStructureChartLayout passed');
+}
+
 testOfficialExamplesZeroErrors();
 testHomoglyphNormalization();
 testValidatorRules();
@@ -833,4 +961,5 @@ testTextWrappingAndNoOverflow();
 testCanvasDimensionsOptions();
 testDFDFlowLabelOffsetBesideArrows();
 testSequentialProvenanceAndVerticalEAPLayout();
+testOfficialEAPStructureChartLayout();
 console.log('All ΠΛΗ11 tests passed!');
