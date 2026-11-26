@@ -244,6 +244,60 @@ function testSVGRendererAndDragOverrides() {
   console.log('testSVGRendererAndDragOverrides passed');
 }
 
+function testFunctionalAssocClassDeterministicMermaidAndQuickFixes() {
+  // 1. Functional ΣΥΣΧΕΤΙΣΗ Σύμβαση (Εταιρεία, Υπάλληλος) syntax + deterministic C_<slug> IDs
+  const code = `
+ΚΛΑΣΗ Εταιρεία
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    επωνυμία;
+ΤΕΛΟΣ
+ΚΛΑΣΗ Υπάλληλος
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    + μισθός: REAL;
+ΤΕΛΟΣ
+ΚΛΑΣΗ Σύμβαση
+  ΚΑΤΗΓΟΡΗΜΑΤΑ
+    ημερομηνία;
+ΤΕΛΟΣ
+ΣΧΕΣΕΙΣ
+  ΣΥΣΧΕΤΙΣΗ Σύμβαση (Εταιρεία, Υπάλληλος)
+  Υπάλληλος (1) -- (0..*) ΑδήλωτηΚλάση : χειρίζεται`;
+
+  const res = Core.compileClassDiagram(code);
+  const assocRel = res.model.relations.find((r) => r.assocClass === 'Σύμβαση');
+  assert.ok(assocRel && assocRel.from === 'Εταιρεία' && assocRel.to === 'Υπάλληλος', 'Should parse ΣΥΣΧΕΤΙΣΗ Name (A, B) syntax');
+  assert.ok(res.mermaid.includes('C_Εταιρεια') || res.mermaid.includes('C_'), 'Mermaid should use deterministic C_<slug> IDs');
+
+  // 2. Quick-Fixes for W03 (declare missing class) & W05 (make public attribute PRIVATE)
+  const w03 = res.validation.diagnostics.find((d) => d.code === 'W03');
+  assert.ok(w03 && w03.fixAction === 'DECLARE_MISSING_CLASS');
+  const afterW03 = Core.applyClassQuickFix(code, w03);
+  const res2 = Core.compileClassDiagram(afterW03);
+  assert.ok(!res2.validation.diagnostics.some((d) => d.code === 'W03'), 'W03 quick-fix should declare missing class');
+
+  const w05 = res2.validation.diagnostics.find((d) => d.code === 'W05');
+  assert.ok(w05 && w05.fixAction === 'MAKE_ATTR_PRIVATE');
+  const afterW05 = Core.applyClassQuickFix(afterW03, w05);
+  const res3 = Core.compileClassDiagram(afterW05);
+  assert.ok(!res3.validation.diagnostics.some((d) => d.code === 'W05'), 'W05 quick-fix should convert + to PRIVATE');
+
+  // 3. Canvas presets & PNG pHYs DPI injection helper
+  const a4Svg = Renderer.renderClassDiagramSVG(res3.model, { canvasWidth: 1120, canvasHeight: 790 });
+  assert.ok(a4Svg.includes('width="1120"') && a4Svg.includes('height="790"'), 'Should honor explicit A4 canvas dimensions');
+  const cropSvg = Renderer.renderClassDiagramSVG(res3.model, { canvasWidth: 1120, canvasHeight: 790, tightCrop: true });
+  assert.ok(!cropSvg.includes('width="1120"'), 'tightCrop should crop tightly around diagram bounds for Word PNG');
+  const fakePng = new Uint8Array([
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0, 0, 4, 0, 0, 0, 3, 0, 8, 6, 0, 0, 0, 0, 0, 0, 0,
+    0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
+  ]);
+  const withDpi = Renderer.injectPngPhysDpi(fakePng, 300);
+  assert.strictEqual(withDpi.length, fakePng.length + 21, 'injectPngPhysDpi should insert 21-byte pHYs chunk');
+
+  console.log('testFunctionalAssocClassDeterministicMermaidAndQuickFixes passed');
+}
+
 function runAll() {
   testOfficialOSS2PseudocodeParsing();
   testAllRelationshipSyntaxes();
@@ -251,6 +305,7 @@ function runAll() {
   testValidatorRules();
   testOfficialPseudocodeAndMermaid();
   testSVGRendererAndDragOverrides();
+  testFunctionalAssocClassDeterministicMermaidAndQuickFixes();
   console.log('All PLI11 Class Diagram tests passed successfully!');
 }
 

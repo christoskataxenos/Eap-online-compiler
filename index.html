@@ -10,6 +10,7 @@
     <meta property="og:type" content="website">
     <title>EAP Online Compiler - ΠΛΗ10 &amp; ΠΛΗ11</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="landing.css">
     <!-- Shared utilities: applies saved theme immediately (FOUC prevention) -->
@@ -207,72 +208,8 @@
         tabPli11Cls.addEventListener('click', () => setPreviewTab('pli11cls'));
         setPreviewTab('pli10');
 
-        // Submenu Dropdown Interactions
-        const submenu = document.getElementById('course-submenu');
-        const submenuBtn = document.getElementById('tools-submenu-btn');
-        let isPinnedByClick = false;
-        let closeTimeout = null;
-
-        function setSubmenuOpen(open, pinned = false) {
-            if (closeTimeout) {
-                clearTimeout(closeTimeout);
-                closeTimeout = null;
-            }
-            if (!open) {
-                isPinnedByClick = false;
-            } else if (pinned) {
-                isPinnedByClick = true;
-            }
-            submenu.classList.toggle('open', open);
-            submenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        }
-
-        submenuBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (submenu.classList.contains('open') && isPinnedByClick) {
-                setSubmenuOpen(false);
-            } else {
-                setSubmenuOpen(true, true);
-            }
-        });
-
-        submenu.addEventListener('mouseenter', () => {
-            if (closeTimeout) {
-                clearTimeout(closeTimeout);
-                closeTimeout = null;
-            }
-            if (window.matchMedia('(hover: hover)').matches) {
-                setSubmenuOpen(true, isPinnedByClick);
-            }
-        });
-
-        submenu.addEventListener('mouseleave', () => {
-            if (isPinnedByClick) return;
-            closeTimeout = setTimeout(() => {
-                setSubmenuOpen(false);
-            }, 200);
-        });
-
-        document.addEventListener('click', (e) => {
-            if (!submenu.contains(e.target)) {
-                setSubmenuOpen(false);
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && submenu.classList.contains('open')) {
-                setSubmenuOpen(false);
-                submenuBtn.focus();
-            }
-        });
-
-        submenu.querySelectorAll('.submenu-item').forEach(item => {
-            item.addEventListener('click', () => {
-                setSubmenuOpen(false);
-            });
-        });
-
-        // Theme toggle (shared via EAPCommon) — rewrites a[data-base] links with ?theme=
+        // Shared Submenu Dropdown & Theme toggle (via EAPCommon)
+        window.EAPCommon.wireCourseSubmenu();
         window.EAPCommon.wireThemeToggle();
     </script>
 

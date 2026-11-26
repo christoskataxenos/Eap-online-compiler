@@ -418,6 +418,30 @@
       else if (kw === normKeyword('ΕΞΑΡΤΗΣΗ') || kw === 'DEPENDENCY') kwKind = 'dependency';
       if (kwKind) {
         s = kwMatch[2].trim();
+        // Support "ΣΥΣΧΕΤΙΣΗ Σύμβαση (Εταιρεία, Υπάλληλος)" syntax
+        if (kwKind === 'association' && !findSymbolicOperator(s)) {
+          const fnStyle = s.match(/^(.+?)\s*\(\s*([^,()]+)\s*,\s*([^,()]+)\s*\)(?:\s*:\s*(.+))?$/);
+          if (fnStyle) {
+            const acName = normalizeClassName(fnStyle[1]);
+            const fName = normalizeClassName(fnStyle[2]);
+            const tName = normalizeClassName(fnStyle[3]);
+            const lbl = fnStyle[4] ? normalizeClassName(fnStyle[4]) : acName;
+            if (acName && fName && tName) {
+              return {
+                relations: [{
+                  kind: 'association',
+                  from: fName,
+                  to: tName,
+                  fromMult: '1..*',
+                  toMult: '1..*',
+                  label: lbl,
+                  assocClass: acName,
+                  line: lineNum
+                }]
+              };
+            }
+          }
+        }
       }
     }
 
@@ -847,6 +871,8 @@
           severity: 'warning',
           code: 'W03',
           line: cls.line || 1,
+          fixAction: 'DECLARE_MISSING_CLASS',
+          fixClass: cls.name,
           message: `Η κλάση «${cls.name}» αναφέρεται στις σχέσεις χωρίς να έχει δηλωθεί με ΚΛΑΣΗ.`,
           hint: `Προσθέστε μπλοκ «ΚΛΑΣΗ ${cls.name} ... ΤΕΛΟΣ» για να ορίσετε τα κατηγορήματά της.`
         });
@@ -861,6 +887,7 @@
             severity: 'error',
             code: 'C04',
             line: attr.line || cls.line,
+            fixAction: 'REMOVE_LINE',
             message: `Διπλό κατηγόρημα «${attr.name}» στην κλάση «${cls.name}» (πρώτη δήλωση στη γραμμή ${seenAttrs.get(ak).line}).`,
             hint: 'Αφαιρέστε τη διπλή καταχώριση του κατηγορήματος.'
           });
@@ -873,6 +900,7 @@
             severity: 'warning',
             code: 'W05',
             line: attr.line || cls.line,
+            fixAction: 'MAKE_ATTR_PRIVATE',
             message: `Το κατηγόρημα «${attr.name}» στην κλάση «${cls.name}» έχει ορατότητα PUBLIC (+).`,
             hint: 'Κατά την ΟΣΣ2 (ενθυλάκωση), τα κατηγορήματα είναι συνήθως PRIVATE (-).'
           });
@@ -1014,6 +1042,7 @@
             severity: 'warning',
             code: 'W01',
             line: a.line || cls.line,
+            fixAction: 'REMOVE_LINE',
             message: `Το κατηγόρημα «${a.name}» επαναλαμβάνεται στην υποκλάση «${cls.name}», ενώ κληρονομείται ήδη από την «${ancAttrMap.get(ak)}».`,
             hint: 'Σύμφωνα με το ΕΑΠ, στην υποκλάση δηλώνουμε μόνο τα επιπρόσθετα (τοπικά) κατηγορήματα.'
           });
@@ -1361,8 +1390,17 @@
     }
 
     const idByKey = new Map();
+    const usedIds = new Set();
     classes.forEach((cls, idx) => {
-      idByKey.set(canonicalKey(cls.name), `C${idx + 1}`);
+      let baseId = 'C_' + slugId(cls.name);
+      if (!baseId || baseId === 'C_') baseId = `C_${idx + 1}`;
+      let finalId = baseId;
+      let n = 2;
+      while (usedIds.has(finalId)) {
+        finalId = `${baseId}_${n++}`;
+      }
+      usedIds.add(finalId);
+      idByKey.set(canonicalKey(cls.name), finalId);
     });
 
     const lines = ['classDiagram'];
@@ -1453,6 +1491,34 @@
     return serializeToDSL(parsed);
   }
 
+  function applyClassQuickFix(source, diag) {
+    if (!diag || !diag.fixAction) return source;
+    const lines = String(source || '').replace(/\r\n/g, '\n').split('\n');
+    const idx = Math.max(0, Math.min(lines.length - 1, (diag.line || 1) - 1));
+
+    if (diag.fixAction === 'DECLARE_MISSING_CLASS' && diag.fixClass) {
+      const block = `ΚΛΑΣΗ ${diag.fixClass}\n  ΚΑΤΗΓΟΡΗΜΑΤΑ\n    κωδικός;\nΤΕΛΟΣ\n`;
+      // Insert right before ΣΧΕΣΕΙΣ if present, else at top
+      let relHeaderIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (/^\s*(?:ΣΧΕΣΕΙΣ|RELATIONS)\s*$/i.test(lines[i])) {
+          relHeaderIdx = i;
+          break;
+        }
+      }
+      if (relHeaderIdx >= 0) {
+        lines.splice(relHeaderIdx, 0, block);
+      } else {
+        lines.unshift(block);
+      }
+    } else if (diag.fixAction === 'MAKE_ATTR_PRIVATE') {
+      lines[idx] = (lines[idx] || '').replace(/^(\s*)(?:\+|PUBLIC\s+)/i, '$1PRIVATE ');
+    } else if (diag.fixAction === 'REMOVE_LINE') {
+      lines.splice(idx, 1);
+    }
+    return lines.join('\n');
+  }
+
   function compileClassDiagram(source, options = {}) {
     const model = parseClassDSL(source);
     const validation = validateClassModel(model);
@@ -1475,6 +1541,7 @@
     slugId,
     parseClassDSL,
     validateClassModel,
+    applyClassQuickFix,
     serializeToDSL,
     formatClassDSL,
     generateOfficialEAPPseudocode,

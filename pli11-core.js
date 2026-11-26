@@ -1609,6 +1609,8 @@
           code: 'E04_ROOT_HAS_PARAMS',
           line: model.rootNode.startLine,
           procName: model.rootNode.name,
+          fixAction: 'MOVE_ROOT_PARAMS_TO_LOCAL',
+          fixProc: model.rootNode.name,
           message: `Η κεντρική μονάδα ελέγχου "${model.rootNode.name}" δεν πρέπει να έχει παραμέτρους επικεφαλίδας (IN / IN/OUT).`,
           hint: 'Αφαιρέστε τις παραμέτρους από τη ρίζα και δηλώστε τις μεταβλητές με LOCAL VAR.'
         });
@@ -1727,6 +1729,8 @@
                   code: 'E02_PARAM_REDECLARED_LOCAL',
                   line: v.line,
                   procName: proc.name,
+                  fixAction: 'REMOVE_FROM_LOCAL_VAR',
+                  fixVar: v.name,
                   message: `Η παράμετρος επικεφαλίδας "${v.name}" επαναδηλώνεται στο LOCAL VAR της "${proc.name}".`,
                   hint: 'Απαγορεύεται να δηλώνονται ξανά ως τοπικές μεταβλητές οι παράμετροι της επικεφαλίδας (IN / IN/OUT).'
                 });
@@ -1747,6 +1751,8 @@
                   code: 'E03_PARAM_INITIALIZED',
                   line: v.line,
                   procName: proc.name,
+                  fixAction: 'REMOVE_FROM_INIT',
+                  fixVar: v.name,
                   message: `Η παράμετρος επικεφαλίδας "${v.name}" αρχικοποιείται στη "${proc.name}", διαγράφοντας την τιμή κλήσης της.`,
                   hint: 'Μην συμπεριλαμβάνετε παραμέτρους επικεφαλίδας στην εντολή ΑΡΧΙΚΟΠΟΙΗΣΕ.'
                 });
@@ -1756,6 +1762,9 @@
                   code: 'E05_UNDECLARED_VAR',
                   line: v.line,
                   procName: proc.name,
+                  fixAction: 'ADD_TO_LOCAL_VAR',
+                  fixVar: v.name,
+                  fixProc: proc.name,
                   message: `Η μεταβλητή "${v.name}" αρχικοποιείται χωρίς να έχει δηλωθεί στο LOCAL VAR της "${proc.name}".`,
                   hint: `Προσθέστε το "${v.name}" στη δήλωση LOCAL VAR.`
                 });
@@ -1773,6 +1782,9 @@
                     code: 'E05_UNDECLARED_VAR',
                     line: v.line,
                     procName: proc.name,
+                    fixAction: 'ADD_TO_LOCAL_VAR',
+                    fixVar: v.name,
+                    fixProc: proc.name,
                     message: `Η μεταβλητή "${v.name}" χρησιμοποιείται στο CALL ${s.target} χωρίς να έχει δηλωθεί (LOCAL VAR ή παράμετρος).`,
                     hint: `Δηλώστε το "${v.name}" στο LOCAL VAR της "${proc.name}".`
                   });
@@ -1823,6 +1835,9 @@
               code: 'E06_UNINITIALIZED_LOCAL',
               line: vInfo.line,
               procName: proc.name,
+              fixAction: 'ADD_TO_INIT',
+              fixVar: vInfo.name,
+              fixProc: proc.name,
               message: `Η τοπική μεταβλητή "${vInfo.name}" δηλώθηκε στο LOCAL VAR αλλά δεν αρχικοποιήθηκε με ΑΡΧΙΚΟΠΟΙΗΣΕ.`,
               hint: 'Σύμφωνα με τη μεθοδολογία ΠΛΗ11 (ΟΕ1/ΓΕ1), όλες οι LOCAL VAR μιας μονάδας ελέγχου πρέπει να αρχικοποιούνται.'
             });
@@ -2244,7 +2259,7 @@
       return directives.central.has(underscored) || directives.central.has(dotted);
     }
 
-    function ensureProcess(key, displayLabel, isCentral = false, isProcTC = false) {
+    function ensureProcess(key, displayLabel, isCentral = false, isProcTC = false, sourceLine = 0) {
       const cleanKey = String(key || 'MAIN').trim();
       const canonKey = normalizeId(cleanKey).replace(/_/g, /^[A-Z]{0,2}[0-9]+(?:_[0-9]+)+$/.test(normalizeId(cleanKey)) ? '.' : '_');
       const effectiveCentral = !noKM && (directives.central ? matchesDirectiveCentral(canonKey) : isCentral);
@@ -2258,6 +2273,7 @@
           type: 'process',
           isCentral: effectiveCentral,
           isTransactionCenter: isProcTC,
+          sourceLine: sourceLine || 0,
           orderIndex: procOrderCounter++
         };
         processes.set(canonKey, ep);
@@ -2266,6 +2282,7 @@
         const existing = processes.get(canonKey);
         if (effectiveCentral) existing.isCentral = true;
         if (isProcTC) existing.isTransactionCenter = true;
+        if (sourceLine && !existing.sourceLine) existing.sourceLine = sourceLine;
         if (aliasHit) {
           existing.label = aliasHit;
         } else if (displayLabel && displayLabel.length > existing.label.length && existing.label === existing.key) {
@@ -2275,7 +2292,7 @@
       return processes.get(canonKey);
     }
 
-    function ensureIOEndpoint(ioKind, ioTarget, fallbackHint, varName) {
+    function ensureIOEndpoint(ioKind, ioTarget, fallbackHint, varName, sourceLine = 0) {
       let type = 'unknown_io';
       let label = '';
       const canonVar = normalizeId(varName);
@@ -2318,7 +2335,9 @@
       const key = `${type}:${normalizeId(label)}`;
       const id = sanitizeMermaidId(key, 'IO');
       if (!endpoints.has(id)) {
-        endpoints.set(id, { id, key, label, type, isCentral: false });
+        endpoints.set(id, { id, key, label, type, isCentral: false, sourceLine: sourceLine || 0 });
+      } else if (sourceLine && !endpoints.get(id).sourceLine) {
+        endpoints.get(id).sourceLine = sourceLine;
       }
       return endpoints.get(id);
     }
@@ -2490,12 +2509,12 @@
         const label = ctrlDesc.label.length > calcDesc.label.length && ctrlDesc.key === calcDesc.key
           ? ctrlDesc.label
           : calcDesc.label;
-        return ensureProcess(calcDesc.key, label, centralKeys.has(calcDesc.key), isTC && centralKeys.has(calcDesc.key));
+        return ensureProcess(calcDesc.key, label, centralKeys.has(calcDesc.key), isTC && centralKeys.has(calcDesc.key), (calcNode && !calcNode.isStub ? calcNode.startLine : ctrlNode.startLine));
       }
 
       if (calcEdges.length === 0 && subCtrlEdges.length === 0 && ctrlNode !== model.rootNode) {
         const desc = extractProcessDescriptor(ctrlNode);
-        return ensureProcess(desc.key, desc.label, centralKeys.has(desc.key), false);
+        return ensureProcess(desc.key, desc.label, centralKeys.has(desc.key), false, ctrlNode.startLine);
       }
 
       return null;
@@ -2647,7 +2666,7 @@
               const label = ownProcEp && ownProcEp.key === desc.key && ownProcEp.label.length > desc.label.length
                 ? ownProcEp.label
                 : desc.label;
-              const procEp = ensureProcess(desc.key, label, centralKeys.has(desc.key), isTC && centralKeys.has(desc.key));
+              const procEp = ensureProcess(desc.key, label, centralKeys.has(desc.key), isTC && centralKeys.has(desc.key), child.startLine);
 
               // 1. Consume IN params (plus IN/OUT params that hold a fresh unconsumed value from GET/upstream)
               for (let i = 0; i < edge.args.length && i < child.params.length; i++) {
@@ -2686,7 +2705,7 @@
                 const arg = edge.args[i];
                 const sk = getSlotKey(arg.canonical, arg.name);
                 const slot = slotState.get(sk);
-                const ioEp = ensureIOEndpoint(child.ioMeta.ioKind, child.ioMeta.ioTarget, isRead ? 'read' : 'write', slot.display);
+                const ioEp = ensureIOEndpoint(child.ioMeta.ioKind, child.ioMeta.ioTarget, isRead ? 'read' : 'write', slot.display, child.startLine);
                 if (isRead) {
                   slot.sources = new Set([ioEp.id]);
                   slot.consumed = false;
@@ -4031,6 +4050,354 @@
   }
 
   // ---------------------------------------------------------------------------
+  // 10B. DFD BALANCING VALIDATOR, DATA DICTIONARY & QUICK-FIX TRANSFORMS
+  // ---------------------------------------------------------------------------
+  function validateDFDBalancing(dfdLevel1, dfdLevel0) {
+    const diags = [];
+    if (!dfdLevel1 || !Array.isArray(dfdLevel1.flows) || dfdLevel1.flows.length === 0) return diags;
+
+    const inByProc = new Map();
+    const outByProc = new Map();
+    for (const p of dfdLevel1.processes || []) {
+      inByProc.set(p.id, 0);
+      outByProc.set(p.id, 0);
+    }
+    for (const f of dfdLevel1.flows) {
+      if (inByProc.has(f.to)) inByProc.set(f.to, inByProc.get(f.to) + 1);
+      if (outByProc.has(f.from)) outByProc.set(f.from, outByProc.get(f.from) + 1);
+    }
+
+    for (const p of dfdLevel1.processes || []) {
+      const ins = inByProc.get(p.id) || 0;
+      const outs = outByProc.get(p.id) || 0;
+      const cleanLbl = String(p.label || p.key || p.id).replace(/\s+/g, ' ');
+      if (ins > 0 && outs === 0) {
+        diags.push({
+          severity: 'warning',
+          code: 'W05_DFD_BLACK_HOLE',
+          line: p.sourceLine || 1,
+          procName: cleanLbl,
+          message: `ΔΡΔ «Μαύρη Τρύπα» (Black Hole): Η διεργασία «${cleanLbl}» δέχεται ροές εισόδου αλλά δεν παράγει καμία ροή εξόδου.`,
+          hint: 'Κάθε διεργασία στο ΔΡΔ πρέπει να μετασχηματίζει δεδομένα και να παράγει τουλάχιστον μία εξερχόμενη ροή.'
+        });
+      } else if (outs > 0 && ins === 0) {
+        diags.push({
+          severity: 'warning',
+          code: 'W06_DFD_MIRACLE',
+          line: p.sourceLine || 1,
+          procName: cleanLbl,
+          message: `ΔΡΔ «Θαύμα» (Miracle): Η διεργασία «${cleanLbl}» παράγει εξερχόμενες ροές χωρίς καμία εισερχόμενη ροή δεδομένων.`,
+          hint: 'Προσθέστε τις απαραίτητες παραμέτρους εισόδου (: IN) ή ανάγνωση από Πηγή/Αποθήκη.'
+        });
+      }
+    }
+
+    // Check Context Level 0 <-> Level 1 external boundary flow conservation
+    if (dfdLevel0 && Array.isArray(dfdLevel0.flows)) {
+      const entIdsL1 = new Set((dfdLevel1.entities || []).map((e) => e.id));
+      const l1In = new Set();
+      const l1Out = new Set();
+      for (const f of dfdLevel1.flows) {
+        if (entIdsL1.has(f.from) && !entIdsL1.has(f.to)) {
+          for (const d of f.data || []) l1In.add(normalizeId(d));
+        } else if (!entIdsL1.has(f.from) && entIdsL1.has(f.to)) {
+          for (const d of f.data || []) l1Out.add(normalizeId(d));
+        }
+      }
+
+      const entIdsL0 = new Set((dfdLevel0.entities || []).map((e) => e.id));
+      const l0In = new Map();
+      const l0Out = new Map();
+      for (const f of dfdLevel0.flows) {
+        if (entIdsL0.has(f.from) && !entIdsL0.has(f.to)) {
+          for (const d of f.data || []) l0In.set(normalizeId(d), d);
+        } else if (!entIdsL0.has(f.from) && entIdsL0.has(f.to)) {
+          for (const d of f.data || []) l0Out.set(normalizeId(d), d);
+        }
+      }
+
+      for (const [k, raw] of l0In.entries()) {
+        if (!l1In.has(k)) {
+          diags.push({
+            severity: 'error',
+            code: 'E12_DFD_UNBALANCED',
+            line: 1,
+            procName: 'ΔΡΔ Ισορροπία',
+            message: `Ασυμφωνία Ισορροπίας ΔΡΔ (Επίπεδο 0 ↔ 1): Η εξωτερική ροή εισόδου «${raw}» υπάρχει στο Διάγραμμα Πλαισίου αλλά απουσιάζει από το Επίπεδο 1.`,
+            hint: 'Οι καθαρές είσοδοι και έξοδοι του Συστήματος στο Επίπεδο 0 πρέπει να ταυτίζονται με εκείνες του Επιπέδου 1.'
+          });
+        }
+      }
+      for (const [k, raw] of l0Out.entries()) {
+        if (!l1Out.has(k)) {
+          diags.push({
+            severity: 'error',
+            code: 'E12_DFD_UNBALANCED',
+            line: 1,
+            procName: 'ΔΡΔ Ισορροπία',
+            message: `Ασυμφωνία Ισορροπίας ΔΡΔ (Επίπεδο 0 ↔ 1): Η εξωτερική ροή εξόδου «${raw}» υπάρχει στο Διάγραμμα Πλαισίου αλλά απουσιάζει από το Επίπεδο 1.`,
+            hint: 'Οι καθαρές είσοδοι και έξοδοι του Συστήματος στο Επίπεδο 0 πρέπει να ταυτίζονται με εκείνες του Επιπέδου 1.'
+          });
+        }
+      }
+      for (const k of l1In) {
+        if (!l0In.has(k)) {
+          diags.push({
+            severity: 'error',
+            code: 'E12_DFD_UNBALANCED',
+            line: 1,
+            procName: 'ΔΡΔ Ισορροπία',
+            message: `Ασυμφωνία Ισορροπίας ΔΡΔ (Επίπεδο 0 ↔ 1): Η ροή εισόδου «${k}» εμφανίζεται στο Επίπεδο 1 χωρίς αντίστοιχη ροή στο Επίπεδο 0.`,
+            hint: 'Ενημερώστε το Διάγραμμα Πλαισίου (Επίπεδο 0) ώστε να περιλαμβάνει όλες τις εξωτερικές ροές.'
+          });
+        }
+      }
+      for (const k of l1Out) {
+        if (!l0Out.has(k)) {
+          diags.push({
+            severity: 'error',
+            code: 'E12_DFD_UNBALANCED',
+            line: 1,
+            procName: 'ΔΡΔ Ισορροπία',
+            message: `Ασυμφωνία Ισορροπίας ΔΡΔ (Επίπεδο 0 ↔ 1): Η ροή εξόδου «${k}» εμφανίζεται στο Επίπεδο 1 χωρίς αντίστοιχη ροή στο Επίπεδο 0.`,
+            hint: 'Ενημερώστε το Διάγραμμα Πλαισίου (Επίπεδο 0) ώστε να περιλαμβάνει όλες τις εξωτερικές ροές.'
+          });
+        }
+      }
+    }
+
+    return diags;
+  }
+
+  function generateDataDictionary(dfd, customOverrides = {}) {
+    if (!dfd) return [];
+    const nodeById = new Map((dfd.nodes || []).map((n) => [n.id, n]));
+    const entries = [];
+
+    const cleanNodeLabel = (n) => String((n && (n.label || n.key)) || '').replace(/\s+/g, ' ').trim();
+
+    // 1. Data Flows (Ροές Δεδομένων)
+    const flowItems = new Map(); // normName -> { name, routes: Set<string>, touchesStore: boolean, isSelector: boolean }
+    for (const f of dfd.flows || []) {
+      const fromN = nodeById.get(f.from);
+      const toN = nodeById.get(f.to);
+      const routeStr = `${cleanNodeLabel(fromN) || f.from} → ${cleanNodeLabel(toN) || f.to}`;
+      const touchesStore = Boolean((fromN && fromN.type === 'store') || (toN && toN.type === 'store'));
+      const isFromTC = Boolean(fromN && fromN.isTransactionCenter);
+
+      for (const rawD of f.data || []) {
+        const dName = String(rawD || '').trim();
+        if (!dName) continue;
+        const norm = normalizeId(dName);
+        if (!flowItems.has(norm)) {
+          flowItems.set(norm, {
+            key: `FLOW:${norm}`,
+            name: dName,
+            routes: new Set(),
+            touchesStore: false,
+            isSelector: /^(FLAG|TYPOS|EPILOGI|ΕΙΔΟΣ|ΤΥΠΟΣ|ΚΑΤΗΓΟΡΙΑ)/i.test(norm) || isFromTC
+          });
+        }
+        const item = flowItems.get(norm);
+        item.routes.add(routeStr);
+        if (touchesStore) item.touchesStore = true;
+      }
+    }
+
+    for (const [, info] of flowItems.entries()) {
+      let defaultDef = `*Στοιχειώδες δεδομένο (${info.name})*`;
+      if (info.isSelector) {
+        defaultDef = `${info.name} = [ Επιλογή_1 | Επιλογή_2 ]`;
+      } else if (info.touchesStore) {
+        defaultDef = `${info.name} = Κωδικός_${info.name} + Στοιχεία_${info.name}`;
+      } else if (/[_\s]/.test(info.name)) {
+        defaultDef = `${info.name} = Πεδίο_1 + Πεδίο_2`;
+      }
+      const ov = customOverrides[info.key] || {};
+      entries.push({
+        key: info.key,
+        name: info.name,
+        category: 'Ροή Δεδομένων',
+        eapSymbol: ov.definition || defaultDef,
+        routes: Array.from(info.routes).join(' · '),
+        notes: ov.notes || (info.touchesStore ? 'Εγγραφή / στοιχείο αποθήκης' : 'Ροή μεταξύ διεργασιών/οντοτήτων')
+      });
+    }
+
+    // 2. Data Stores (Αποθήκες Δεδομένων — EAP notation: { Εγγραφή })
+    for (const st of dfd.stores || []) {
+      const stLabel = cleanNodeLabel(st);
+      const written = new Set();
+      const read = new Set();
+      for (const f of dfd.flows || []) {
+        if (f.to === st.id) (f.data || []).forEach((d) => written.add(d));
+        if (f.from === st.id) (f.data || []).forEach((d) => read.add(d));
+      }
+      const allFields = Array.from(new Set([...written, ...read]));
+      const recordBody = allFields.length > 0 ? allFields.join(' + ') : `Στοιχεία_${stLabel.replace(/\s+/g, '_')}`;
+      const key = `STORE:${normalizeId(stLabel)}`;
+      const ov = customOverrides[key] || {};
+      const ioSummary = [
+        written.size ? `Εγγραφή: ${Array.from(written).join(', ')}` : '',
+        read.size ? `Ανάγνωση: ${Array.from(read).join(', ')}` : ''
+      ].filter(Boolean).join(' | ');
+
+      entries.push({
+        key,
+        name: stLabel,
+        category: 'Αποθήκη Δεδομένων',
+        eapSymbol: ov.definition || `${stLabel} = { ${recordBody} }`,
+        routes: ioSummary || '—',
+        notes: ov.notes || 'Επαναλαμβανόμενες εγγραφές { ... } (Συμβολισμός ΕΑΠ)'
+      });
+    }
+
+    // 3. External Entities (Εξωτερικές Οντότητες: Πηγές / Αποδέκτες)
+    for (const ent of dfd.entities || []) {
+      const entLabel = cleanNodeLabel(ent);
+      const provided = new Set();
+      const received = new Set();
+      for (const f of dfd.flows || []) {
+        if (f.from === ent.id) (f.data || []).forEach((d) => provided.add(d));
+        if (f.to === ent.id) (f.data || []).forEach((d) => received.add(d));
+      }
+      const role = provided.size > 0 && received.size > 0
+        ? 'Πηγή & Αποδέκτης'
+        : (provided.size > 0 ? 'Εξωτερική Πηγή' : 'Εξωτερικός Αποδέκτης');
+      const key = `ENTITY:${normalizeId(entLabel)}`;
+      const ov = customOverrides[key] || {};
+      const flowDesc = [
+        provided.size ? `Παρέχει: ${Array.from(provided).join(', ')}` : '',
+        received.size ? `Λαμβάνει: ${Array.from(received).join(', ')}` : ''
+      ].filter(Boolean).join(' | ');
+
+      entries.push({
+        key,
+        name: entLabel,
+        category: role,
+        eapSymbol: ov.definition || `*Εξωτερική Οντότητα (${role})*`,
+        routes: flowDesc || '—',
+        notes: ov.notes || (ent.type === 'unknown_io' ? 'Έμμεση οντότητα (προσθέστε σχόλιο Πηγής/Αποθήκης)' : 'Εκτός ορίων συστήματος')
+      });
+    }
+
+    return entries;
+  }
+
+  function applyQuickFix(source, diag) {
+    if (!diag || !diag.fixAction) return source;
+    const lines = String(source || '').replace(/\r\n/g, '\n').split('\n');
+    const lineIdx = Math.max(0, Math.min(lines.length - 1, (diag.line || 1) - 1));
+    const targetCanon = diag.fixVar ? normalizeId(diag.fixVar) : '';
+
+    function removeVarFromStatementLine(idx, prefixRegex) {
+      const raw = lines[idx] || '';
+      const m = raw.match(prefixRegex);
+      if (!m) return false;
+      const indent = m[1] || '';
+      const kw = m[2] || '';
+      const body = m[3] || '';
+      const items = body.replace(/;+\s*$/, '').split(',').map((s) => s.trim()).filter(Boolean);
+      const kept = items.filter((v) => normalizeId(v) !== targetCanon);
+      if (kept.length === items.length) return false;
+      if (kept.length === 0) {
+        lines.splice(idx, 1);
+      } else {
+        lines[idx] = `${indent}${kw} ${kept.join(', ')};`;
+      }
+      return true;
+    }
+
+    function findProcRange(procName) {
+      const pCanon = normalizeId(procName || '');
+      let start = -1;
+      let end = lines.length - 1;
+      for (let i = 0; i < lines.length; i++) {
+        const hm = lines[i].match(/^\s*(?:PROCEDURE|ΔΙΑΔΙΚΑΣΙΑ)\s+([^\s(;]+)/i);
+        if (hm && normalizeId(hm[1]) === pCanon) {
+          start = i;
+          for (let j = i + 1; j < lines.length; j++) {
+            if (/^\s*(?:END_?PROCEDURE|ΤΕΛΟΣ_?ΔΙΑΔΙΚΑΣΙΑΣ)\b/i.test(lines[j])) {
+              end = j;
+              break;
+            }
+          }
+          break;
+        }
+      }
+      return start >= 0 ? { start, end } : null;
+    }
+
+    if (diag.fixAction === 'REMOVE_FROM_LOCAL_VAR') {
+      removeVarFromStatementLine(lineIdx, /^(\s*)(LOCAL\s+VAR|ΤΟΠΙΚΕΣ\s+ΜΕΤΑΒΛΗΤΕΣ)\s+(.+)$/i);
+    } else if (diag.fixAction === 'REMOVE_FROM_INIT') {
+      removeVarFromStatementLine(lineIdx, /^(\s*)(ΑΡΧΙΚΟΠΟΙΗΣΕ|INITIALIZE|INIT)\s+(.+)$/i);
+    } else if (diag.fixAction === 'ADD_TO_INIT') {
+      const range = findProcRange(diag.fixProc);
+      if (range && diag.fixVar) {
+        let initLine = -1;
+        let localLine = -1;
+        for (let i = range.start + 1; i < range.end; i++) {
+          if (/^\s*(?:LOCAL\s+VAR|ΤΟΠΙΚΕΣ\s+ΜΕΤΑΒΛΗΤΕΣ)\b/i.test(lines[i])) localLine = i;
+          if (/^\s*(?:ΑΡΧΙΚΟΠΟΙΗΣΕ|INITIALIZE|INIT)\b/i.test(lines[i])) { initLine = i; break; }
+        }
+        if (initLine >= 0) {
+          lines[initLine] = lines[initLine].replace(/;*\s*$/, `, ${diag.fixVar};`);
+        } else {
+          const insertAfter = localLine >= 0 ? localLine : range.start;
+          lines.splice(insertAfter + 1, 0, `  ΑΡΧΙΚΟΠΟΙΗΣΕ ${diag.fixVar};`);
+        }
+      }
+    } else if (diag.fixAction === 'ADD_TO_LOCAL_VAR') {
+      const range = findProcRange(diag.fixProc);
+      if (range && diag.fixVar) {
+        let localLine = -1;
+        for (let i = range.start + 1; i < range.end; i++) {
+          if (/^\s*(?:LOCAL\s+VAR|ΤΟΠΙΚΕΣ\s+ΜΕΤΑΒΛΗΤΕΣ)\b/i.test(lines[i])) { localLine = i; break; }
+        }
+        if (localLine >= 0) {
+          lines[localLine] = lines[localLine].replace(/;*\s*$/, `, ${diag.fixVar};`);
+        } else {
+          lines.splice(range.start + 1, 0, `  LOCAL VAR ${diag.fixVar};`);
+        }
+      }
+    } else if (diag.fixAction === 'MOVE_ROOT_PARAMS_TO_LOCAL') {
+      const header = lines[lineIdx] || '';
+      const pm = header.match(/^(\s*(?:PROCEDURE|ΔΙΑΔΙΚΑΣΙΑ)\s+[^\s(;]+)\s*\(([^)]*)\)\s*;?\s*$/i);
+      if (pm) {
+        lines[lineIdx] = pm[1];
+        const rawParams = pm[2]
+          .split(',')
+          .map((seg) => seg.split(':')[0].trim())
+          .filter(Boolean);
+        if (rawParams.length > 0) {
+          const range = findProcRange(diag.fixProc) || { start: lineIdx, end: lines.length - 1 };
+          let localLine = -1;
+          let initLine = -1;
+          for (let i = range.start + 1; i < range.end; i++) {
+            if (localLine < 0 && /^\s*(?:LOCAL\s+VAR|ΤΟΠΙΚΕΣ\s+ΜΕΤΑΒΛΗΤΕΣ)\b/i.test(lines[i])) localLine = i;
+            if (initLine < 0 && /^\s*(?:ΑΡΧΙΚΟΠΟΙΗΣΕ|INITIALIZE|INIT)\b/i.test(lines[i])) initLine = i;
+          }
+          if (localLine >= 0) {
+            lines[localLine] = lines[localLine].replace(/;*\s*$/, `, ${rawParams.join(', ')};`);
+          } else {
+            lines.splice(lineIdx + 1, 0, `  LOCAL VAR ${rawParams.join(', ')};`);
+            if (initLine >= 0) initLine++;
+          }
+          if (initLine >= 0) {
+            lines[initLine] = lines[initLine].replace(/;*\s*$/, `, ${rawParams.join(', ')};`);
+          } else {
+            const afterIdx = localLine >= 0 ? localLine : lineIdx + 1;
+            lines.splice(afterIdx + 1, 0, `  ΑΡΧΙΚΟΠΟΙΗΣΕ ${rawParams.join(', ')};`);
+          }
+        }
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  // ---------------------------------------------------------------------------
   // 11. PUBLIC COMPILER PIPELINE
   // ---------------------------------------------------------------------------
   function compilePLI11(source) {
@@ -4040,6 +4407,19 @@
     const directives = parseDirectives(model.comments || []);
     const dfd = synthesizeDFD(model, { directives, level: 1 });
     const dfdLevel0 = synthesizeDFDLevel0(dfd, model);
+
+    // Append DFD Black-Hole / Miracle / Balancing diagnostics when no syntax errors
+    if (ast.parseErrors.length === 0) {
+      const dfdDiags = validateDFDBalancing(dfd, dfdLevel0);
+      for (const dd of dfdDiags) {
+        validation.diagnostics.push(dd);
+        if (dd.severity === 'error') validation.summary.errorCount++;
+        else if (dd.severity === 'warning') validation.summary.warningCount++;
+        else validation.summary.infoCount++;
+      }
+    }
+
+    const dataDictionary = generateDataDictionary(dfd);
     const ddpMermaid = generateDDPMermaid(model);
     const dfdMermaid = generateDFDMermaid(directives.level === 0 ? dfdLevel0 : dfd);
     const callTrace = buildCallTrace(ast, model);
@@ -4050,6 +4430,7 @@
       directives,
       dfd,
       dfdLevel0,
+      dataDictionary,
       ddpMermaid,
       dfdMermaid,
       callTrace
@@ -4063,6 +4444,9 @@
     parsePLI11,
     analyzePLI11,
     validatePLI11,
+    validateDFDBalancing,
+    generateDataDictionary,
+    applyQuickFix,
     synthesizeDFD,
     synthesizeDFDLevel0,
     generateDDPMermaid,

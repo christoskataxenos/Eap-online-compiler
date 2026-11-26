@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EAP Pseudocode Interpreter &amp; Debugger</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.json">
     
     <!-- CodeMirror & Addons Stylesheets -->
     <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
@@ -26,24 +27,73 @@
             <span class="version-tag">ΠΛΗ10</span>
         </div>
         <div class="header-right">
-            <a href="pli11.html" id="switch-course-link" class="course-switch-link" data-base="pli11.html" title="Μετάβαση στον ΠΛΗ11 ΔΔΠ / ΔΡΔ Compiler">ΠΛΗ11 (ΔΔΠ/ΔΡΔ) &rarr;</a>
+            <button id="layout-toggle" class="action-btn" type="button" title="Εναλλαγή διάταξης: Πάνω/Κάτω ή Δίπλα-Δίπλα">◫ Διάταξη</button>
+            <div class="course-submenu" id="course-submenu">
+                <button type="button" class="submenu-trigger" id="tools-submenu-btn" aria-expanded="false" aria-controls="tools-submenu-panel">
+                    <span>Εργαλεία</span>
+                    <span class="submenu-caret" aria-hidden="true">&#9662;</span>
+                </button>
+                <div class="submenu-panel" id="tools-submenu-panel" role="menu">
+                    <a href="editor.html" class="submenu-item course-link active" data-base="editor.html" role="menuitem">
+                        <div class="submenu-item-head">
+                            <span class="submenu-badge">ΠΛΗ10</span>
+                            <span class="submenu-title">Ψευδογλώσσα Interpreter</span>
+                        </div>
+                        <span class="submenu-desc">Εκτέλεση, βήμα-βήμα debugger, επιθεωρητής μνήμης &amp; πίνακας τιμών.</span>
+                    </a>
+                    <a href="pli11.html" class="submenu-item course-link" data-base="pli11.html" role="menuitem">
+                        <div class="submenu-item-head">
+                            <span class="submenu-badge alt">ΠΛΗ11</span>
+                            <span class="submenu-title">ΔΔΠ / ΔΡΔ &amp; Ψευδοκώδικας</span>
+                        </div>
+                        <span class="submenu-desc">Μεταγλώττιση σε ΔΔΠ &amp; ΔΡΔ, έλεγχος κανόνων ΕΑΠ, Mermaid &amp; ΔΡΔ Builder.</span>
+                    </a>
+                    <a href="pli11-classes.html" class="submenu-item course-link" data-base="pli11-classes.html" role="menuitem">
+                        <div class="submenu-item-head">
+                            <span class="submenu-badge alt">ΠΛΗ11</span>
+                            <span class="submenu-title">Διαγράμματα Κλάσεων</span>
+                        </div>
+                        <span class="submenu-desc">Υβριδικός DSL &amp; Visual Builder, Drag &amp; Drop SVG, OO-Ψευδοκώδικας (ΟΣΣ2) &amp; Mermaid.</span>
+                    </a>
+                </div>
+            </div>
             <button id="theme-toggle" type="button" aria-label="Εναλλαγή θέματος (φωτεινό / σκοτεινό)" aria-pressed="false">Dark Mode</button>
         </div>
     </header>
 
     <main id="main-content">
-        <div class="container">
+        <div class="container" id="pli10-container">
+            <div class="pli10-pane-left" id="pli10-pane-left">
             <!-- Code Editor Section -->
             <div class="editor-container">
                 <div class="panel-header">
                     <span id="editor-title">Κώδικας Ψευδογλώσσας</span>
                     <div class="panel-header-actions">
+                        <button id="workspaces-btn" class="action-btn" type="button" title="Οι Εργασίες μου — Αποθήκευση και εναλλαγή πολλαπλών ασκήσεων">📁 Εργασίες</button>
+                        <button id="notes-toggle-btn" class="action-btn" type="button" title="Εκφώνηση θέματος &amp; προσωπικές σημειώσεις δίπλα στον κώδικα">📝 Εκφώνηση</button>
                         <select id="example-selector" aria-label="Επιλογή παραδείγματος κώδικα">
                             <option value="" disabled selected>Παραδείγματα (ΠΛΗ10)...</option>
                         </select>
+                        <button id="wrap-button" class="action-btn" type="button" title="Αναδίπλωση μεγάλων γραμμών κώδικα">Wrap</button>
                         <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
+                        <button id="export-docx-btn" class="action-btn" type="button" title="Εξαγωγή πλήρους αναφοράς (Κώδικας, Έξοδος &amp; Πίνακας Τιμών) σε αρχείο Word (.docx)">📄 .docx</button>
                         <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με τον κώδικα">Share</button>
                     </div>
+                </div>
+
+                <!-- Quick Snippets Bar (ΠΛΗ10) -->
+                <div class="pli10-snippets-bar" aria-label="Γρήγορη εισαγωγή δομών Ψευδογλώσσας">
+                    <span class="pli10-snippet-label">Εισαγωγή:</span>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="algo" title="Σκελετός Αλγορίθμου">+ Αλγόριθμος</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="if" title="Δομή Επιλογής ΕΑΝ...ΤΟΤΕ...ΕΑΝ-ΤΕΛΟΣ">+ ΕΑΝ</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="select" title="Δομή Πολλαπλής Επιλογής ΕΠΙΛΕΞΕ...ΠΕΡΙΠΤΩΣΗ">+ ΕΠΙΛΕΞΕ</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="for" title="Βρόχος ΓΙΑ...ΕΩΣ...ΓΙΑ-ΤΕΛΟΣ">+ ΓΙΑ</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="while" title="Βρόχος ΕΝΟΣΩ...ΕΠΑΝΑΛΑΒΕ...ΕΝΟΣΩ-ΤΕΛΟΣ">+ ΕΝΟΣΩ</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="repeat" title="Βρόχος ΕΠΑΝΑΛΑΒΕ...ΜΕΧΡΙ">+ ΜΕΧΡΙ</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="array1d" title="Δήλωση Μονοδιάστατου Πίνακα">+ Πίνακας 1D</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="record" title="Δήλωση Εγγραφής (ΤΥΠΟΙ ... ΕΓΓΡΑΦΗ)">+ Εγγραφή</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="proc" title="Δήλωση Διαδικασίας με ΔΙΕΠΑΦΗ">+ Διαδικασία</button>
+                    <button type="button" class="pli10-snippet-chip" data-snippet="func" title="Δήλωση Συνάρτησης με ΔΙΕΠΑΦΗ">+ Συνάρτηση</button>
                 </div>
                 
                 <div class="editor-wrapper">
@@ -55,9 +105,10 @@
             <!-- Execution & Debugging Controls -->
             <div class="controls">
                 <div class="primary-controls">
-                    <button id="run-button" class="btn-run" title="Εκτέλεση όλου του προγράμματος (F5)">ΕΚΤΕΛΕΣΗ</button>
-                    <button id="step-button" class="btn-step" title="Εκτέλεση επόμενης εντολής (F10)">ΒΗΜΑ</button>
-                    <button id="continue-button" class="btn-continue" title="Συνέχιση κανονικής εκτέλεσης" disabled>ΣΥΝΕΧΕΙΑ</button>
+                    <button id="run-button" class="btn-run" title="Εκτέλεση προγράμματος — σταματά αυτόματα αν έχετε βάλει Breakpoint ● (F5)">ΕΚΤΕΛΕΣΗ</button>
+                    <button id="step-back-button" class="btn-step" title="Επιστροφή στο προηγούμενο βήμα (Shift+F10)" disabled>&#9664; ΠΙΣΩ</button>
+                    <button id="step-button" class="btn-step" title="Εκτέλεση επόμενης εντολής (F10)">ΒΗΜΑ &#9654;</button>
+                    <button id="continue-button" class="btn-continue" title="Συνέχιση εκτέλεσης μέχρι το επόμενο Breakpoint ή το τέλος (F8)" disabled>ΣΥΝΕΧΕΙΑ</button>
                     <button id="stop-button" class="btn-stop" title="Διακοπή εκτέλεσης" disabled>ΔΙΑΚΟΠΗ</button>
                     
                     <div class="speed-control-wrapper">
@@ -78,12 +129,13 @@
                     <button id="syntax-help-button" title="Βοήθεια Σύνταξης">ΒΟΗΘΕΙΑ</button>
                 </div>
             </div>
+            </div>
 
             <!-- Resizer Handle -->
-            <div class="resizer" id="drag-handle" title="Σύρετε για αλλαγή μεγέθους"></div>
+            <div class="resizer" id="drag-handle" title="Σύρετε για αλλαγή μεγέθους • Διπλό κλικ για επαναφορά"></div>
 
             <!-- Output, Variables & Trace Container -->
-            <div class="output-container">
+            <div class="output-container" id="pli10-pane-right">
                 <div class="panel-header tab-header">
                     <div class="tabs-list">
                         <button class="tab-btn active" data-tab="tab-terminal">Τερματικό &amp; Έξοδος</button>
@@ -91,8 +143,14 @@
                         <button class="tab-btn" data-tab="tab-trace">Πίνακας Τιμών (Trace Table) <span id="trace-step-badge" class="tab-badge">0</span></button>
                     </div>
                     <div class="tab-actions">
+                        <button id="toggle-batch-input-btn" class="tab-action-btn" title="Προκαθορισμένες τιμές για αυτόματο γέμισμα των εντολών ΔΙΑΒΑΣΕ">Δεδομένα Εισόδου <span id="batch-count-pill" class="tab-badge" hidden>0</span></button>
                         <button id="clear-terminal-btn" class="tab-action-btn" title="Καθαρισμός εξόδου τερματικού">Καθαρισμός</button>
-                        <button id="copy-trace-btn" class="tab-action-btn" hidden title="Αντιγραφή Πίνακα Τιμών σε μορφή Markdown">Αντιγραφή Markdown</button>
+                        <div id="trace-mode-group" class="var-toggle-group" hidden>
+                            <button id="trace-mode-eap-btn" class="tab-action-btn active" title="Κλασικός Πίνακας Τιμών ΕΑΠ (ξεχωριστή στήλη ανά μεταβλητή)">Στήλες ΕΑΠ</button>
+                            <button id="trace-mode-compact-btn" class="tab-action-btn" title="Συνοπτική προβολή μεταβολών ανά βήμα">Συνοπτικός</button>
+                        </div>
+                        <button id="copy-trace-word-btn" class="tab-action-btn" hidden title="Αντιγραφή μορφοποιημένου πίνακα για άμεσο Ctrl+V στο MS Word">Αντιγραφή για Word</button>
+                        <button id="copy-trace-btn" class="tab-action-btn" hidden title="Αντιγραφή Πίνακα Τιμών σε μορφή Markdown">Markdown</button>
                         <div id="var-view-toggle" class="var-toggle-group" hidden>
                             <button id="var-cards-btn" class="tab-action-btn active" title="Προβολή σε Κάρτες Μνήμης">Κάρτες</button>
                             <button id="var-table-btn" class="tab-action-btn" title="Προβολή σε Αναλυτικό Πίνακα">Πίνακας</button>
@@ -100,8 +158,22 @@
                     </div>
                 </div>
 
-                <!-- Tab 1: Terminal / Console Output -->
+                <!-- Tab 1: Terminal / Console Output + Batch Auto-Input -->
                 <div class="tab-pane active" id="tab-terminal">
+                    <div class="batch-input-drawer" id="batch-input-drawer" hidden>
+                        <div class="batch-input-head">
+                            <label class="batch-check-label">
+                                <input type="checkbox" id="batch-input-enabled" checked>
+                                <strong>Αυτόματη τροφοδότηση <code>ΔΙΑΒΑΣΕ</code></strong>
+                                <span class="batch-hint-text">(χωρίστε τιμές με κενό ή νέα γραμμή — αν τελειώσουν, ζητείται είσοδος από το πληκτρολόγιο)</span>
+                            </label>
+                            <div class="batch-input-btns">
+                                <button type="button" class="tab-action-btn" id="batch-random-btn" title="Παραγωγή 10 τυχαίων ακεραίων για γρήγορη δοκιμή πινάκων">🎲 Τυχαίες Τιμές</button>
+                                <button type="button" class="tab-action-btn" id="batch-clear-btn" title="Καθαρισμός προκαθορισμένης εισόδου">Καθαρισμός</button>
+                            </div>
+                        </div>
+                        <textarea id="batch-input-box" rows="2" spellcheck="false" placeholder="Π.χ. 5  12 -3 8 4 19 (έτοιμες τιμές εισόδου ώστε να μην τις πληκτρολογείτε ξανά σε κάθε εκτέλεση)"></textarea>
+                    </div>
                     <div id="terminal-window">
                         <div id="terminal-output"></div>
                         <div id="terminal-input-line" hidden>
@@ -116,7 +188,7 @@
                     <div id="variables-window">
                         <div id="variables-empty" class="panel-placeholder">
                             <div class="placeholder-text">Δεν υπάρχουν ακόμη ενεργές μεταβλητές.</div>
-                            <div class="placeholder-sub">Ξεκινήστε την εκτέλεση ή πατήστε <strong>ΒΗΜΑ</strong> για παρακολούθηση της μνήμης.</div>
+                            <div class="placeholder-sub">Ξεκινήστε την εκτέλεση, βάλτε <strong>Breakpoint (κλικ στον αριθμό γραμμής)</strong> ή πατήστε <strong>ΒΗΜΑ</strong>.</div>
                         </div>
                         
                         <div id="variables-content" hidden>
@@ -131,6 +203,12 @@
                                 </div>
                             </div>
 
+                            <!-- Call Stack Frames (Active Subroutines & Recursion) -->
+                            <div class="vars-section" id="section-callstack" hidden>
+                                <div class="vars-section-title">Στοίβα Κλήσεων &amp; Εμβέλεια (Call Stack / Αναδρομή)</div>
+                                <div id="callstack-strip" class="callstack-strip"></div>
+                            </div>
+
                             <!-- Cards View -->
                             <div id="variables-cards-view">
                                 <div class="vars-section" id="section-primitives">
@@ -138,7 +216,7 @@
                                     <div id="primitives-grid" class="vars-grid"></div>
                                 </div>
                                 <div class="vars-section" id="section-arrays">
-                                    <div class="vars-section-title">Πίνακες στη Μνήμη (Array Memory Tapes)</div>
+                                    <div class="vars-section-title">Πίνακες στη Μνήμη (Array Memory Tapes &amp; Δείκτες)</div>
                                     <div id="arrays-container" class="arrays-list"></div>
                                 </div>
                                 <div class="vars-section" id="section-constants" hidden>
@@ -169,13 +247,17 @@
                 <!-- Tab 3: Trace Table (Πίνακας Τιμών) -->
                 <div class="tab-pane" id="tab-trace">
                     <div id="trace-window">
+                        <div class="trace-filter-bar" id="trace-filter-bar" hidden>
+                            <label for="trace-watch-input">Φίλτρο Στηλών (Watch):</label>
+                            <input type="text" id="trace-watch-input" placeholder="Όλες οι μεταβλητές (ή γράψτε π.χ. i, j, sum, PIN[1])" autocomplete="off">
+                        </div>
                         <div id="trace-empty" class="panel-placeholder">
                             <div class="placeholder-text">Ο Πίνακας Τιμών είναι κενός.</div>
-                            <div class="placeholder-sub">Εκτελέστε το πρόγραμμα με το κουμπί <strong>ΒΗΜΑ</strong> για βήμα-προς-βήμα ανάλυση (tracing).</div>
+                            <div class="placeholder-sub">Εκτελέστε το πρόγραμμα (με <strong>ΕΚΤΕΛΕΣΗ</strong> ή <strong>ΒΗΜΑ</strong>) για αυτόματη δημιουργία Πίνακα Τιμών έτοιμου για το Word!</div>
                         </div>
                         <div id="trace-table-container" hidden>
                             <table class="trace-table" id="trace-table">
-                                <thead>
+                                <thead id="trace-table-head">
                                     <tr>
                                         <th style="width: 50px;">#</th>
                                         <th style="width: 70px;">Γραμμή</th>
@@ -214,6 +296,7 @@
     <!-- Compiler Core & UI Controller -->
     <script src="core.v6.js"></script>
     <script src="diagram-viewport.js"></script>
+    <script src="docx-exporter.js"></script>
     <script src="app.v6.js"></script>
 </body>
 </html>

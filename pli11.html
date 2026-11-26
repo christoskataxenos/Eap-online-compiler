@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EAP ΠΛΗ11 Pseudocode → ΔΔΠ &amp; ΔΡΔ Compiler</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
 
   <!-- CodeMirror & Addons Stylesheets -->
   <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
@@ -39,7 +40,35 @@
       <button id="layout-toggle" class="layout-toggle-btn" type="button" title="Εναλλαγή διάταξης: Left/Right ή Up/Down">
         <span class="layout-icon">◫</span> <span class="layout-text">Side-by-Side</span>
       </button>
-      <a href="editor.html" id="switch-course-link" class="course-switch-link" data-base="editor.html" title="Μετάβαση στον Interpreter Ψευδογλώσσας ΠΛΗ10">ΠΛΗ10 (Ψευδογλώσσα) &rarr;</a>
+      <div class="course-submenu" id="course-submenu">
+        <button type="button" class="submenu-trigger" id="tools-submenu-btn" aria-expanded="false" aria-controls="tools-submenu-panel">
+          <span>Εργαλεία</span>
+          <span class="submenu-caret" aria-hidden="true">&#9662;</span>
+        </button>
+        <div class="submenu-panel" id="tools-submenu-panel" role="menu">
+          <a href="editor.html" class="submenu-item course-link" data-base="editor.html" role="menuitem">
+            <div class="submenu-item-head">
+              <span class="submenu-badge">ΠΛΗ10</span>
+              <span class="submenu-title">Ψευδογλώσσα Interpreter</span>
+            </div>
+            <span class="submenu-desc">Εκτέλεση, βήμα-βήμα debugger, επιθεωρητής μνήμης &amp; πίνακας τιμών.</span>
+          </a>
+          <a href="pli11.html" class="submenu-item course-link active" data-base="pli11.html" role="menuitem">
+            <div class="submenu-item-head">
+              <span class="submenu-badge alt">ΠΛΗ11</span>
+              <span class="submenu-title">ΔΔΠ / ΔΡΔ &amp; Ψευδοκώδικας</span>
+            </div>
+            <span class="submenu-desc">Μεταγλώττιση σε ΔΔΠ &amp; ΔΡΔ, έλεγχος κανόνων ΕΑΠ, Mermaid &amp; ΔΡΔ Builder.</span>
+          </a>
+          <a href="pli11-classes.html" class="submenu-item course-link" data-base="pli11-classes.html" role="menuitem">
+            <div class="submenu-item-head">
+              <span class="submenu-badge alt">ΠΛΗ11</span>
+              <span class="submenu-title">Διαγράμματα Κλάσεων</span>
+            </div>
+            <span class="submenu-desc">Υβριδικός DSL &amp; Visual Builder, Drag &amp; Drop SVG, OO-Ψευδοκώδικας (ΟΣΣ2) &amp; Mermaid.</span>
+          </a>
+        </div>
+      </div>
       <button id="theme-toggle" type="button" aria-label="Εναλλαγή θέματος (φωτεινό / σκοτεινό)" aria-pressed="false">Dark Mode</button>
     </div>
   </header>
@@ -55,23 +84,26 @@
               <span id="arch-badge" class="arch-badge" role="status" title="Ανιχνευμένη αρχιτεκτονική δομή (ενημερώνεται αυτόματα από τον κώδικα)">Αναμονή</span>
             </div>
             <div class="panel-header-actions">
+              <button id="workspaces-btn" class="action-btn" type="button" title="Οι Εργασίες μου — Αποθήκευση και εναλλαγή πολλαπλών ασκήσεων">📁 Εργασίες</button>
+              <button id="notes-toggle-btn" class="action-btn" type="button" title="Εκφώνηση θέματος &amp; προσωπικές σημειώσεις δίπλα στον κώδικα">📝 Εκφώνηση</button>
               <select id="example-selector" title="Παραδείγματα ύλης ΠΛΗ11">
                 <option value="" disabled selected>Παραδείγματα (ΠΛΗ11)...</option>
               </select>
               <button id="wrap-button" class="action-btn" type="button" title="Αναδίπλωση μεγάλων γραμμών κώδικα ώστε να φαίνονται όλες χωρίς οριζόντιο scroll">Wrap</button>
               <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
-              <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με τον κώδικα">Share</button>
+              <button id="export-docx-btn" class="action-btn" type="button" title="Εξαγωγή πλήρους παραδοτέου (Ψευδοκώδικας, ΔΔΠ, ΔΡΔ &amp; Λεξικό Δεδομένων) σε αρχείο Word (.docx)">📄 .docx</button>
+              <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με τον κώδικα και τη διάταξη">Share</button>
             </div>
           </div>
 
           <!-- Quick Snippets Bar for DDP -->
           <div class="editor-quick-snippets" aria-label="Γρήγορη Εισαγωγή Διαδικασιών">
-            <span class="snippet-title">Εισαγωγη:</span>
-            <button type="button" class="snippet-chip" data-snippet="main" title="Πρότυπο Κύριας Διαδικασίας">+ Κύρια</button>
-            <button type="button" class="snippet-chip" data-snippet="control" title="Διαδικασία Ελέγχου (ΚΑΛΕΣΕ)">+ Έλεγχος</button>
-            <button type="button" class="snippet-chip" data-snippet="calc" title="Διαδικασία Υπολογισμού (αριθμητικές πράξεις)">+ Υπολογισμός</button>
-            <button type="button" class="snippet-chip" data-snippet="io-in" title="Διαδικασία Διαχείρισης Δεδομένων (ΔΙΑΒΑΣΕ)">+ Είσοδος (ΔΙΑΒΑΣΕ)</button>
-            <button type="button" class="snippet-chip" data-snippet="io-out" title="Διαδικασία Παρουσίασης (ΓΡΑΨΕ)">+ Έξοδος (ΓΡΑΨΕ)</button>
+            <span class="snippet-title">Εισαγωγή:</span>
+            <button type="button" class="snippet-chip" data-snippet="main" title="Πρότυπο Ρίζας Ελέγχου (PROCEDURE EXEC_ROOT)">+ Κύρια (EXEC)</button>
+            <button type="button" class="snippet-chip" data-snippet="control" title="Υπομονάδα Ελέγχου (PROCEDURE EXEC_SUB)">+ Έλεγχος</button>
+            <button type="button" class="snippet-chip" data-snippet="calc" title="Υπομονάδα Υπολογισμού (PROCEDURE CALC_*)">+ Υπολογισμός (CALC)</button>
+            <button type="button" class="snippet-chip" data-snippet="io-in" title="Υπομονάδα Εισόδου / Ανάληψης (PROCEDURE GET_*)">+ Είσοδος (GET)</button>
+            <button type="button" class="snippet-chip" data-snippet="io-out" title="Υπομονάδα Εξόδου / Παρουσίασης (PROCEDURE PUT_*)">+ Έξοδος (PUT)</button>
           </div>
 
           <div class="editor-wrapper">
@@ -124,6 +156,7 @@
           <div class="tabs-list">
             <button class="tab-btn active" data-tab="tab-ddp">ΔΔΠ</button>
             <button class="tab-btn" data-tab="tab-dfd">ΔΡΔ</button>
+            <button class="tab-btn" data-tab="tab-dd">Λεξικό Δεδομένων <span id="dd-badge" class="tab-badge">0</span></button>
             <button class="tab-btn" data-tab="tab-validator">Έλεγχος ΕΑΠ <span id="val-badge" class="tab-badge">0</span></button>
             <button class="tab-btn" data-tab="tab-mermaid">Mermaid</button>
             <button class="tab-btn" data-tab="tab-builder">ΔΡΔ Builder</button>
@@ -152,6 +185,8 @@
               <span class="zoom-readout" id="ddp-zoom-label">100%</span>
               <button class="tool-mini-btn" id="ddp-zoom-in" title="Μεγέθυνση">+</button>
               <button class="tool-mini-btn" id="ddp-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
+              <button class="tool-mini-btn" id="ddp-undo-btn" type="button" disabled title="Αναίρεση μετακίνησης μονάδας ΔΔΠ (Ctrl+Z)">↶</button>
+              <button class="tool-mini-btn" id="ddp-redo-btn" type="button" disabled title="Επανάληψη μετακίνησης μονάδας ΔΔΠ (Ctrl+Y)">↷</button>
               <button class="tool-mini-btn" id="ddp-auto-layout" title="Επαναφορά στην αυτόματη διάταξη του ΔΔΠ">Αυτόματη Διάταξη</button>
             </div>
             <div class="diagram-toolbar-group" role="group" aria-label="Διαστάσεις Καμβά">
@@ -226,6 +261,8 @@
               <span class="zoom-readout" id="dfd-zoom-label">100%</span>
               <button class="tool-mini-btn" id="dfd-zoom-in" title="Μεγέθυνση">+</button>
               <button class="tool-mini-btn" id="dfd-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
+              <button class="tool-mini-btn" id="dfd-undo-btn" type="button" disabled title="Αναίρεση μετακίνησης κόμβου ΔΡΔ (Ctrl+Z)">↶</button>
+              <button class="tool-mini-btn" id="dfd-redo-btn" type="button" disabled title="Επανάληψη μετακίνησης κόμβου ΔΡΔ (Ctrl+Y)">↷</button>
               <button class="tool-mini-btn" id="dfd-auto-layout" title="Επαναφορά στην αυτόματη διάταξη του compiler">Αυτόματη Διάταξη</button>
               <button class="tool-mini-btn" id="dfd-edit-in-builder-btn" style="color:var(--accent); font-weight:600;" title="Φόρτωση του τρέχοντος ΔΡΔ στον ΔΡΔ Builder για πλήρη παραμετροποίηση">Επεξεργασία στον Builder ✎</button>
             </div>
@@ -239,7 +276,40 @@
 
           <div class="diagram-viewport" id="dfd-viewport">
             <div class="diagram-canvas" id="dfd-canvas"></div>
-            <div class="diagram-hint">Σύρετε για μετακίνηση &bull; Ροδέλα για zoom</div>
+            <div class="diagram-hint">Σύρετε κόμβο για μετακίνηση &bull; Διπλό κλικ σε διεργασία/αποθήκη για μετάβαση στον κώδικα &bull; Ροδέλα για zoom</div>
+          </div>
+        </div>
+
+        <!-- Tab 2B: Λεξικό Δεδομένων ΕΑΠ (Data Dictionary) -->
+        <div class="tab-pane" id="tab-dd">
+          <div class="diagram-toolbar">
+            <div class="diagram-toolbar-group">
+              <strong style="font-size:0.77rem; color:var(--header-text);">Λεξικό Δεδομένων ΔΡΔ (Συμβολισμός ΕΑΠ: <code>=</code>, <code>+</code>, <code>[ | ]</code>, <code>{ }</code>, <code>( )</code>)</strong>
+            </div>
+            <div class="diagram-toolbar-group">
+              <button type="button" class="tool-mini-btn" id="dd-reset-btn" title="Επαναφορά στους αυτόματους ορισμούς από τον κώδικα">↺ Αυτόματοι Ορισμοί</button>
+              <button type="button" class="tool-mini-btn" id="dd-copy-md-btn" title="Αντιγραφή Λεξικού Δεδομένων σε μορφή Markdown">Markdown</button>
+              <button type="button" class="tool-mini-btn" id="dd-copy-word-btn" style="color:var(--accent); font-weight:700;" title="Αντιγραφή μορφοποιημένου πίνακα για άμεσο Ctrl+V στο MS Word">Αντιγραφή Πίνακα (Word)</button>
+            </div>
+          </div>
+          <div class="builder-scroll">
+            <div style="font-size:0.78rem; color:var(--muted); line-height:1.45;">
+              Το Λεξικό Δεδομένων παράγεται αυτόματα από τις ροές, τις αποθήκες και τις οντότητες του ΔΡΔ. Μπορείτε να επεξεργαστείτε απευθείας τη στήλη <strong>Ορισμός (Συμβολισμός ΕΑΠ)</strong> πριν την επικόλληση στο Word!
+            </div>
+            <div class="builder-table-wrap">
+              <table class="builder-flows-table" id="dd-table">
+                <thead>
+                  <tr>
+                    <th style="width:18%;">Όνομα Στοιχείου</th>
+                    <th style="width:16%;">Κατηγορία</th>
+                    <th style="width:32%;">Ορισμός (Συμβολισμός ΕΑΠ)</th>
+                    <th style="width:20%;">Ροές / Κατεύθυνση</th>
+                    <th style="width:14%;">Σχόλια</th>
+                  </tr>
+                </thead>
+                <tbody id="dd-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -275,6 +345,22 @@
               <button class="tool-mini-btn active" id="mermaid-toggle-code-btn" type="button" title="Εμφάνιση / απόκρυψη πλαισίου κώδικα Mermaid για περισσότερο χώρο στο διάγραμμα">Κώδικας ▾</button>
               <span id="mermaid-edit-status" class="pli11-stat-pill" style="font-size:0.7rem; padding:0.12rem 0.42rem;">Αυτόματο</span>
             </div>
+            <div class="diagram-toolbar-group" role="group" aria-label="Οπτική Επεξεργασία Mermaid (χωρίς αλλαγή κώδικα)">
+              <select class="tool-mini-select" id="mermaid-curve-select" title="Στυλ γραμμών διαγράμματος (χωρίς αλλαγή κώδικα Mermaid)">
+                <option value="basis">Γραμμές: Καμπύλες</option>
+                <option value="stepAfter">Γραμμές: Ορθογώνιες</option>
+                <option value="linear">Γραμμές: Ευθείες</option>
+              </select>
+              <select class="tool-mini-select" id="mermaid-spacing-select" title="Αποστάσεις κόμβων (χωρίς αλλαγή κώδικα Mermaid)">
+                <option value="compact">Αποστάσεις: Συμπαγείς</option>
+                <option value="normal" selected>Αποστάσεις: Κανονικές</option>
+                <option value="wide">Αποστάσεις: Άνετες</option>
+              </select>
+              <button class="tool-mini-btn" id="mermaid-print-btn" type="button" title="Ασπρόμαυρη εμφάνιση Mermaid έτοιμη για MS Word (χωρίς αλλαγή κώδικα)">Ασπρόμαυρο (Word)</button>
+              <button class="tool-mini-btn" id="mermaid-undo-btn" type="button" disabled title="Αναίρεση οπτικής αλλαγής">↶</button>
+              <button class="tool-mini-btn" id="mermaid-redo-btn" type="button" disabled title="Επανάληψη οπτικής αλλαγής">↷</button>
+              <button class="tool-mini-btn" id="mermaid-reset-visual-btn" type="button" hidden title="Επαναφορά όλων των οπτικών μετακινήσεων/χρωμάτων">↺ Διάταξη</button>
+            </div>
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="mermaid-zoom-out" type="button" title="Σμίκρυνση">-</button>
               <span class="zoom-readout" id="mermaid-zoom-label">100%</span>
@@ -298,7 +384,7 @@
             <div class="resizer mermaid-resizer" id="mermaid-resizer" title="Σύρετε για αλλαγή ύψους κώδικα/προεπισκόπησης • Διπλό κλικ για επαναφορά"></div>
             <div class="diagram-viewport mermaid-viewport" id="mermaid-viewport">
               <div class="diagram-canvas" id="mermaid-preview-host"></div>
-              <div class="diagram-hint">Σύρετε για μετακίνηση &bull; Ροδέλα για zoom &bull; Διπλό κλικ για Fit</div>
+              <div class="diagram-hint">Σύρετε κόμβο ή ετικέτα για μετακίνηση &bull; Κλικ σε κόμβο για στυλ &bull; Σύρετε φόντο για pan</div>
             </div>
           </div>
         </div>
@@ -382,8 +468,8 @@
   <!-- Permalink LZ-String Compression -->
   <script src="vendor/lz-string.min.js"></script>
 
-  <!-- Mermaid Live Preview (progressive enhancement; core and SVG renderer work offline) -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js" defer></script>
+  <!-- Mermaid Live Preview (100% local & offline) -->
+  <script src="vendor/mermaid.min.js" defer></script>
 
   <!-- ΠΛΗ11 Grammar, Examples, Core Compiler, SVG Renderer & UI Controller -->
   <script src="pli11-mode.js"></script>
@@ -391,6 +477,8 @@
   <script src="pli11-core.js"></script>
   <script src="pli11-renderer.js"></script>
   <script src="diagram-viewport.js"></script>
+  <script src="mermaid-visual-editor.js"></script>
+  <script src="docx-exporter.js"></script>
   <script src="pli11-app.js"></script>
 </body>
 </html>

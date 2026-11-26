@@ -98,6 +98,21 @@
     return Promise.resolve(false);
   }
 
+  function copyHtmlTableToClipboard(htmlString, plainFallback, okMessage) {
+    if (!htmlString) return Promise.resolve(false);
+    if (navigator.clipboard && typeof window !== 'undefined' && window.ClipboardItem) {
+      const htmlBlob = new Blob([htmlString], { type: 'text/html' });
+      const textBlob = new Blob([plainFallback || htmlString], { type: 'text/plain' });
+      return navigator.clipboard.write([
+        new window.ClipboardItem({ 'text/html': htmlBlob, 'text/plain': textBlob })
+      ]).then(() => {
+        showToast(okMessage || 'Ο πίνακας αντιγράφηκε! Πατήστε Ctrl+V στο MS Word.');
+        return true;
+      }).catch(() => copyTextToClipboard(plainFallback || htmlString, okMessage));
+    }
+    return copyTextToClipboard(plainFallback || htmlString, okMessage);
+  }
+
   // ---------------------------------------------------------------------------
   // Theme management (FOUC-safe: initTheme() runs immediately on script load)
   // ---------------------------------------------------------------------------
@@ -181,6 +196,80 @@
       applyTheme(getTheme() !== 'dark', opts);
       syncPressed();
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Unified Tools / Course Submenu Dropdown (shared across all pages)
+  // ---------------------------------------------------------------------------
+  function wireCourseSubmenu() {
+    const submenu = document.getElementById('course-submenu');
+    const submenuBtn = document.getElementById('tools-submenu-btn');
+    if (!submenu || !submenuBtn || submenu.dataset.wired === 'true') return;
+    submenu.dataset.wired = 'true';
+
+    let isPinnedByClick = false;
+    let closeTimeout = null;
+
+    function setSubmenuOpen(open, pinned = false) {
+      if (closeTimeout) {
+        clearTimeout(closeTimeout);
+        closeTimeout = null;
+      }
+      if (!open) {
+        isPinnedByClick = false;
+      } else if (pinned) {
+        isPinnedByClick = true;
+      }
+      submenu.classList.toggle('open', open);
+      submenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    submenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (submenu.classList.contains('open') && isPinnedByClick) {
+        setSubmenuOpen(false);
+      } else {
+        setSubmenuOpen(true, true);
+      }
+    });
+
+    submenu.addEventListener('mouseenter', () => {
+      if (closeTimeout) {
+        clearTimeout(closeTimeout);
+        closeTimeout = null;
+      }
+      if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
+        setSubmenuOpen(true, isPinnedByClick);
+      }
+    });
+
+    submenu.addEventListener('mouseleave', () => {
+      if (isPinnedByClick) return;
+      closeTimeout = setTimeout(() => {
+        setSubmenuOpen(false);
+      }, 200);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!submenu.contains(e.target)) {
+        setSubmenuOpen(false);
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && submenu.classList.contains('open')) {
+        setSubmenuOpen(false);
+        submenuBtn.focus();
+      }
+    });
+
+    submenu.querySelectorAll('.submenu-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        setSubmenuOpen(false);
+      });
+    });
+
+    updateThemeLinks(getTheme());
   }
 
   // ---------------------------------------------------------------------------
@@ -457,17 +546,45 @@
     return Promise.resolve(fullUrl);
   }
 
-  function shareCode(code) {
+  function encodeSharePayload(code, layoutObj) {
+    const cleanCode = String(code || '').replace(/\n?\/\*\s*@EAP_LAYOUT:\s*\{[\s\S]*?\}\s*\*\/\s*$/, '');
+    if (!layoutObj || typeof layoutObj !== 'object') return cleanCode;
+    const hasEntries = Object.values(layoutObj).some((v) => v && typeof v === 'object' && Object.keys(v).length > 0);
+    if (!hasEntries) return cleanCode;
+    try {
+      return `${cleanCode}\n/* @EAP_LAYOUT: ${JSON.stringify(layoutObj)} */`;
+    } catch (e) {
+      return cleanCode;
+    }
+  }
+
+  function decodeSharePayload(rawText) {
+    const str = String(rawText || '');
+    const m = str.match(/\n?\/\*\s*@EAP_LAYOUT:\s*(\{[\s\S]*?\})\s*\*\/\s*$/);
+    if (!m) return { code: str, layout: null };
+    let layout = null;
+    try {
+      layout = JSON.parse(m[1]);
+    } catch (e) {
+      layout = null;
+    }
+    const cleanCode = str.slice(0, m.index);
+    return { code: cleanCode, layout };
+  }
+
+  function shareCode(code, extraOrMsg) {
     if (!code || !code.trim()) {
       showToast('Δεν υπάρχει κώδικας για κοινοποίηση.');
       return Promise.resolve(null);
     }
-    return buildShareURLAsync(code).then((fullUrl) => {
+    const layoutObj = (extraOrMsg && typeof extraOrMsg === 'object') ? extraOrMsg : null;
+    const payload = encodeSharePayload(code, layoutObj);
+    return buildShareURLAsync(payload).then((fullUrl) => {
       if (!fullUrl) {
         showToast('Η βιβλιοθήκη συμπίεσης δεν είναι διαθέσιμη.');
         return null;
       }
-      return showShareModal(code, fullUrl);
+      return showShareModal(payload, fullUrl);
     });
   }
 
@@ -736,6 +853,470 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Multi-File Student Workspace Manager («Οι Εργασίες μου») + Assignment Notes
+  // ---------------------------------------------------------------------------
+  function createWorkspaceManager(opts = {}) {
+    const courseKey = opts.courseKey || 'default';
+    const storageKey = `eapWorkspaces_${courseKey}_v1`;
+    const defaultTitle = opts.defaultSlotTitle || 'Άσκηση 1';
+    const getCode = opts.getCode || (() => '');
+    const setCode = opts.setCode || (() => {});
+    const getExtraState = opts.getExtraState || (() => ({}));
+    const setExtraState = opts.setExtraState || (() => {});
+
+    let state = { activeId: null, items: [] };
+    try {
+      const raw = SettingsManager.get(storageKey, null);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+          state = parsed;
+        }
+      }
+    } catch (e) { /* ignore corrupt JSON */ }
+
+    function makeId() {
+      return 'ws_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    }
+
+    if (state.items.length === 0) {
+      const firstId = makeId();
+      state.items.push({
+        id: firstId,
+        title: defaultTitle,
+        updatedAt: Date.now(),
+        code: getCode(),
+        notes: '',
+        extra: getExtraState()
+      });
+      state.activeId = firstId;
+    } else if (!state.items.some((x) => x.id === state.activeId)) {
+      state.activeId = state.items[0].id;
+    }
+
+    function persist() {
+      try {
+        SettingsManager.set(storageKey, JSON.stringify(state));
+      } catch (e) { /* quota fallback */ }
+    }
+
+    function getActiveSlot() {
+      return state.items.find((x) => x.id === state.activeId) || state.items[0];
+    }
+
+    function saveActiveNow() {
+      const slot = getActiveSlot();
+      if (!slot) return;
+      slot.code = getCode();
+      slot.extra = getExtraState();
+      slot.updatedAt = Date.now();
+      persist();
+      syncHeaderUI();
+    }
+
+    const saveDebounced = debounce(saveActiveNow, 450);
+
+    // Wire Notes Drawer UI
+    const notesBtn = document.getElementById('notes-toggle-btn');
+    const wsBtn = document.getElementById('workspaces-btn');
+    let notesDrawer = document.getElementById('eap-notes-drawer');
+    const hostEl = opts.notesHostEl || document.querySelector('.editor-container');
+
+    if (!notesDrawer && hostEl) {
+      notesDrawer = el('div', { id: 'eap-notes-drawer', class: 'eap-notes-drawer', hidden: 'hidden' });
+      notesDrawer.innerHTML = `
+        <div class="eap-notes-header">
+          <div>
+            <strong>📝 Εκφώνηση &amp; Προσωπικές Σημειώσεις</strong>
+            <span class="eap-notes-sub" id="eap-notes-slot-label"></span>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button type="button" class="tab-action-btn" id="eap-notes-clear-btn" title="Καθαρισμός σημειώσεων αυτής της άσκησης">Καθαρισμός</button>
+            <button type="button" class="tab-action-btn" id="eap-notes-close-btn" title="Απόκρυψη πλαισίου εκφώνησης">Κλείσιμο ▲</button>
+          </div>
+        </div>
+        <textarea id="eap-notes-textarea" rows="4" spellcheck="false" placeholder="Επικολλήστε εδώ την εκφώνηση του θέματος (π.χ. ΓΕ1 / ΓΕ2 - Θέμα 3) ή τις σημειώσεις σας ώστε να τις βλέπετε δίπλα στον κώδικα..."></textarea>
+      `;
+      const editorWrap = hostEl.querySelector('.editor-wrapper');
+      if (editorWrap) hostEl.insertBefore(notesDrawer, editorWrap);
+      else hostEl.appendChild(notesDrawer);
+    }
+
+    const notesTextarea = notesDrawer ? notesDrawer.querySelector('#eap-notes-textarea') : null;
+    const notesSlotLabel = notesDrawer ? notesDrawer.querySelector('#eap-notes-slot-label') : null;
+
+    function syncHeaderUI() {
+      const slot = getActiveSlot();
+      if (wsBtn && slot) {
+        wsBtn.textContent = `📁 ${slot.title} (${state.items.length})`;
+        wsBtn.title = `Οι Εργασίες μου — Ενεργή: ${slot.title} (${state.items.length} αποθηκευμένες ασκήσεις)`;
+      }
+      if (notesSlotLabel && slot) {
+        notesSlotLabel.textContent = `— ${slot.title}`;
+      }
+      if (notesBtn && slot) {
+        const hasNotes = Boolean(slot.notes && slot.notes.trim());
+        notesBtn.classList.toggle('has-notes', hasNotes);
+        notesBtn.textContent = hasNotes ? '📝 Εκφώνηση ●' : '📝 Εκφώνηση';
+      }
+    }
+
+    if (notesTextarea) {
+      const curSlot = getActiveSlot();
+      notesTextarea.value = (curSlot && curSlot.notes) || '';
+      notesTextarea.addEventListener('input', () => {
+        const slot = getActiveSlot();
+        if (slot) {
+          slot.notes = notesTextarea.value;
+          slot.updatedAt = Date.now();
+          persist();
+          syncHeaderUI();
+        }
+      });
+    }
+
+    if (notesDrawer) {
+      const closeN = notesDrawer.querySelector('#eap-notes-close-btn');
+      const clearN = notesDrawer.querySelector('#eap-notes-clear-btn');
+      if (closeN) {
+        closeN.addEventListener('click', () => {
+          notesDrawer.hidden = true;
+          if (notesBtn) notesBtn.classList.remove('active');
+        });
+      }
+      if (clearN && notesTextarea) {
+        clearN.addEventListener('click', () => {
+          notesTextarea.value = '';
+          const slot = getActiveSlot();
+          if (slot) {
+            slot.notes = '';
+            persist();
+            syncHeaderUI();
+          }
+        });
+      }
+    }
+
+    if (notesBtn && notesDrawer) {
+      notesBtn.addEventListener('click', () => {
+        notesDrawer.hidden = !notesDrawer.hidden;
+        notesBtn.classList.toggle('active', !notesDrawer.hidden);
+        if (!notesDrawer.hidden && notesTextarea) notesTextarea.focus();
+      });
+    }
+
+    function activateSlot(slotId, silent) {
+      saveActiveNow();
+      const next = state.items.find((x) => x.id === slotId);
+      if (!next) return;
+      state.activeId = next.id;
+      persist();
+      setCode(next.code || '');
+      setExtraState(next.extra || {});
+      if (notesTextarea) notesTextarea.value = next.notes || '';
+      syncHeaderUI();
+      if (!silent) showToast(`Φορτώθηκε η εργασία «${next.title}»!`);
+    }
+
+    // Restore active slot extra state on boot if no shared hash is present
+    if (!hasSharedHash()) {
+      const bootSlot = getActiveSlot();
+      if (bootSlot && bootSlot.extra && Object.keys(bootSlot.extra).length > 0) {
+        setExtraState(bootSlot.extra);
+      }
+    }
+    syncHeaderUI();
+
+    function openWorkspacesModal() {
+      saveActiveNow();
+      const existing = document.getElementById('eap-workspaces-modal');
+      if (existing) existing.remove();
+
+      const modal = createModal({
+        id: 'eap-workspaces-modal',
+        title: '📁 Οι Εργασίες μου (Αποθηκευμένες Ασκήσεις)',
+        bodyHTML: `
+          <p style="margin-top:0; font-size:0.84rem; opacity:0.88;">
+            Κάθε άσκηση αποθηκεύει αυτόματα τον κώδικα, την εκφώνηση/σημειώσεις και τη χειροκίνητη διάταξη των διαγραμμάτων σας στον browser.
+          </p>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+            <button type="button" class="btn-run" id="ws-new-btn" style="text-transform:none; padding:5px 12px; font-size:0.8rem;">+ Νέα Άσκηση</button>
+            <button type="button" class="tab-action-btn" id="ws-dup-btn">Διπλότυπο Τρέχουσας</button>
+            <button type="button" class="tab-action-btn" id="ws-export-btn">⬇ Εξαγωγή Όλων (.json)</button>
+            <button type="button" class="tab-action-btn" id="ws-import-btn">⬆ Εισαγωγή (.json)</button>
+          </div>
+          <div id="ws-items-list" class="eap-ws-list"></div>
+        `
+      });
+
+      function renderList() {
+        const listEl = modal.body.querySelector('#ws-items-list');
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        state.items.forEach((item) => {
+          const isAct = item.id === state.activeId;
+          const dateStr = new Date(item.updatedAt || Date.now()).toLocaleString('el-GR', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+          });
+          const linesCount = String(item.code || '').split('\n').length;
+          const row = el('div', { class: `eap-ws-row${isAct ? ' active' : ''}` });
+          row.innerHTML = `
+            <div class="eap-ws-info">
+              <div class="eap-ws-title-line">
+                <strong>${escapeHTML(item.title)}</strong>
+                ${isAct ? '<span class="eap-ws-active-pill">Ενεργή</span>' : ''}
+                ${item.notes && item.notes.trim() ? '<span class="eap-ws-notes-pill" title="Περιέχει σημειώσεις εκφώνησης">📝 Εκφώνηση</span>' : ''}
+              </div>
+              <div class="eap-ws-meta">${linesCount} γραμμές &bull; Ενημερώθηκε: ${escapeHTML(dateStr)}</div>
+            </div>
+            <div class="eap-ws-actions">
+              ${!isAct ? '<button type="button" class="btn-run ws-open-item" style="text-transform:none; padding:3px 9px; font-size:0.76rem;">Άνοιγμα</button>' : ''}
+              <button type="button" class="tab-action-btn ws-rename-item" title="Μετονομασία">✎</button>
+              ${state.items.length > 1 ? '<button type="button" class="tab-action-btn ws-del-item" title="Διαγραφή">&times;</button>' : ''}
+            </div>
+          `;
+          const openB = row.querySelector('.ws-open-item');
+          if (openB) {
+            openB.addEventListener('click', () => {
+              activateSlot(item.id, false);
+              modal.close();
+            });
+          }
+          row.querySelector('.ws-rename-item').addEventListener('click', () => {
+            showPrompt('Νέο όνομα για την εργασία:', {
+              title: 'Μετονομασία Εργασίας',
+              defaultValue: item.title,
+              onSubmit: (val) => {
+                if (val && val.trim()) {
+                  item.title = val.trim();
+                  persist();
+                  syncHeaderUI();
+                  renderList();
+                }
+              }
+            });
+          });
+          const delB = row.querySelector('.ws-del-item');
+          if (delB) {
+            delB.addEventListener('click', () => {
+              showConfirm(`Οριστική διαγραφή της εργασίας «${item.title}»;`, {
+                danger: true,
+                yesText: 'Διαγραφή',
+                onYes: () => {
+                  state.items = state.items.filter((x) => x.id !== item.id);
+                  if (state.activeId === item.id) {
+                    const fallback = state.items[0];
+                    state.activeId = fallback.id;
+                    setCode(fallback.code || '');
+                    setExtraState(fallback.extra || {});
+                    if (notesTextarea) notesTextarea.value = fallback.notes || '';
+                  }
+                  persist();
+                  syncHeaderUI();
+                  renderList();
+                }
+              });
+            });
+          }
+          listEl.appendChild(row);
+        });
+      }
+
+      modal.body.querySelector('#ws-new-btn').addEventListener('click', () => {
+        const nextNum = state.items.length + 1;
+        showPrompt('Όνομα νέας άσκησης (π.χ. ΓΕ1 - Θέμα 3):', {
+          title: 'Νέα Άσκηση',
+          defaultValue: `Άσκηση ${nextNum}`,
+          onSubmit: (name) => {
+            if (!name || !name.trim()) return;
+            saveActiveNow();
+            const newId = makeId();
+            state.items.push({
+              id: newId,
+              title: name.trim(),
+              updatedAt: Date.now(),
+              code: '',
+              notes: '',
+              extra: {}
+            });
+            state.activeId = newId;
+            persist();
+            setCode('');
+            setExtraState({});
+            if (notesTextarea) notesTextarea.value = '';
+            syncHeaderUI();
+            modal.close();
+            showToast(`Δημιουργήθηκε η «${name.trim()}»!`);
+          }
+        });
+      });
+
+      modal.body.querySelector('#ws-dup-btn').addEventListener('click', () => {
+        saveActiveNow();
+        const cur = getActiveSlot();
+        if (!cur) return;
+        const newId = makeId();
+        state.items.push({
+          id: newId,
+          title: `${cur.title} (Αντίγραφο)`,
+          updatedAt: Date.now(),
+          code: cur.code,
+          notes: cur.notes || '',
+          extra: JSON.parse(JSON.stringify(cur.extra || {}))
+        });
+        state.activeId = newId;
+        persist();
+        syncHeaderUI();
+        renderList();
+        showToast('Δημιουργήθηκε αντίγραφο της τρέχουσας άσκησης!');
+      });
+
+      modal.body.querySelector('#ws-export-btn').addEventListener('click', () => {
+        saveActiveNow();
+        const payload = JSON.stringify({ courseKey, exportedAt: new Date().toISOString(), items: state.items }, null, 2);
+        saveTextAsFile(payload, `eap-ergasies-${courseKey}.json`, 'application/json;charset=utf-8');
+        showToast('Εξήχθησαν όλες οι εργασίες σε αρχείο .json!');
+      });
+
+      modal.body.querySelector('#ws-import-btn').addEventListener('click', async () => {
+        const file = await pickFile('.json');
+        if (!file) return;
+        try {
+          const txt = await readTextFile(file);
+          const parsed = JSON.parse(txt);
+          if (!parsed || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+            showToast('Μη έγκυρο αρχείο εργασιών JSON.');
+            return;
+          }
+          for (const imp of parsed.items) {
+            state.items.push({
+              id: makeId(),
+              title: imp.title || 'Εισαγόμενη Άσκηση',
+              updatedAt: imp.updatedAt || Date.now(),
+              code: imp.code || '',
+              notes: imp.notes || '',
+              extra: imp.extra || {}
+            });
+          }
+          persist();
+          syncHeaderUI();
+          renderList();
+          showToast(`Εισήχθησαν ${parsed.items.length} εργασίες!`);
+        } catch (e) {
+          showToast('Σφάλμα κατά την ανάγνωση του αρχείου JSON.');
+        }
+      });
+
+      renderList();
+      modal.open();
+    }
+
+    if (wsBtn) {
+      wsBtn.addEventListener('click', openWorkspacesModal);
+    }
+
+    return {
+      onChange: saveDebounced,
+      saveNow: saveActiveNow,
+      getActiveSlot,
+      openModal: openWorkspacesModal
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mobile / Tablet Touch Symbol Bar (avoids Greek <-> English keyboard switching)
+  // ---------------------------------------------------------------------------
+  function attachTouchSymbolBar(cmEditor, customSymbols) {
+    if (!cmEditor || typeof document === 'undefined') return null;
+    const wrapper = cmEditor.getWrapperElement && cmEditor.getWrapperElement();
+    const editorContainer = wrapper && wrapper.closest('.editor-container');
+    if (!editorContainer) return null;
+
+    const symbols = Array.isArray(customSymbols) && customSymbols.length > 0
+      ? customSymbols
+      : [':=', ';', ':', '(', ')', '[', ']', '..', '%', '<>', '<=', '>=', '=', ',', '.', '"'];
+
+    const bar = el('div', {
+      class: 'eap-touch-symbol-bar',
+      role: 'toolbar',
+      'aria-label': 'Γρήγορη εισαγωγή συμβόλων κώδικα'
+    });
+
+    const label = el('span', { class: 'eap-touch-sym-label', text: '⌨' });
+    bar.appendChild(label);
+
+    symbols.forEach((sym) => {
+      const btn = el('button', {
+        type: 'button',
+        class: 'eap-touch-sym-btn',
+        text: sym,
+        title: `Εισαγωγή ${sym}`
+      });
+      btn.addEventListener('mousedown', (e) => {
+        // Keep focus inside CodeMirror on touch/mouse click
+        e.preventDefault();
+      });
+      btn.addEventListener('click', () => {
+        const doc = cmEditor.getDoc();
+        const cur = doc.getCursor();
+        if (sym === '()') {
+          doc.replaceRange('()', cur);
+          doc.setCursor({ line: cur.line, ch: cur.ch + 1 });
+        } else {
+          doc.replaceRange(sym, cur);
+        }
+        cmEditor.focus();
+      });
+      bar.appendChild(btn);
+    });
+
+    const editorWrap = editorContainer.querySelector('.editor-wrapper');
+    if (editorWrap && editorWrap.nextSibling) {
+      editorContainer.insertBefore(bar, editorWrap.nextSibling);
+    } else {
+      editorContainer.appendChild(bar);
+    }
+
+    // Add a compact toggle chip inside the snippets bar so desktop users can also show/hide it
+    const snippetsBar = editorContainer.querySelector('.editor-quick-snippets, .pli10-snippets-bar');
+    const savedDesktopShow = SettingsManager.get('eapShowSymbolBar', 'false') === 'true';
+    if (savedDesktopShow) bar.classList.add('force-visible');
+
+    if (snippetsBar) {
+      const toggleChip = el('button', {
+        type: 'button',
+        class: (snippetsBar.classList.contains('pli10-snippets-bar') ? 'pli10-snippet-chip' : 'snippet-chip') + (savedDesktopShow ? ' active' : ''),
+        text: '⌨ Σύμβολα',
+        title: 'Εμφάνιση/απόκρυψη μπάρας γρήγορων συμβόλων (:=  ;  [ ]  <>  %) χωρίς εναλλαγή Ελληνικού/Αγγλικού πληκτρολογίου'
+      });
+      toggleChip.style.marginLeft = 'auto';
+      toggleChip.addEventListener('click', () => {
+        const next = !bar.classList.contains('force-visible');
+        bar.classList.toggle('force-visible', next);
+        toggleChip.classList.toggle('active', next);
+        SettingsManager.set('eapShowSymbolBar', next ? 'true' : 'false');
+        cmEditor.refresh();
+      });
+      snippetsBar.appendChild(toggleChip);
+    }
+
+    return bar;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Offline PWA Service Worker Registration (safe no-op on file://)
+  // ---------------------------------------------------------------------------
+  function registerOfflineServiceWorker() {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+    if (!('serviceWorker' in navigator)) return;
+    const proto = window.location && window.location.protocol;
+    if (proto !== 'https:' && proto !== 'http:') return;
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => { /* ignore in restricted contexts */ });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
   const EAPCommon = {
@@ -745,14 +1326,18 @@
     el,
     showToast,
     copyTextToClipboard,
+    copyHtmlTableToClipboard,
     initTheme,
     getTheme,
     applyTheme,
     wireThemeToggle,
+    wireCourseSubmenu,
     updateThemeLinks,
     hasSharedHash,
     loadCodeFromHash,
     loadCodeFromHashAsync,
+    encodeSharePayload,
+    decodeSharePayload,
     buildShareURL,
     buildShareURLAsync,
     shareCode,
@@ -767,7 +1352,10 @@
     switchTabs,
     wireTabs,
     populateExampleSelector,
-    createAutosave
+    createAutosave,
+    createWorkspaceManager,
+    attachTouchSymbolBar,
+    registerOfflineServiceWorker
   };
 
   global.EAPCommon = EAPCommon;
@@ -775,5 +1363,6 @@
   // Auto-init theme as early as possible to prevent FOUC (safe to call again).
   if (typeof document !== 'undefined' && document.documentElement) {
     initTheme();
+    registerOfflineServiceWorker();
   }
 })(typeof window !== 'undefined' ? window : globalThis);

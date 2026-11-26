@@ -73,6 +73,23 @@ const EXAMPLE_CATEGORIES = [
   }
 ];
 
+const EXAMPLE_INPUTS = {
+  AVERAGE: "6\n10 20 15 25 30 20",
+  FIBONACCI: "7",
+  FACTORIAL: "6",
+  EUKLEIDIS_GCD: "48 18",
+  ARRAY_MIN: "14 -3 27 8 -9",
+  ARRAY_MAX: "14 -3 27 8 -9",
+  LINEAR_SEARCH: "12 45 7 33 19\n33",
+  BINARY_SEARCH: "2 5 9 14 21 28 34 42 50 63\n28",
+  BUBBLE_SORT: "42 15 8 91 23 4 16 55 11",
+  SELECTION_SORT: "42 15 8 91 23 4 16 55 11",
+  INSERTION_SORT: "42 15 8 91 23 4 16 55 11",
+  QUICK_SORT: "6\n35 12 48 7 29 18",
+  MERGE_SORT: "6\n35 12 48 7 29 18",
+  MATRIX_TRANSPOSE: "3\n1 2 3\n4 5 6\n7 8 9"
+};
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { EXAMPLES, EXAMPLE_CATEGORIES };
+  module.exports = { EXAMPLES, EXAMPLE_CATEGORIES, EXAMPLE_INPUTS };
 }

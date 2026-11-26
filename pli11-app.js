@@ -150,8 +150,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ? PLI11_EXAMPLES.GE1_2025_2026_FULL
     : 'PROCEDURE Exec_M1\n  LOCAL VAR A;\n  ΑΡΧΙΚΟΠΟΙΗΣΕ A;\nEND_PROCEDURE;';
 
-  const sharedCode = Common.loadCodeFromHash();
-  if (sharedCode) initialCode = sharedCode;
+  let sharedInitialLayout = null;
+  const rawSharedCode = Common.loadCodeFromHash();
+  if (rawSharedCode) {
+    const decoded = Common.decodeSharePayload ? Common.decodeSharePayload(rawSharedCode) : { code: rawSharedCode, layout: null };
+    initialCode = decoded.code;
+    sharedInitialLayout = decoded.layout;
+  }
 
   const isDarkInitial = Common.getTheme() === 'dark';
   let lineWrapEnabled = SettingsManager.get('pli11LineWrap', 'true') !== 'false';
@@ -161,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mode: 'eap-pli11',
     theme: isDarkInitial ? 'dracula' : 'default',
     lineNumbers: true,
+    gutters: ['CodeMirror-linenumbers', 'cm-pli11-diag'],
     lineWrapping: lineWrapEnabled,
     matchBrackets: true,
     autoCloseBrackets: true,
@@ -208,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   const getCurrentTheme = () => Common.getTheme();
 
+  Common.wireCourseSubmenu();
   Common.wireThemeToggle({
     onChange: () => {
       if (editor) editor.setOption('theme', Common.getTheme() === 'dark' ? 'dracula' : 'default');
@@ -277,6 +284,151 @@ document.addEventListener('DOMContentLoaded', () => {
   let customDDPPositions = {};
   let customDFDPositionsLevel1 = {};
   let customDFDPositionsLevel0 = {};
+  let ddCustomOverrides = {};
+
+  const ddpUndoBtn = document.getElementById('ddp-undo-btn');
+  const ddpRedoBtn = document.getElementById('ddp-redo-btn');
+  const dfdUndoBtn = document.getElementById('dfd-undo-btn');
+  const dfdRedoBtn = document.getElementById('dfd-redo-btn');
+  const ddpUndoStack = [];
+  const ddpRedoStack = [];
+  const dfdUndoStack = [];
+  const dfdRedoStack = [];
+
+  function loadPersistedPositions() {
+    if (sharedInitialLayout) {
+      customDDPPositions = sharedInitialLayout.ddp || {};
+      customDFDPositionsLevel1 = sharedInitialLayout.dfd1 || {};
+      customDFDPositionsLevel0 = sharedInitialLayout.dfd0 || {};
+      return;
+    }
+    try {
+      const raw = SettingsManager.get('pli11SavedPositionsV1', null);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          customDDPPositions = parsed.ddp || {};
+          customDFDPositionsLevel1 = parsed.dfd1 || {};
+          customDFDPositionsLevel0 = parsed.dfd0 || {};
+        }
+      }
+      const rawDd = SettingsManager.get('pli11DataDictOverridesV1', null);
+      if (rawDd) ddCustomOverrides = JSON.parse(rawDd) || {};
+    } catch (e) { /* ignore */ }
+  }
+  loadPersistedPositions();
+
+  function savePersistedPositions() {
+    try {
+      SettingsManager.set('pli11SavedPositionsV1', JSON.stringify({
+        ddp: customDDPPositions,
+        dfd1: customDFDPositionsLevel1,
+        dfd0: customDFDPositionsLevel0
+      }));
+    } catch (e) { /* ignore */ }
+    if (typeof workspaceMgr !== 'undefined' && workspaceMgr) workspaceMgr.onChange();
+  }
+
+  function saveDataDictOverrides() {
+    try {
+      SettingsManager.set('pli11DataDictOverridesV1', JSON.stringify(ddCustomOverrides));
+    } catch (e) { /* ignore */ }
+    if (typeof workspaceMgr !== 'undefined' && workspaceMgr) workspaceMgr.onChange();
+  }
+
+  function syncLayoutUndoButtons() {
+    if (ddpUndoBtn) ddpUndoBtn.disabled = ddpUndoStack.length === 0;
+    if (ddpRedoBtn) ddpRedoBtn.disabled = ddpRedoStack.length === 0;
+    if (dfdUndoBtn) dfdUndoBtn.disabled = dfdUndoStack.length === 0;
+    if (dfdRedoBtn) dfdRedoBtn.disabled = dfdRedoStack.length === 0;
+  }
+
+  function pushDDPUndo(snap) {
+    ddpUndoStack.push(snap);
+    if (ddpUndoStack.length > 50) ddpUndoStack.shift();
+    ddpRedoStack.length = 0;
+    syncLayoutUndoButtons();
+  }
+
+  function pushDFDUndo(snap) {
+    dfdUndoStack.push(snap);
+    if (dfdUndoStack.length > 50) dfdUndoStack.shift();
+    dfdRedoStack.length = 0;
+    syncLayoutUndoButtons();
+  }
+
+  function undoDDPLayout() {
+    if (!ddpUndoStack.length) return;
+    ddpRedoStack.push(JSON.parse(JSON.stringify(customDDPPositions)));
+    customDDPPositions = ddpUndoStack.pop();
+    syncLayoutUndoButtons();
+    savePersistedPositions();
+    renderDDPView(false);
+  }
+
+  function redoDDPLayout() {
+    if (!ddpRedoStack.length) return;
+    ddpUndoStack.push(JSON.parse(JSON.stringify(customDDPPositions)));
+    customDDPPositions = ddpRedoStack.pop();
+    syncLayoutUndoButtons();
+    savePersistedPositions();
+    renderDDPView(false);
+  }
+
+  function undoDFDLayout() {
+    if (!dfdUndoStack.length) return;
+    dfdRedoStack.push({
+      l1: JSON.parse(JSON.stringify(customDFDPositionsLevel1)),
+      l0: JSON.parse(JSON.stringify(customDFDPositionsLevel0))
+    });
+    const prev = dfdUndoStack.pop();
+    customDFDPositionsLevel1 = prev.l1 || {};
+    customDFDPositionsLevel0 = prev.l0 || {};
+    syncLayoutUndoButtons();
+    savePersistedPositions();
+    renderDFDView(false);
+  }
+
+  function redoDFDLayout() {
+    if (!dfdRedoStack.length) return;
+    dfdUndoStack.push({
+      l1: JSON.parse(JSON.stringify(customDFDPositionsLevel1)),
+      l0: JSON.parse(JSON.stringify(customDFDPositionsLevel0))
+    });
+    const next = dfdRedoStack.pop();
+    customDFDPositionsLevel1 = next.l1 || {};
+    customDFDPositionsLevel0 = next.l0 || {};
+    syncLayoutUndoButtons();
+    savePersistedPositions();
+    renderDFDView(false);
+  }
+
+  if (ddpUndoBtn) ddpUndoBtn.addEventListener('click', undoDDPLayout);
+  if (ddpRedoBtn) ddpRedoBtn.addEventListener('click', redoDDPLayout);
+  if (dfdUndoBtn) dfdUndoBtn.addEventListener('click', undoDFDLayout);
+  if (dfdRedoBtn) dfdRedoBtn.addEventListener('click', redoDFDLayout);
+
+  document.addEventListener('keydown', (e) => {
+    const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.closest('.CodeMirror'))) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      if (document.getElementById('tab-ddp').classList.contains('active') && ddpUndoStack.length) {
+        e.preventDefault();
+        undoDDPLayout();
+      } else if (document.getElementById('tab-dfd').classList.contains('active') && dfdUndoStack.length) {
+        e.preventDefault();
+        undoDFDLayout();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+      if (document.getElementById('tab-ddp').classList.contains('active') && ddpRedoStack.length) {
+        e.preventDefault();
+        redoDDPLayout();
+      } else if (document.getElementById('tab-dfd').classList.contains('active') && dfdRedoStack.length) {
+        e.preventDefault();
+        redoDFDLayout();
+      }
+    }
+  });
 
   if (dfdLayoutModeSelect) {
     dfdLayoutModeSelect.value = dfdLayoutMode;
@@ -318,6 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ddpBoxDrag = {
     active: false,
     moved: false,
+    preSnap: null,
     nodeId: null,
     startClientX: 0,
     startClientY: 0,
@@ -328,6 +481,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const dfdBoxDrag = {
     active: false,
+    moved: false,
+    preSnap: null,
     nodeId: null,
     startClientX: 0,
     startClientY: 0,
@@ -361,6 +516,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const scale = (dfdPanZoom && dfdPanZoom.state && dfdPanZoom.state.scale) || 1;
     const dx = (e.clientX - dfdBoxDrag.startClientX) / scale;
     const dy = (e.clientY - dfdBoxDrag.startClientY) / scale;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dfdBoxDrag.moved = true;
+    if (!dfdBoxDrag.moved) return;
     const snappedX = Math.round((dfdBoxDrag.startBoxX + dx) / 8) * 8;
     const snappedY = Math.round((dfdBoxDrag.startBoxY + dy) / 8) * 8;
     const targetPositions = getCustomPositions();
@@ -376,10 +533,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('mouseup', () => {
     if (ddpBoxDrag.active) {
+      if (ddpBoxDrag.moved && ddpBoxDrag.preSnap) {
+        pushDDPUndo(ddpBoxDrag.preSnap);
+        savePersistedPositions();
+      }
       setTimeout(() => { ddpBoxDrag.moved = false; }, 0);
       ddpBoxDrag.active = false;
+      ddpBoxDrag.preSnap = null;
     }
-    if (dfdBoxDrag.active) dfdBoxDrag.active = false;
+    if (dfdBoxDrag.active) {
+      if (dfdBoxDrag.moved && dfdBoxDrag.preSnap) {
+        pushDFDUndo(dfdBoxDrag.preSnap);
+        savePersistedPositions();
+      }
+      setTimeout(() => { dfdBoxDrag.moved = false; }, 0);
+      dfdBoxDrag.active = false;
+      dfdBoxDrag.preSnap = null;
+    }
   });
 
   function updateDFDToolbarButtons() {
@@ -455,7 +625,11 @@ document.addEventListener('DOMContentLoaded', () => {
   ddpZoomFit.addEventListener('click', () => ddpPanZoom.fit());
   if (ddpAutoLayout) {
     ddpAutoLayout.addEventListener('click', () => {
+      if (Object.keys(customDDPPositions).length > 0) {
+        pushDDPUndo(JSON.parse(JSON.stringify(customDDPPositions)));
+      }
       customDDPPositions = {};
+      savePersistedPositions();
       renderDDPView(true);
       showToast('Η αυτόματη διάταξη του ΔΔΠ επαναφέρθηκε.');
     });
@@ -466,11 +640,16 @@ document.addEventListener('DOMContentLoaded', () => {
   dfdZoomFit.addEventListener('click', () => dfdPanZoom.fit());
   if (dfdAutoLayout) {
     dfdAutoLayout.addEventListener('click', () => {
+      pushDFDUndo({
+        l1: JSON.parse(JSON.stringify(customDFDPositionsLevel1)),
+        l0: JSON.parse(JSON.stringify(customDFDPositionsLevel0))
+      });
       if (dfdActiveLevel === 0) {
         customDFDPositionsLevel0 = {};
       } else {
         customDFDPositionsLevel1 = {};
       }
+      savePersistedPositions();
       renderDFDView(true);
       showToast('Η αυτόματη διάταξη του ΔΡΔ επαναφέρθηκε.');
     });
@@ -487,11 +666,22 @@ document.addEventListener('DOMContentLoaded', () => {
     '1920x1080': { width: 1920, height: 1080 }
   };
 
+  function parseSavedDims(key, fallback) {
+    const raw = SettingsManager.get(key, null);
+    if (!raw) return fallback;
+    if (typeof raw === 'object' && raw.width && raw.height) return raw;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.width && parsed.height) return parsed;
+    } catch (e) { /* ignore legacy value */ }
+    return fallback;
+  }
+
   let ddpCanvasSetting = SettingsManager.get('pli11DdpCanvasSetting', 'auto');
-  let ddpCustomCanvas = SettingsManager.get('pli11DdpCustomCanvas', { width: 1400, height: 900 });
+  let ddpCustomCanvas = parseSavedDims('pli11DdpCustomCanvas', { width: 1400, height: 900 });
 
   let dfdCanvasSetting = SettingsManager.get('pli11DfdCanvasSetting', 'auto');
-  let dfdCustomCanvas = SettingsManager.get('pli11DfdCustomCanvas', { width: 1400, height: 900 });
+  let dfdCustomCanvas = parseSavedDims('pli11DfdCustomCanvas', { width: 1400, height: 900 });
 
   function getCanvasDims(setting, custom) {
     if (setting === 'auto') return null;
@@ -505,25 +695,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const val = ddpCanvasSizeSelect.value;
       if (val === 'custom') {
         const currentPrompt = `${ddpCustomCanvas.width}x${ddpCustomCanvas.height}`;
-        const input = prompt('Εισάγετε διαστάσεις καμβά ΔΔΠ (Πλάτος x Ύψος σε px, π.χ. 1600x900):', currentPrompt);
-        if (input) {
-          const parts = input.toLowerCase().replace(/[,x]/g, ' ').trim().split(/\s+/).map(Number);
-          if (parts.length >= 2 && parts[0] >= 300 && parts[1] >= 200) {
-            ddpCustomCanvas = { width: Math.round(parts[0]), height: Math.round(parts[1]) };
-            SettingsManager.set('pli11DdpCustomCanvas', ddpCustomCanvas);
-            ddpCanvasSetting = 'custom';
-          } else {
-            showToast('Μη έγκυρες διαστάσεις (π.χ. 1600x900).');
-            ddpCanvasSizeSelect.value = ddpCanvasSetting;
-            return;
+        ddpCanvasSizeSelect.value = ddpCanvasSetting;
+        Common.showPrompt('Εισάγετε διαστάσεις καμβά ΔΔΠ (Πλάτος x Ύψος σε px, π.χ. 1600x900):', {
+          title: 'Προσαρμοσμένες Διαστάσεις ΔΔΠ',
+          defaultValue: currentPrompt,
+          onSubmit: (input) => {
+            if (!input) return;
+            const parts = input.toLowerCase().replace(/[,x×]/g, ' ').trim().split(/\s+/).map(Number);
+            if (parts.length >= 2 && parts[0] >= 300 && parts[1] >= 200) {
+              ddpCustomCanvas = { width: Math.round(parts[0]), height: Math.round(parts[1]) };
+              SettingsManager.set('pli11DdpCustomCanvas', JSON.stringify(ddpCustomCanvas));
+              ddpCanvasSetting = 'custom';
+              ddpCanvasSizeSelect.value = 'custom';
+              SettingsManager.set('pli11DdpCanvasSetting', ddpCanvasSetting);
+              renderDDPView(true);
+              showToast(`Καμβάς ΔΔΠ: ${ddpCustomCanvas.width} × ${ddpCustomCanvas.height} px`);
+            } else {
+              showToast('Μη έγκυρες διαστάσεις (π.χ. 1600x900).');
+            }
           }
-        } else {
-          ddpCanvasSizeSelect.value = ddpCanvasSetting;
-          return;
-        }
-      } else {
-        ddpCanvasSetting = val;
+        });
+        return;
       }
+      ddpCanvasSetting = val;
       SettingsManager.set('pli11DdpCanvasSetting', ddpCanvasSetting);
       renderDDPView(true);
       const dims = getCanvasDims(ddpCanvasSetting, ddpCustomCanvas);
@@ -537,25 +731,29 @@ document.addEventListener('DOMContentLoaded', () => {
       const val = dfdCanvasSizeSelect.value;
       if (val === 'custom') {
         const currentPrompt = `${dfdCustomCanvas.width}x${dfdCustomCanvas.height}`;
-        const input = prompt('Εισάγετε διαστάσεις καμβά ΔΡΔ (Πλάτος x Ύψος σε px, π.χ. 1600x900):', currentPrompt);
-        if (input) {
-          const parts = input.toLowerCase().replace(/[,x]/g, ' ').trim().split(/\s+/).map(Number);
-          if (parts.length >= 2 && parts[0] >= 300 && parts[1] >= 200) {
-            dfdCustomCanvas = { width: Math.round(parts[0]), height: Math.round(parts[1]) };
-            SettingsManager.set('pli11DfdCustomCanvas', dfdCustomCanvas);
-            dfdCanvasSetting = 'custom';
-          } else {
-            showToast('Μη έγκυρες διαστάσεις (π.χ. 1600x900).');
-            dfdCanvasSizeSelect.value = dfdCanvasSetting;
-            return;
+        dfdCanvasSizeSelect.value = dfdCanvasSetting;
+        Common.showPrompt('Εισάγετε διαστάσεις καμβά ΔΡΔ (Πλάτος x Ύψος σε px, π.χ. 1600x900):', {
+          title: 'Προσαρμοσμένες Διαστάσεις ΔΡΔ',
+          defaultValue: currentPrompt,
+          onSubmit: (input) => {
+            if (!input) return;
+            const parts = input.toLowerCase().replace(/[,x×]/g, ' ').trim().split(/\s+/).map(Number);
+            if (parts.length >= 2 && parts[0] >= 300 && parts[1] >= 200) {
+              dfdCustomCanvas = { width: Math.round(parts[0]), height: Math.round(parts[1]) };
+              SettingsManager.set('pli11DfdCustomCanvas', JSON.stringify(dfdCustomCanvas));
+              dfdCanvasSetting = 'custom';
+              dfdCanvasSizeSelect.value = 'custom';
+              SettingsManager.set('pli11DfdCanvasSetting', dfdCanvasSetting);
+              renderDFDView(true);
+              showToast(`Καμβάς ΔΡΔ: ${dfdCustomCanvas.width} × ${dfdCustomCanvas.height} px`);
+            } else {
+              showToast('Μη έγκυρες διαστάσεις (π.χ. 1600x900).');
+            }
           }
-        } else {
-          dfdCanvasSizeSelect.value = dfdCanvasSetting;
-          return;
-        }
-      } else {
-        dfdCanvasSetting = val;
+        });
+        return;
       }
+      dfdCanvasSetting = val;
       SettingsManager.set('pli11DfdCanvasSetting', dfdCanvasSetting);
       renderDFDView(true);
       const dims = getCanvasDims(dfdCanvasSetting, dfdCustomCanvas);
@@ -703,6 +901,54 @@ document.addEventListener('DOMContentLoaded', () => {
       editor.removeLineClass(h, 'background', 'cm-pli11-error-line');
     }
     errorLineHandles = [];
+    editor.clearGutter('cm-pli11-diag');
+  }
+
+  let activeCtxPopover = null;
+  function closeCtxPopover() {
+    if (activeCtxPopover) {
+      activeCtxPopover.remove();
+      activeCtxPopover = null;
+    }
+  }
+  document.addEventListener('mousedown', (e) => {
+    if (activeCtxPopover && !activeCtxPopover.contains(e.target)) closeCtxPopover();
+  });
+
+  function openDiagnosticPopover(clientX, clientY, diagList) {
+    closeCtxPopover();
+    const d = diagList[0];
+    if (!d) return;
+    const pop = Common.el('div', { class: 'eap-canvas-ctx-popover' });
+    const canFix = Boolean(d.fixAction && Core.applyQuickFix);
+    pop.innerHTML = `
+      <div class="eap-canvas-ctx-head">
+        <span>${d.severity === 'error' ? '❌' : '⚠️'} ${escapeHTML(d.code)} (Γρ. ${d.line})</span>
+        <button type="button" class="tool-mini-btn" data-close>&times;</button>
+      </div>
+      <div style="line-height:1.42;">${escapeHTML(d.message)}</div>
+      ${d.hint ? `<div style="font-size:0.73rem; opacity:0.8;">💡 ${escapeHTML(d.hint)}</div>` : ''}
+      ${canFix ? `<button type="button" class="val-quickfix-btn" data-fix style="justify-content:center;">🔧 Αυτόματη Διόρθωση</button>` : ''}
+    `;
+    pop.style.left = Math.min(window.innerWidth - 320, Math.max(8, clientX + 8)) + 'px';
+    pop.style.top = Math.min(window.innerHeight - 180, Math.max(8, clientY - 12)) + 'px';
+    document.body.appendChild(pop);
+    activeCtxPopover = pop;
+    pop.querySelector('[data-close]').addEventListener('click', closeCtxPopover);
+    const fixB = pop.querySelector('[data-fix]');
+    if (fixB) {
+      fixB.addEventListener('click', () => {
+        const fixed = Core.applyQuickFix(editor.getValue(), d);
+        if (fixed !== editor.getValue()) {
+          const si = editor.getScrollInfo();
+          editor.setValue(fixed);
+          editor.scrollTo(si.left, si.top);
+          runCompile({ fit: false });
+          showToast('Εφαρμόστηκε αυτόματη διόρθωση!');
+        }
+        closeCtxPopover();
+      });
+    }
   }
 
   function clearTraceLineMark() {
@@ -753,6 +999,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const by = parseFloat(g.getAttribute('data-y')) || 0;
         ddpBoxDrag.active = true;
         ddpBoxDrag.moved = false;
+        ddpBoxDrag.preSnap = JSON.parse(JSON.stringify(customDDPPositions));
         ddpBoxDrag.nodeId = nid;
         ddpBoxDrag.startClientX = e.clientX;
         ddpBoxDrag.startClientY = e.clientY;
@@ -781,11 +1028,97 @@ document.addEventListener('DOMContentLoaded', () => {
         const bx = parseFloat(g.getAttribute('data-x')) || 0;
         const by = parseFloat(g.getAttribute('data-y')) || 0;
         dfdBoxDrag.active = true;
+        dfdBoxDrag.moved = false;
+        dfdBoxDrag.preSnap = {
+          l1: JSON.parse(JSON.stringify(customDFDPositionsLevel1)),
+          l0: JSON.parse(JSON.stringify(customDFDPositionsLevel0))
+        };
         dfdBoxDrag.nodeId = nid;
         dfdBoxDrag.startClientX = e.clientX;
         dfdBoxDrag.startClientY = e.clientY;
         dfdBoxDrag.startBoxX = bx;
         dfdBoxDrag.startBoxY = by;
+      });
+
+      g.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        const ln = parseInt(g.getAttribute('data-line'), 10);
+        if (ln > 0) {
+          jumpToLine(ln);
+          showToast(`Μετάβαση στη γραμμή ${ln} του ψευδοκώδικα`);
+        }
+      });
+
+      g.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rawId = g.getAttribute('data-node-id') || '';
+        const baseId = rawId.replace(/__B\d+$/, '');
+        const activeDFD = getActiveDFD();
+        const nodeObj = activeDFD && (activeDFD.nodes || []).find((n) => n.id === baseId);
+        if (!nodeObj) return;
+        const ln = parseInt(g.getAttribute('data-line'), 10) || nodeObj.sourceLine || 0;
+        const cleanLabel = String(nodeObj.label || nodeObj.key || '').replace(/\s+/g, ' ').trim();
+
+        closeCtxPopover();
+        const pop = Common.el('div', { class: 'eap-canvas-ctx-popover' });
+        pop.innerHTML = `
+          <div class="eap-canvas-ctx-head">
+            <span>⚙️ ${escapeHTML(cleanLabel)}</span>
+            <button type="button" class="tool-mini-btn" data-close>&times;</button>
+          </div>
+          ${nodeObj.type === 'process' && nodeObj.key ? `
+            <div style="font-size:0.73rem; opacity:0.85;">Μετονομασία ετικέτας (<code>@ALIAS</code>):</div>
+            <div class="eap-canvas-ctx-row">
+              <input type="text" data-alias-inp value="${escapeHTML(cleanLabel)}" placeholder="Νέος τίτλος...">
+              <button type="button" class="tool-mini-btn" data-save-alias>OK</button>
+            </div>
+            <button type="button" class="tool-mini-btn" data-toggle-km style="width:100%;">
+              ${nodeObj.isCentral ? 'Αφαίρεση από Κεντρικό Μετασχηματισμό (ΚΜ)' : 'Ορισμός ως Κεντρικός Μετασχηματισμός (@KM)'}
+            </button>
+          ` : ''}
+          ${ln > 0 ? `<button type="button" class="tool-mini-btn" data-jump style="width:100%;">↪ Μετάβαση στη Γραμμή ${ln}</button>` : ''}
+        `;
+        pop.style.left = Math.min(window.innerWidth - 320, Math.max(8, e.clientX)) + 'px';
+        pop.style.top = Math.min(window.innerHeight - 200, Math.max(8, e.clientY)) + 'px';
+        document.body.appendChild(pop);
+        activeCtxPopover = pop;
+
+        pop.querySelector('[data-close]').addEventListener('click', closeCtxPopover);
+        const jumpB = pop.querySelector('[data-jump]');
+        if (jumpB) {
+          jumpB.addEventListener('click', () => {
+            closeCtxPopover();
+            jumpToLine(ln);
+          });
+        }
+        const saveAliasB = pop.querySelector('[data-save-alias]');
+        if (saveAliasB) {
+          saveAliasB.addEventListener('click', () => {
+            const val = pop.querySelector('[data-alias-inp]').value.trim().replace(/"/g, "'");
+            if (!val) return;
+            const directive = `/* @ALIAS: ${nodeObj.key} = "${val}" */`;
+            editor.setValue(`${directive}\n${editor.getValue()}`);
+            runCompile({ fit: false });
+            closeCtxPopover();
+            showToast(`Προστέθηκε οδηγία @ALIAS για «${nodeObj.key}»!`);
+          });
+        }
+        const kmB = pop.querySelector('[data-toggle-km]');
+        if (kmB) {
+          kmB.addEventListener('click', () => {
+            const curCentrals = (activeDFD.processes || []).filter((p) => p.isCentral).map((p) => p.key);
+            const nextSet = nodeObj.isCentral
+              ? curCentrals.filter((k) => k !== nodeObj.key)
+              : [...curCentrals, nodeObj.key];
+            const cleanSrc = editor.getValue().replace(/\/\*\s*@KM:[^*]*\*\/\s*\n?/gi, '');
+            const kmDirective = nextSet.length > 0 ? `/* @KM: ${nextSet.join(', ')} */\n` : `/* @KM: NONE */\n`;
+            editor.setValue(kmDirective + cleanSrc);
+            runCompile({ fit: false });
+            closeCtxPopover();
+            showToast('Ενημερώθηκε ο Κεντρικός Μετασχηματισμός (@KM)!');
+          });
+        }
       });
     });
   }
@@ -837,12 +1170,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearErrorLineMarks();
     const markedLines = new Set();
+    const diagsByLine = new Map();
     for (const d of validation.diagnostics) {
+      if (d.line > 0 && (d.severity === 'error' || d.severity === 'warning')) {
+        if (!diagsByLine.has(d.line)) diagsByLine.set(d.line, []);
+        diagsByLine.get(d.line).push(d);
+      }
       if (d.severity === 'error' && d.line > 0 && !markedLines.has(d.line)) {
         markedLines.add(d.line);
         const h = editor.addLineClass(Math.min(d.line - 1, editor.lineCount() - 1), 'background', 'cm-pli11-error-line');
         errorLineHandles.push(h);
       }
+    }
+    for (const [ln, list] of diagsByLine.entries()) {
+      const hasErr = list.some((x) => x.severity === 'error');
+      const marker = document.createElement('div');
+      marker.className = 'cm-pli11-gutter-marker';
+      marker.textContent = hasErr ? '❌' : '⚠️';
+      marker.title = list.map((x) => `[${x.code}] ${x.message}`).join('\n');
+      marker.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        openDiagnosticPopover(ev.clientX, ev.clientY, list);
+      });
+      editor.setGutterMarker(Math.min(ln - 1, editor.lineCount() - 1), 'cm-pli11-diag', marker);
     }
 
     valBadge.classList.remove('has-errors', 'all-ok');
@@ -879,6 +1229,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const d of validation.diagnostics) {
       const div = document.createElement('div');
       div.className = `val-diag-item ${d.severity}`;
+      const canFix = Boolean(d.fixAction && Core.applyQuickFix);
       div.innerHTML = `
         <div class="val-diag-head">
           <span class="val-diag-code">${escapeHTML(d.code)}</span>
@@ -886,10 +1237,130 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="val-diag-msg">${escapeHTML(d.message)}</div>
         ${d.hint ? `<div class="val-diag-hint">Υπόδειξη: ${escapeHTML(d.hint)}</div>` : ''}
+        ${canFix ? `<button type="button" class="val-quickfix-btn">🔧 Αυτόματη Διόρθωση</button>` : ''}
       `;
       div.addEventListener('click', () => jumpToLine(d.line));
+      const fixBtn = div.querySelector('.val-quickfix-btn');
+      if (fixBtn) {
+        fixBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const fixedCode = Core.applyQuickFix(editor.getValue(), d);
+          if (fixedCode !== editor.getValue()) {
+            const scrollInfo = editor.getScrollInfo();
+            editor.setValue(fixedCode);
+            editor.scrollTo(scrollInfo.left, scrollInfo.top);
+            runCompile({ fit: false });
+            showToast('Εφαρμόστηκε αυτόματη διόρθωση στον ψευδοκώδικα!');
+          }
+        });
+      }
       valDiagnosticsList.appendChild(div);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // EAP DATA DICTIONARY («ΛΕΞΙΚΟ ΔΕΔΟΜΕΝΩΝ ΔΡΔ») VIEW & EXPORTS
+  // ---------------------------------------------------------------------------
+  const ddBadge = document.getElementById('dd-badge');
+  const ddTbody = document.getElementById('dd-tbody');
+  const ddResetBtn = document.getElementById('dd-reset-btn');
+  const ddCopyMdBtn = document.getElementById('dd-copy-md-btn');
+  const ddCopyWordBtn = document.getElementById('dd-copy-word-btn');
+
+  function getActiveDataDictionary() {
+    if (!currentCompiled || !Core.generateDataDictionary) return [];
+    const activeDFD = getActiveDFD();
+    return Core.generateDataDictionary(activeDFD, ddCustomOverrides);
+  }
+
+  function renderDataDictionaryView() {
+    const entries = getActiveDataDictionary();
+    if (ddBadge) ddBadge.textContent = String(entries.length);
+    if (!ddTbody) return;
+    ddTbody.innerHTML = '';
+
+    if (entries.length === 0) {
+      ddTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:1rem; opacity:0.75;">Δεν βρέθηκαν ροές ή αποθήκες δεδομένων στο τρέχον ΔΡΔ.</td></tr>';
+      return;
+    }
+
+    for (const item of entries) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${escapeHTML(item.name)}</strong></td>
+        <td><span class="dd-cat-pill">${escapeHTML(item.category)}</span></td>
+        <td><input type="text" class="dd-def-input" value="${escapeHTML(item.eapSymbol)}" title="Συμβολισμός ΕΑΠ: = (ορίζεται ως), + (και), [Α|Β] (επιλογή), {Χ} (επανάληψη), (Ψ) (προαιρετικό)"></td>
+        <td style="font-size:0.74rem;">${escapeHTML(item.routes)}</td>
+        <td><input type="text" class="dd-notes-input" value="${escapeHTML(item.notes)}" placeholder="Σημείωση..."></td>
+      `;
+      const defInp = tr.querySelector('.dd-def-input');
+      const notesInp = tr.querySelector('.dd-notes-input');
+      defInp.addEventListener('change', () => {
+        if (!ddCustomOverrides[item.key]) ddCustomOverrides[item.key] = {};
+        ddCustomOverrides[item.key].definition = defInp.value.trim();
+        saveDataDictOverrides();
+      });
+      notesInp.addEventListener('change', () => {
+        if (!ddCustomOverrides[item.key]) ddCustomOverrides[item.key] = {};
+        ddCustomOverrides[item.key].notes = notesInp.value.trim();
+        saveDataDictOverrides();
+      });
+      ddTbody.appendChild(tr);
+    }
+  }
+
+  if (ddResetBtn) {
+    ddResetBtn.addEventListener('click', () => {
+      ddCustomOverrides = {};
+      saveDataDictOverrides();
+      renderDataDictionaryView();
+      showToast('Επαναφέρθηκαν οι αυτόματοι ορισμοί Λεξικού Δεδομένων.');
+    });
+  }
+
+  if (ddCopyMdBtn) {
+    ddCopyMdBtn.addEventListener('click', () => {
+      const entries = getActiveDataDictionary();
+      if (!entries.length) return;
+      const lines = [
+        '| Όνομα Στοιχείου | Κατηγορία | Ορισμός (Συμβολισμός ΕΑΠ) | Ροές / Κατεύθυνση | Σχόλια |',
+        '| :--- | :--- | :--- | :--- | :--- |'
+      ];
+      for (const e of entries) {
+        const esc = (s) => String(s || '').replace(/\|/g, '\\|');
+        lines.push(`| **${esc(e.name)}** | ${esc(e.category)} | \`${esc(e.eapSymbol)}\` | ${esc(e.routes)} | ${esc(e.notes)} |`);
+      }
+      copyTextToClipboard(lines.join('\n'), 'Το Λεξικό Δεδομένων αντιγράφηκε σε Markdown!');
+    });
+  }
+
+  if (ddCopyWordBtn) {
+    ddCopyWordBtn.addEventListener('click', () => {
+      const entries = getActiveDataDictionary();
+      if (!entries.length) {
+        showToast('Το Λεξικό Δεδομένων είναι κενό.');
+        return;
+      }
+      const thStyle = 'border:1px solid #1e293b;padding:6px 10px;background:#e2e8f0;color:#0f172a;font-weight:bold;font-family:Calibri,Arial,sans-serif;font-size:10.5pt;text-align:left;';
+      const tdStyle = 'border:1px solid #94a3b8;padding:5px 9px;color:#0f172a;font-family:Calibri,Arial,sans-serif;font-size:10pt;vertical-align:top;';
+      const rowsHtml = entries.map((e) => `
+        <tr>
+          <td style="${tdStyle}font-weight:bold;">${escapeHTML(e.name)}</td>
+          <td style="${tdStyle}">${escapeHTML(e.category)}</td>
+          <td style="${tdStyle}font-family:Consolas,monospace;">${escapeHTML(e.eapSymbol)}</td>
+          <td style="${tdStyle}">${escapeHTML(e.routes)}</td>
+          <td style="${tdStyle}">${escapeHTML(e.notes)}</td>
+        </tr>`).join('');
+      const htmlTable = `<table style="border-collapse:collapse;width:100%;"><thead><tr>
+        <th style="${thStyle}">Όνομα Στοιχείου</th>
+        <th style="${thStyle}">Κατηγορία</th>
+        <th style="${thStyle}">Ορισμός (Συμβολισμός ΕΑΠ)</th>
+        <th style="${thStyle}">Ροές / Κατεύθυνση</th>
+        <th style="${thStyle}">Σχόλια</th>
+      </tr></thead><tbody>${rowsHtml}</tbody></table>`;
+      const tsv = entries.map((e) => [e.name, e.category, e.eapSymbol, e.routes, e.notes].join('\t')).join('\n');
+      Common.copyHtmlTableToClipboard(htmlTable, tsv, 'Το Λεξικό Δεδομένων αντιγράφηκε! Πατήστε Ctrl+V στο MS Word.');
+    });
   }
 
   function getActiveMermaidCode() {
@@ -904,19 +1375,53 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   let mermaidIsUserEdited = false;
   let mermaidDebounceTimer = null;
+  let mermaidVisualEditsCount = 0;
 
   function updateMermaidStatusBadge() {
     const badge = document.getElementById('mermaid-edit-status');
     if (!badge) return;
     if (mermaidIsUserEdited) {
-      badge.textContent = 'Χειροκίνητο';
+      badge.textContent = mermaidVisualEditsCount > 0 ? `Κώδικας + Οπτικό (${mermaidVisualEditsCount})` : 'Χειροκίνητο';
       badge.style.color = 'var(--token-string, #ffee00)';
-      badge.title = 'Έχει τροποποιηθεί χειροκίνητα. Κάντε κλικ στο "Επαναφορά από Κώδικα" για επανασυγχρονισμό.';
+      badge.title = 'Ο κώδικας Mermaid έχει τροποποιηθεί χειροκίνητα.';
+    } else if (mermaidVisualEditsCount > 0) {
+      badge.textContent = `Οπτικό (${mermaidVisualEditsCount})`;
+      badge.style.color = 'var(--accent)';
+      badge.title = `${mermaidVisualEditsCount} οπτικές προσαρμογές χωρίς αλλαγή κώδικα!`;
     } else {
       badge.textContent = 'Αυτόματο';
       badge.style.color = '';
       badge.title = 'Συγχρονισμένο αυτόματα με τον κύριο ψευδοκώδικα.';
     }
+  }
+
+  const mermaidVisualEditor = window.EAPMermaidEditor
+    ? window.EAPMermaidEditor.createMermaidVisualEditor({
+        storageKey: 'pli11MermaidVisualV1',
+        viewportEl: mermaidViewport,
+        getScale: () => (mermaidPanZoom && mermaidPanZoom.state && mermaidPanZoom.state.scale) || 1,
+        showToast,
+        onConfigChange: () => renderMermaidPreview({ fit: false }),
+        onStatusChange: ({ editCount, canUndo, canRedo, config }) => {
+          mermaidVisualEditsCount = editCount;
+          updateMermaidStatusBadge();
+          const uBtn = document.getElementById('mermaid-undo-btn');
+          const rBtn = document.getElementById('mermaid-redo-btn');
+          const rstBtn = document.getElementById('mermaid-reset-visual-btn');
+          const pBtn = document.getElementById('mermaid-print-btn');
+          if (uBtn) uBtn.disabled = !canUndo;
+          if (rBtn) rBtn.disabled = !canRedo;
+          if (rstBtn) rstBtn.hidden = editCount === 0;
+          if (pBtn) pBtn.classList.toggle('active', Boolean(config && config.printMode));
+        }
+      })
+    : null;
+
+  if (mermaidVisualEditor && window.EAPMermaidEditor.wireToolbar) {
+    window.EAPMermaidEditor.wireToolbar(mermaidVisualEditor, {
+      showToast,
+      onReset: () => mermaidPanZoom.fit(false)
+    });
   }
 
   async function renderMermaidPreview(opts = {}) {
@@ -953,11 +1458,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const isDark = getCurrentTheme() === 'dark';
-      window.mermaid.initialize({
-        startOnLoad: false,
-        theme: isDark ? 'dark' : 'default',
-        securityLevel: 'loose'
-      });
+      window.mermaid.initialize(
+        mermaidVisualEditor
+          ? mermaidVisualEditor.getMermaidInitConfig(isDark)
+          : { startOnLoad: false, theme: isDark ? 'dark' : 'default', securityLevel: 'loose' }
+      );
       mermaidRenderCounter++;
       const id = `pli11_mmd_${mermaidRenderCounter}`;
       const { svg } = await window.mermaid.render(id, code);
@@ -975,6 +1480,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           svgEl.style.maxWidth = 'none';
           svgEl.style.height = 'auto';
+          if (mermaidVisualEditor) {
+            mermaidVisualEditor.attachToSVG(svgEl, mermaidMode);
+          }
         }
         if (opts.fit !== false || mermaidPanZoom.state.autoFitted || mermaidPanZoom.state.pendingFit) {
           requestAnimationFrame(() => mermaidPanZoom.fit(false));
@@ -1234,6 +1742,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderStatsAndHeader();
     renderDDPView(opts.fit !== false);
     renderDFDView(opts.fit !== false);
+    renderDataDictionaryView();
     renderValidatorView();
     renderMermaidPreview();
 
@@ -1251,7 +1760,7 @@ document.addEventListener('DOMContentLoaded', () => {
     runCompile({ manualToast: true, switchToErrorsIfFailed: false });
   });
 
-  // Autosave draft to localStorage — restores on next visit
+  // Autosave draft & Multi-File Workspace Manager («Οι Εργασίες μου»)
   const autosave = Common.createAutosave({
     key: 'pli11DraftCode',
     getValue: () => editor.getValue(),
@@ -1259,9 +1768,42 @@ document.addEventListener('DOMContentLoaded', () => {
     onRestore: () => showToast('Επαναφέρθηκε το πρόχειρο από την προηγούμενη συνεδρία!')
   });
 
+  const workspaceMgr = Common.createWorkspaceManager
+    ? Common.createWorkspaceManager({
+        courseKey: 'pli11',
+        defaultSlotTitle: 'Άσκηση 1 (ΠΛΗ11)',
+        getCode: () => editor.getValue(),
+        setCode: (code) => {
+          stopAutoTrace();
+          resetTraceState();
+          editor.setValue(code);
+          runCompile({ fit: true });
+        },
+        getExtraState: () => ({
+          ddp: customDDPPositions,
+          dfd1: customDFDPositionsLevel1,
+          dfd0: customDFDPositionsLevel0,
+          dd: ddCustomOverrides
+        }),
+        setExtraState: (extra) => {
+          customDDPPositions = (extra && extra.ddp) || {};
+          customDFDPositionsLevel1 = (extra && extra.dfd1) || {};
+          customDFDPositionsLevel0 = (extra && extra.dfd0) || {};
+          ddCustomOverrides = (extra && extra.dd) || {};
+          savePersistedPositions();
+          if (currentCompiled) {
+            renderDDPView(true);
+            renderDFDView(true);
+            renderDataDictionaryView();
+          }
+        }
+      })
+    : null;
+
   let liveDebounceTimer = null;
   editor.on('change', () => {
     autosave.onChange();
+    if (workspaceMgr) workspaceMgr.onChange();
     if (!liveCompileToggle.checked) return;
     clearTimeout(liveDebounceTimer);
     liveDebounceTimer = setTimeout(() => {
@@ -1387,8 +1929,109 @@ document.addEventListener('DOMContentLoaded', () => {
 
   formatButton.addEventListener('click', formatEditorCode);
 
+  if (Common.attachTouchSymbolBar) {
+    Common.attachTouchSymbolBar(editor, [';', ':', '(', ')', ',', 'IN', 'IN/OUT', ':=', '<>', '=', '"']);
+  }
+
+  const exportDocxBtn = document.getElementById('export-docx-btn');
+  if (exportDocxBtn && window.EAPDocx) {
+    exportDocxBtn.addEventListener('click', async () => {
+      if (!currentCompiled) runCompile({ fit: false });
+      showToast('Δημιουργία αρχείου Word (.docx)...');
+      try {
+        const slot = workspaceMgr ? workspaceMgr.getActiveSlot() : null;
+        const rootName = (currentCompiled.model && currentCompiled.model.rootNode && currentCompiled.model.rootNode.name) || 'ΠΛΗ11';
+        const ddpSvg = Renderer.renderDDPSVG(currentCompiled.model, {
+          printMode: true,
+          positions: customDDPPositions,
+          tightCrop: true
+        });
+        const ddpPng = await window.EAPDocx.svgToPngBytes(ddpSvg, 3);
+
+        const sections = [];
+        if (slot && slot.notes && slot.notes.trim()) {
+          sections.push({ type: 'heading', text: 'Εκφώνηση / Σημειώσεις' });
+          sections.push({ type: 'paragraph', text: slot.notes.trim() });
+        }
+
+        sections.push({
+          type: 'image',
+          title: '1. Διάγραμμα Δομής Προγράμματος (ΔΔΠ)',
+          pngBytes: ddpPng,
+          caption: `Διάγραμμα Δομής Προγράμματος (${archLabel(currentCompiled.model.architecture)})`
+        });
+
+        if (currentCompiled.dfd && (currentCompiled.dfd.flows || []).length > 0) {
+          const dfd1Svg = Renderer.renderDFDSVG(currentCompiled.dfd, {
+            printMode: true,
+            positions: customDFDPositionsLevel1,
+            showKMFrame: dfdShowKMFrame,
+            layoutMode: dfdLayoutMode,
+            clonePeripherals: dfdClonePeripherals,
+            tightCrop: true
+          });
+          const dfd1Png = await window.EAPDocx.svgToPngBytes(dfd1Svg, 3);
+          sections.push({
+            type: 'image',
+            title: '2. Διάγραμμα Ροής Δεδομένων (ΔΡΔ Επιπέδου 1)',
+            pngBytes: dfd1Png,
+            caption: 'Διάγραμμα Ροής Δεδομένων Επιπέδου 1'
+          });
+        }
+
+        if (currentCompiled.dfdLevel0 && (currentCompiled.dfdLevel0.flows || []).length > 0) {
+          const dfd0Svg = Renderer.renderDFDSVG(currentCompiled.dfdLevel0, {
+            printMode: true,
+            positions: customDFDPositionsLevel0,
+            showKMFrame: false,
+            tightCrop: true
+          });
+          const dfd0Png = await window.EAPDocx.svgToPngBytes(dfd0Svg, 3);
+          sections.push({
+            type: 'image',
+            title: '3. Διάγραμμα Πλαισίου (Επίπεδο 0)',
+            pngBytes: dfd0Png,
+            caption: 'Διάγραμμα Πλαισίου Συστήματος (Επίπεδο 0)'
+          });
+        }
+
+        const ddEntries = getActiveDataDictionary();
+        if (ddEntries.length > 0) {
+          sections.push({
+            type: 'table',
+            title: '4. Λεξικό Δεδομένων ΔΡΔ (Συμβολισμός ΕΑΠ)',
+            headers: ['Όνομα Στοιχείου', 'Κατηγορία', 'Ορισμός (Συμβολισμός ΕΑΠ)', 'Ροές / Κατεύθυνση', 'Σχόλια'],
+            rows: ddEntries.map((e) => [e.name, e.category, e.eapSymbol, e.routes, e.notes]),
+            monoColumns: [2]
+          });
+        }
+
+        sections.push({
+          type: 'code',
+          title: '5. Ψευδοκώδικας ΠΛΗ11',
+          code: editor.getValue(),
+          lineNumbers: true
+        });
+
+        const safeFile = rootName.replace(/[^A-Za-zΑ-Ωα-ω0-9_\-]/g, '_') + '.docx';
+        window.EAPDocx.downloadDocx({
+          title: slot ? `${slot.title} — ${rootName}` : `Παραδοτέο ΠΛΗ11 — ${rootName}`,
+          subtitle: `Ελληνικό Ανοικτό Πανεπιστήμιο (ΠΛΗ11) · Αρχιτεκτονική: ${archLabel(currentCompiled.model.architecture)} · ${new Date().toLocaleDateString('el-GR')}`,
+          sections
+        }, safeFile);
+        showToast(`Το αρχείο Word (${safeFile}) εξήχθη επιτυχώς!`);
+      } catch (err) {
+        showToast('Σφάλμα εξαγωγής .docx: ' + (err.message || 'Αποτυχία'));
+      }
+    });
+  }
+
   shareButton.addEventListener('click', () => {
-    Common.shareCode(editor.getValue(), 'Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!');
+    Common.shareCode(editor.getValue(), {
+      ddp: customDDPPositions,
+      dfd1: customDFDPositionsLevel1,
+      dfd0: customDFDPositionsLevel0
+    });
   });
 
   loadButton.addEventListener('click', async () => {
@@ -1416,13 +2059,22 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   clearButton.addEventListener('click', () => {
-    stopAutoTrace();
-    resetTraceState();
-    customDFDPositionsLevel1 = {};
-    customDFDPositionsLevel0 = {};
-    editor.setValue('');
-    runCompile({ fit: true });
-    editor.focus();
+    Common.showConfirm('Καθαρισμός όλου του ψευδοκώδικα και των διατάξεων στον συντάκτη;', {
+      danger: true,
+      yesText: 'Καθαρισμός',
+      onYes: () => {
+        stopAutoTrace();
+        resetTraceState();
+        customDDPPositions = {};
+        customDFDPositionsLevel1 = {};
+        customDFDPositionsLevel0 = {};
+        if (exampleSelector) exampleSelector.value = '';
+        editor.setValue('');
+        autosave.clear();
+        runCompile({ fit: true });
+        editor.focus();
+      }
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -1847,19 +2499,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     switch (type) {
       case 'main':
-        snippet = `\nΠΡΟΓΡΑΜΜΑ Κύριο\nΜΕΤΑΒΛΗΤΕΣ\n  ΑΚΕΡΑΙΕΣ: χ, ψ;\nΑΡΧΗ\n  ΚΑΛΕΣΕ Είσοδος(χ);\n  ΚΑΛΕΣΕ Υπολογισμός(χ, ψ);\n  ΚΑΛΕΣΕ Έξοδος(ψ);\nΤΕΛΟΣ_ΠΡΟΓΡΑΜΜΑΤΟΣ\n`;
+        snippet = `\nPROCEDURE EXEC_ROOT\n  LOCAL VAR A, B;\n  ΑΡΧΙΚΟΠΟΙΗΣΕ A, B;\n  CALL GET_A(A);\n  CALL CALC_M1(A, B);\n  CALL PUT_B(B);\nEND_PROCEDURE;\n`;
         break;
       case 'control':
-        snippet = `\nΔΙΑΔΙΚΑΣΙΑ ΔιαχείρισηΡοής(χ)\nΑΡΧΗ\n  ΚΑΛΕΣΕ Βοηθητική1(χ);\n  ΚΑΛΕΣΕ Βοηθητική2(χ);\nΤΕΛΟΣ_ΔΙΑΔΙΚΑΣΙΑΣ\n`;
+        snippet = `\nPROCEDURE EXEC_SUB(A: IN, B: IN/OUT)\n  LOCAL VAR T;\n  ΑΡΧΙΚΟΠΟΙΗΣΕ T;\n  CALL CALC_STEP1(A, T);\n  CALL CALC_STEP2(T, B);\nEND_PROCEDURE;\n`;
         break;
       case 'calc':
-        snippet = `\nΔΙΑΔΙΚΑΣΙΑ Υπολογισμός(είσοδος, έξοδος)\nΑΡΧΗ\n  έξοδος <- είσοδος * 2;\nΤΕΛΟΣ_ΔΙΑΔΙΚΑΣΙΑΣ\n`;
+        snippet = `\nPROCEDURE CALC_M1(A: IN, B: IN/OUT)\n  Υπολόγισε το B βάσει του A;\nEND_PROCEDURE;\n`;
         break;
       case 'io-in':
-        snippet = `\nΔΙΑΔΙΚΑΣΙΑ Είσοδος(τιμή)\nΑΡΧΗ\n  ΔΙΑΒΑΣΕ τιμή;\nΤΕΛΟΣ_ΔΙΑΔΙΚΑΣΙΑΣ\n`;
+        snippet = `\nPROCEDURE GET_A(A: IN/OUT)\n  Διάβασε το A από την Πηγή 1;\nEND_PROCEDURE;\n`;
         break;
       case 'io-out':
-        snippet = `\nΔΙΑΔΙΚΑΣΙΑ Έξοδος(αποτέλεσμα)\nΑΡΧΗ\n  ΓΡΑΨΕ αποτέλεσμα;\nΤΕΛΟΣ_ΔΙΑΔΙΚΑΣΙΑΣ\n`;
+        snippet = `\nPROCEDURE PUT_B(B: IN)\n  Εμφάνισε το B στον Αποδέκτη 1;\nEND_PROCEDURE;\n`;
         break;
     }
 
@@ -1869,7 +2521,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (liveCompileToggle && liveCompileToggle.checked) {
         runCompile({ fit: false });
       }
-      showToast('Εισήχθη πρότυπο διαδικασίας!');
+      showToast('Εισήχθη πρότυπο διαδικασίας ΠΛΗ11!');
     }
   }
 
@@ -2137,7 +2789,13 @@ END_PROCEDURE;</code></pre>
   runCompile({ fit: true });
   if (typeof Common.loadCodeFromHashAsync === 'function') {
     Common.loadCodeFromHashAsync((shared) => {
-      editor.setValue(shared);
+      const dec = Common.decodeSharePayload ? Common.decodeSharePayload(shared) : { code: shared, layout: null };
+      if (dec.layout) {
+        customDDPPositions = dec.layout.ddp || {};
+        customDFDPositionsLevel1 = dec.layout.dfd1 || {};
+        customDFDPositionsLevel0 = dec.layout.dfd0 || {};
+      }
+      editor.setValue(dec.code);
       runCompile({ fit: true });
     });
   }

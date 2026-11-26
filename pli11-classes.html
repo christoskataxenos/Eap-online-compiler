@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EAP ΠΛΗ11 - Διαγράμματα Κλάσεων &amp; OO-Ψευδοκώδικας</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
 
   <!-- CodeMirror & Addons Stylesheets -->
   <link rel="stylesheet" href="vendor/codemirror/codemirror.min.css">
@@ -39,7 +40,35 @@
       <button id="layout-toggle" class="layout-toggle-btn" type="button" title="Εναλλαγή διάταξης: Left/Right ή Up/Down">
         <span class="layout-icon">◫</span> <span class="layout-text">Side-by-Side</span>
       </button>
-      <a href="editor.html" id="switch-course-link" class="course-switch-link" data-base="editor.html" title="Μετάβαση στον Interpreter Ψευδογλώσσας ΠΛΗ10">ΠΛΗ10 (Ψευδογλώσσα) &rarr;</a>
+      <div class="course-submenu" id="course-submenu">
+        <button type="button" class="submenu-trigger" id="tools-submenu-btn" aria-expanded="false" aria-controls="tools-submenu-panel">
+          <span>Εργαλεία</span>
+          <span class="submenu-caret" aria-hidden="true">&#9662;</span>
+        </button>
+        <div class="submenu-panel" id="tools-submenu-panel" role="menu">
+          <a href="editor.html" class="submenu-item course-link" data-base="editor.html" role="menuitem">
+            <div class="submenu-item-head">
+              <span class="submenu-badge">ΠΛΗ10</span>
+              <span class="submenu-title">Ψευδογλώσσα Interpreter</span>
+            </div>
+            <span class="submenu-desc">Εκτέλεση, βήμα-βήμα debugger, επιθεωρητής μνήμης &amp; πίνακας τιμών.</span>
+          </a>
+          <a href="pli11.html" class="submenu-item course-link" data-base="pli11.html" role="menuitem">
+            <div class="submenu-item-head">
+              <span class="submenu-badge alt">ΠΛΗ11</span>
+              <span class="submenu-title">ΔΔΠ / ΔΡΔ &amp; Ψευδοκώδικας</span>
+            </div>
+            <span class="submenu-desc">Μεταγλώττιση σε ΔΔΠ &amp; ΔΡΔ, έλεγχος κανόνων ΕΑΠ, Mermaid &amp; ΔΡΔ Builder.</span>
+          </a>
+          <a href="pli11-classes.html" class="submenu-item course-link active" data-base="pli11-classes.html" role="menuitem">
+            <div class="submenu-item-head">
+              <span class="submenu-badge alt">ΠΛΗ11</span>
+              <span class="submenu-title">Διαγράμματα Κλάσεων</span>
+            </div>
+            <span class="submenu-desc">Υβριδικός DSL &amp; Visual Builder, Drag &amp; Drop SVG, OO-Ψευδοκώδικας (ΟΣΣ2) &amp; Mermaid.</span>
+          </a>
+        </div>
+      </div>
       <button id="theme-toggle" type="button" aria-label="Εναλλαγή θέματος (φωτεινό / σκοτεινό)" aria-pressed="false">Dark Mode</button>
     </div>
   </header>
@@ -55,12 +84,15 @@
               <span id="cls-summary-badge" class="arch-badge">Αναμονή</span>
             </div>
             <div class="panel-header-actions">
+              <button id="workspaces-btn" class="action-btn" type="button" title="Οι Εργασίες μου — Αποθήκευση και εναλλαγή πολλαπλών ασκήσεων">📁 Εργασίες</button>
+              <button id="notes-toggle-btn" class="action-btn" type="button" title="Εκφώνηση θέματος &amp; προσωπικές σημειώσεις δίπλα στον κώδικα">📝 Εκφώνηση</button>
               <select id="example-selector" title="Παραδείγματα Διαγραμμάτων Κλάσεων ΠΛΗ11">
                 <option value="" disabled selected>Παραδείγματα (Κλάσεις ΠΛΗ11)...</option>
               </select>
               <button id="wrap-button" class="action-btn" type="button" title="Αναδίπλωση μεγάλων γραμμών κώδικα ώστε να φαίνονται όλες χωρίς οριζόντιο scroll">Wrap</button>
               <button id="format-button" class="action-btn" title="Αυτόματη μορφοποίηση κώδικα (Ctrl+Shift+F)">Format</button>
-              <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με το διάγραμμα">Share</button>
+              <button id="export-docx-btn" class="action-btn" type="button" title="Εξαγωγή πλήρους παραδοτέου (Διάγραμμα Κλάσεων, OO-Ψευδοκώδικας &amp; Πίνακας Σχέσεων) σε αρχείο Word (.docx)">📄 .docx</button>
+              <button id="share-button" class="action-btn" title="Αντιγραφή συνδέσμου με το διάγραμμα και τη διάταξη">Share</button>
             </div>
           </div>
 
@@ -145,6 +177,8 @@
               <span class="zoom-readout" id="cls-zoom-label">100%</span>
               <button class="tool-mini-btn" id="cls-zoom-in" title="Μεγέθυνση">+</button>
               <button class="tool-mini-btn" id="cls-zoom-fit" title="Προσαρμογή στο παράθυρο">Fit</button>
+              <button class="tool-mini-btn" id="cls-undo-btn" type="button" disabled title="Αναίρεση μετακίνησης κλάσης (Ctrl+Z)">↶</button>
+              <button class="tool-mini-btn" id="cls-redo-btn" type="button" disabled title="Επανάληψη μετακίνησης κλάσης (Ctrl+Y)">↷</button>
               <button class="tool-mini-btn" id="cls-auto-layout" title="Επαναφορά αυτόματης διάταξης">Auto-Layout</button>
             </div>
             <div class="diagram-toolbar-group">
@@ -161,10 +195,22 @@
                 Χωρίς Τύπους
               </label>
             </div>
+            <div class="diagram-toolbar-group" role="group" aria-label="Διαστάσεις Καμβά">
+              <label for="cls-canvas-size" class="toolbar-label" style="font-size:0.74rem; color:var(--muted); margin-right:2px;">Καμβάς:</label>
+              <select class="tool-mini-select" id="cls-canvas-size" title="Επιλογή διαστάσεων καμβά για άνετη προβολή και εξαγωγή σε Word">
+                <option value="auto">Αυτόματο (Fit)</option>
+                <option value="a4-landscape">A4 Οριζόντιο (1120×790)</option>
+                <option value="a4-portrait">A4 Κάθετο (790×1120)</option>
+                <option value="1280x720">HD 720p (1280×720)</option>
+                <option value="1920x1080">Full HD (1920×1080)</option>
+                <option value="custom">Προσαρμοσμένο...</option>
+              </select>
+            </div>
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="cls-print-btn" title="Ασπρόμαυρη μορφή ΕΑΠ έτοιμη για επικόλληση σε MS Word">Ασπρόμαυρο (Word)</button>
-              <button class="tool-mini-btn" id="cls-export-svg" title="Λήψη διαγράμματος ως αρχείο SVG">Export SVG</button>
+              <button class="tool-mini-btn" id="cls-copy-png" title="Αντιγραφή εικόνας PNG υψηλής ανάλυσης στο πρόχειρο για άμεσο Ctrl+V στο Word">Αντιγραφή PNG (Word)</button>
               <button class="tool-mini-btn" id="cls-export-png" title="Λήψη διαγράμματος υψηλής ανάλυσης PNG για MS Word">Export PNG</button>
+              <button class="tool-mini-btn" id="cls-export-svg" title="Λήψη διαγράμματος ως αρχείο SVG">Export SVG</button>
             </div>
           </div>
 
@@ -262,6 +308,22 @@
               <button class="tool-mini-btn active" id="mermaid-toggle-code-btn" type="button" title="Εμφάνιση / απόκρυψη πλαισίου κώδικα Mermaid για περισσότερο χώρο στο διάγραμμα">Κώδικας ▾</button>
               <span id="mermaid-edit-status" class="pli11-stat-pill" style="font-size:0.7rem; padding:0.12rem 0.42rem;">Αυτόματο</span>
             </div>
+            <div class="diagram-toolbar-group" role="group" aria-label="Οπτική Επεξεργασία Mermaid (χωρίς αλλαγή κώδικα)">
+              <select class="tool-mini-select" id="mermaid-curve-select" title="Στυλ γραμμών διαγράμματος (χωρίς αλλαγή κώδικα Mermaid)">
+                <option value="basis">Γραμμές: Καμπύλες</option>
+                <option value="stepAfter">Γραμμές: Ορθογώνιες</option>
+                <option value="linear">Γραμμές: Ευθείες</option>
+              </select>
+              <select class="tool-mini-select" id="mermaid-spacing-select" title="Αποστάσεις κλάσεων (χωρίς αλλαγή κώδικα Mermaid)">
+                <option value="compact">Αποστάσεις: Συμπαγείς</option>
+                <option value="normal" selected>Αποστάσεις: Κανονικές</option>
+                <option value="wide">Αποστάσεις: Άνετες</option>
+              </select>
+              <button class="tool-mini-btn" id="mermaid-print-btn" type="button" title="Ασπρόμαυρη εμφάνιση Mermaid έτοιμη για MS Word (χωρίς αλλαγή κώδικα)">Ασπρόμαυρο (Word)</button>
+              <button class="tool-mini-btn" id="mermaid-undo-btn" type="button" disabled title="Αναίρεση οπτικής αλλαγής">↶</button>
+              <button class="tool-mini-btn" id="mermaid-redo-btn" type="button" disabled title="Επανάληψη οπτικής αλλαγής">↷</button>
+              <button class="tool-mini-btn" id="mermaid-reset-visual-btn" type="button" hidden title="Επαναφορά όλων των οπτικών μετακινήσεων/χρωμάτων">↺ Διάταξη</button>
+            </div>
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="mermaid-zoom-out" type="button" title="Σμίκρυνση">-</button>
               <span class="zoom-readout" id="mermaid-zoom-label">100%</span>
@@ -271,6 +333,7 @@
             <div class="diagram-toolbar-group">
               <button class="tool-mini-btn" id="mermaid-rerender-btn" title="Ανανέωση προεπισκόπησης από τον κώδικα Mermaid">Ανανέωση</button>
               <button class="tool-mini-btn" id="mermaid-reset-btn" title="Επαναφορά Mermaid από τον κύριο Ψευδοκώδικα">Επαναφορά</button>
+              <button class="tool-mini-btn" id="mermaid-copy-png" title="Αντιγραφή Mermaid ως εικόνα PNG στο πρόχειρο για άμεσο Ctrl+V στο Word">Αντιγραφή PNG</button>
               <button class="tool-mini-btn" id="mermaid-export-png" title="Λήψη του Mermaid διαγράμματος ως PNG υψηλής ανάλυσης για Word">PNG</button>
               <button class="tool-mini-btn" id="mermaid-export-svg" title="Λήψη του Mermaid διαγράμματος ως αρχείο SVG">SVG</button>
               <button class="tool-mini-btn" id="mermaid-copy-code-btn" title="Αντιγραφή κώδικα Mermaid στο πρόχειρο">Αντιγραφή Κώδικα</button>
@@ -284,7 +347,7 @@
             <div class="resizer mermaid-resizer" id="mermaid-resizer" title="Σύρετε για αλλαγή ύψους κώδικα/προεπισκόπησης • Διπλό κλικ για επαναφορά"></div>
             <div class="diagram-viewport mermaid-viewport" id="mermaid-viewport">
               <div class="diagram-canvas" id="mermaid-preview-host"></div>
-              <div class="diagram-hint">Σύρετε για μετακίνηση &bull; Ροδέλα για zoom &bull; Διπλό κλικ για Fit</div>
+              <div class="diagram-hint">Σύρετε κλάση ή πληθικότητα/ετικέτα για μετακίνηση &bull; Κλικ σε κλάση για στυλ &bull; Σύρετε φόντο για pan</div>
             </div>
           </div>
         </div>
@@ -307,15 +370,17 @@
   <!-- Permalink LZ-String Compression -->
   <script src="vendor/lz-string.min.js"></script>
 
-  <!-- Mermaid Live Preview (progressive enhancement; core and SVG renderer work offline) -->
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js" defer></script>
+  <!-- Mermaid Live Preview (100% local & offline) -->
+  <script src="vendor/mermaid.min.js" defer></script>
 
   <!-- ΠΛΗ11 Class Diagrams Modules -->
   <script src="pli11-classes-mode.js"></script>
   <script src="pli11-classes-examples.js"></script>
   <script src="pli11-classes-core.js"></script>
-  <script src="pli11-classes-renderer.js?v=1795630879896"></script>
+  <script src="pli11-classes-renderer.js"></script>
   <script src="diagram-viewport.js"></script>
-  <script src="pli11-classes-app.js?v=1795630879896"></script>
+  <script src="mermaid-visual-editor.js"></script>
+  <script src="docx-exporter.js"></script>
+  <script src="pli11-classes-app.js"></script>
 </body>
 </html>

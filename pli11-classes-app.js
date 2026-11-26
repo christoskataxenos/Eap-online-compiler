@@ -55,7 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const optHideVis = document.getElementById('opt-hide-vis');
   const optHideMethods = document.getElementById('opt-hide-methods');
   const optHideTypes = document.getElementById('opt-hide-types');
+  const clsCanvasSizeSelect = document.getElementById('cls-canvas-size');
   const clsPrintBtn = document.getElementById('cls-print-btn');
+  const clsCopyPng = document.getElementById('cls-copy-png');
   const clsExportSvg = document.getElementById('cls-export-svg');
   const clsExportPng = document.getElementById('cls-export-png');
 
@@ -120,8 +122,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ? PLI11_CLASS_EXAMPLES.GE1_2025_2026_LOGISTICS
     : 'ΚΛΑΣΗ Πελάτης\n  ΚΑΤΗΓΟΡΗΜΑΤΑ\n    κωδικός;\nΤΕΛΟΣ';
 
-  const sharedCode = Common.loadCodeFromHash();
-  if (sharedCode) initialCode = sharedCode;
+  let sharedInitialClsLayout = null;
+  const rawSharedCode = Common.loadCodeFromHash();
+  if (rawSharedCode) {
+    const decoded = Common.decodeSharePayload ? Common.decodeSharePayload(rawSharedCode) : { code: rawSharedCode, layout: null };
+    initialCode = decoded.code;
+    sharedInitialClsLayout = decoded.layout;
+  }
 
   const isDarkInitial = Common.getTheme() === 'dark';
   let lineWrapEnabled = SettingsManager.get('pli11ClassesLineWrap', 'true') !== 'false';
@@ -131,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mode: 'eap-pli11-classes',
     theme: isDarkInitial ? 'dracula' : 'default',
     lineNumbers: true,
+    gutters: ['CodeMirror-linenumbers', 'cm-pli11-diag'],
     lineWrapping: lineWrapEnabled,
     matchBrackets: true,
     autoCloseBrackets: true,
@@ -172,6 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   const getCurrentTheme = () => Common.getTheme();
 
+  Common.wireCourseSubmenu();
   Common.wireThemeToggle({
     onChange: () => {
       if (editor) editor.setOption('theme', Common.getTheme() === 'dark' ? 'dracula' : 'default');
@@ -238,12 +247,81 @@ document.addEventListener('DOMContentLoaded', () => {
     fitMax: 1.25
   });
   const mermaidPanZoom = Viewport.createPanZoom(mermaidViewport, mermaidPreviewHost, mermaidZoomLabel);
-  const boxDrag = { active: false, classId: null, startClientX: 0, startClientY: 0, startBoxX: 0, startBoxY: 0, rafPending: false };
+  const clsUndoBtn = document.getElementById('cls-undo-btn');
+  const clsRedoBtn = document.getElementById('cls-redo-btn');
+  const clsUndoStack = [];
+  const clsRedoStack = [];
+
+  if (sharedInitialClsLayout && sharedInitialClsLayout.cls) {
+    customPositions = sharedInitialClsLayout.cls;
+  } else {
+    try {
+      const savedPos = SettingsManager.get('pli11ClsSavedPositionsV1', null);
+      if (savedPos) customPositions = JSON.parse(savedPos) || {};
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveClsPositions() {
+    try {
+      SettingsManager.set('pli11ClsSavedPositionsV1', JSON.stringify(customPositions));
+    } catch (e) { /* ignore */ }
+    if (typeof clsWorkspaceMgr !== 'undefined' && clsWorkspaceMgr) clsWorkspaceMgr.onChange();
+  }
+
+  function syncClsUndoBtns() {
+    if (clsUndoBtn) clsUndoBtn.disabled = clsUndoStack.length === 0;
+    if (clsRedoBtn) clsRedoBtn.disabled = clsRedoStack.length === 0;
+  }
+
+  function pushClsUndo(snap) {
+    clsUndoStack.push(snap);
+    if (clsUndoStack.length > 50) clsUndoStack.shift();
+    clsRedoStack.length = 0;
+    syncClsUndoBtns();
+  }
+
+  function undoClsLayout() {
+    if (!clsUndoStack.length) return;
+    clsRedoStack.push(JSON.parse(JSON.stringify(customPositions)));
+    customPositions = clsUndoStack.pop();
+    syncClsUndoBtns();
+    saveClsPositions();
+    renderDiagramView(false);
+  }
+
+  function redoClsLayout() {
+    if (!clsRedoStack.length) return;
+    clsUndoStack.push(JSON.parse(JSON.stringify(customPositions)));
+    customPositions = clsRedoStack.pop();
+    syncClsUndoBtns();
+    saveClsPositions();
+    renderDiagramView(false);
+  }
+
+  if (clsUndoBtn) clsUndoBtn.addEventListener('click', undoClsLayout);
+  if (clsRedoBtn) clsRedoBtn.addEventListener('click', redoClsLayout);
+
+  document.addEventListener('keydown', (e) => {
+    const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || (e.target && e.target.closest('.CodeMirror'))) return;
+    if (!document.getElementById('tab-diagram').classList.contains('active')) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey && clsUndoStack.length) {
+      e.preventDefault();
+      undoClsLayout();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey)) && clsRedoStack.length) {
+      e.preventDefault();
+      redoClsLayout();
+    }
+  });
+
+  const boxDrag = { active: false, moved: false, preSnap: null, classId: null, startClientX: 0, startClientY: 0, startBoxX: 0, startBoxY: 0, rafPending: false };
 
   window.addEventListener('mousemove', (e) => {
     if (!boxDrag.active) return;
     const dx = (e.clientX - boxDrag.startClientX) / panZoom.state.scale;
     const dy = (e.clientY - boxDrag.startClientY) / panZoom.state.scale;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) boxDrag.moved = true;
+    if (!boxDrag.moved) return;
     const snappedX = Math.round((boxDrag.startBoxX + dx) / 8) * 8;
     const snappedY = Math.round((boxDrag.startBoxY + dy) / 8) * 8;
     customPositions[boxDrag.classId] = { x: snappedX, y: snappedY };
@@ -257,23 +335,93 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('mouseup', () => {
-    if (boxDrag.active) boxDrag.active = false;
+    if (boxDrag.active) {
+      if (boxDrag.moved && boxDrag.preSnap) {
+        pushClsUndo(boxDrag.preSnap);
+        saveClsPositions();
+      }
+      boxDrag.active = false;
+      boxDrag.moved = false;
+      boxDrag.preSnap = null;
+    }
   });
 
   clsZoomOut.addEventListener('click', () => panZoom.zoomBy(0.85));
   clsZoomIn.addEventListener('click', () => panZoom.zoomBy(1.18));
   clsZoomFit.addEventListener('click', () => panZoom.fit());
   clsAutoLayout.addEventListener('click', () => {
+    if (Object.keys(customPositions).length > 0) {
+      pushClsUndo(JSON.parse(JSON.stringify(customPositions)));
+    }
     customPositions = {};
+    saveClsPositions();
     selectedClassId = null;
     renderDiagramView(true);
     showToast('Η αυτόματη διάταξη επαναφέρθηκε.');
   });
 
   // ---------------------------------------------------------------------------
-  // RENDERERS: DIAGRAM, STATS, VALIDATOR, PSEUDOCODE, MERMAID
+  // CANVAS DIMENSIONS & RENDERERS: DIAGRAM, STATS, VALIDATOR, PSEUDOCODE, MERMAID
   // ---------------------------------------------------------------------------
-  function getRenderOptions() {
+  const CANVAS_PRESETS = {
+    'auto': null,
+    'a4-landscape': { width: 1120, height: 790 },
+    'a4-portrait': { width: 790, height: 1120 },
+    '1280x720': { width: 1280, height: 720 },
+    '1920x1080': { width: 1920, height: 1080 }
+  };
+
+  let clsCanvasSetting = SettingsManager.get('pli11ClsCanvasSetting', 'auto');
+  let clsCustomCanvas = { width: 1400, height: 900 };
+  try {
+    const rawSaved = SettingsManager.get('pli11ClsCustomCanvas', null);
+    if (rawSaved) clsCustomCanvas = JSON.parse(rawSaved);
+  } catch (e) { /* ignore */ }
+
+  function getClsCanvasDims() {
+    if (clsCanvasSetting === 'auto') return null;
+    if (clsCanvasSetting === 'custom') return clsCustomCanvas;
+    return CANVAS_PRESETS[clsCanvasSetting] || null;
+  }
+
+  if (clsCanvasSizeSelect) {
+    clsCanvasSizeSelect.value = clsCanvasSetting;
+    clsCanvasSizeSelect.addEventListener('change', () => {
+      const val = clsCanvasSizeSelect.value;
+      if (val === 'custom') {
+        const currentPrompt = `${clsCustomCanvas.width}x${clsCustomCanvas.height}`;
+        clsCanvasSizeSelect.value = clsCanvasSetting;
+        Common.showPrompt('Εισάγετε διαστάσεις καμβά Κλάσεων (Πλάτος x Ύψος σε px, π.χ. 1600x900):', {
+          title: 'Προσαρμοσμένες Διαστάσεις Καμβά',
+          defaultValue: currentPrompt,
+          onSubmit: (input) => {
+            if (!input) return;
+            const parts = input.toLowerCase().replace(/[,x×]/g, ' ').trim().split(/\s+/).map(Number);
+            if (parts.length >= 2 && parts[0] >= 300 && parts[1] >= 200) {
+              clsCustomCanvas = { width: Math.round(parts[0]), height: Math.round(parts[1]) };
+              SettingsManager.set('pli11ClsCustomCanvas', JSON.stringify(clsCustomCanvas));
+              clsCanvasSetting = 'custom';
+              clsCanvasSizeSelect.value = 'custom';
+              SettingsManager.set('pli11ClsCanvasSetting', clsCanvasSetting);
+              renderDiagramView(true);
+              showToast(`Καμβάς Κλάσεων: ${clsCustomCanvas.width} × ${clsCustomCanvas.height} px`);
+            } else {
+              showToast('Μη έγκυρες διαστάσεις (π.χ. 1600x900).');
+            }
+          }
+        });
+        return;
+      }
+      clsCanvasSetting = val;
+      SettingsManager.set('pli11ClsCanvasSetting', clsCanvasSetting);
+      renderDiagramView(true);
+      const dims = getClsCanvasDims();
+      showToast(dims ? `Καμβάς Κλάσεων: ${dims.width} × ${dims.height} px` : 'Καμβάς Κλάσεων: Αυτόματο (Fit)');
+    });
+  }
+
+  function getRenderOptions(extra = {}) {
+    const dims = getClsCanvasDims();
     return {
       theme: getCurrentTheme(),
       printMode: clsPrintMode,
@@ -281,7 +429,10 @@ document.addEventListener('DOMContentLoaded', () => {
       hideMethods: optHideMethods.checked,
       hideTypes: optHideTypes.checked,
       positions: customPositions,
-      selectedClassId
+      selectedClassId,
+      canvasWidth: dims ? dims.width : null,
+      canvasHeight: dims ? dims.height : null,
+      ...extra
     };
   }
 
@@ -290,6 +441,55 @@ document.addEventListener('DOMContentLoaded', () => {
       editor.removeLineClass(h, 'background', 'cm-pli11-error-line');
     }
     errorLineHandles = [];
+    editor.clearGutter('cm-pli11-diag');
+  }
+
+  let activeClsPopover = null;
+  function closeClsPopover() {
+    if (activeClsPopover) {
+      activeClsPopover.remove();
+      activeClsPopover = null;
+    }
+  }
+  document.addEventListener('mousedown', (e) => {
+    if (activeClsPopover && !activeClsPopover.contains(e.target)) closeClsPopover();
+  });
+
+  function openClsDiagPopover(clientX, clientY, list) {
+    closeClsPopover();
+    const d = list[0];
+    if (!d) return;
+    const pop = Common.el('div', { class: 'eap-canvas-ctx-popover' });
+    const canFix = Boolean(d.fixAction && Core.applyClassQuickFix);
+    pop.innerHTML = `
+      <div class="eap-canvas-ctx-head">
+        <span>${d.severity === 'error' ? '❌' : '⚠️'} ${escapeHTML(d.code)} (Γρ. ${d.line})</span>
+        <button type="button" class="tool-mini-btn" data-close>&times;</button>
+      </div>
+      <div style="line-height:1.42;">${escapeHTML(d.message)}</div>
+      ${d.hint ? `<div style="font-size:0.73rem; opacity:0.8;">💡 ${escapeHTML(d.hint)}</div>` : ''}
+      ${canFix ? `<button type="button" class="val-quickfix-btn" data-fix style="justify-content:center;">🔧 Αυτόματη Διόρθωση</button>` : ''}
+    `;
+    pop.style.left = Math.min(window.innerWidth - 320, Math.max(8, clientX + 8)) + 'px';
+    pop.style.top = Math.min(window.innerHeight - 180, Math.max(8, clientY - 12)) + 'px';
+    document.body.appendChild(pop);
+    activeClsPopover = pop;
+    pop.querySelector('[data-close]').addEventListener('click', closeClsPopover);
+    const fixB = pop.querySelector('[data-fix]');
+    if (fixB) {
+      fixB.addEventListener('click', () => {
+        const fixed = Core.applyClassQuickFix(editor.getValue(), d);
+        if (fixed !== editor.getValue()) {
+          const si = editor.getScrollInfo();
+          editor.setValue(fixed);
+          editor.scrollTo(si.left, si.top);
+          builderDirty = true;
+          runCompile({ fit: false });
+          showToast('Εφαρμόστηκε αυτόματη διόρθωση!');
+        }
+        closeClsPopover();
+      });
+    }
   }
 
   function jumpToLine(lineNum) {
@@ -317,6 +517,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const by = parseFloat(g.getAttribute('data-y')) || 0;
         selectedClassId = cid;
         boxDrag.active = true;
+        boxDrag.moved = false;
+        boxDrag.preSnap = JSON.parse(JSON.stringify(customPositions));
         boxDrag.classId = cid;
         boxDrag.startClientX = e.clientX;
         boxDrag.startClientY = e.clientY;
@@ -328,6 +530,69 @@ document.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         const ln = parseInt(g.getAttribute('data-line'), 10);
         if (ln > 0) jumpToLine(ln);
+      });
+
+      g.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const cid = g.getAttribute('data-class-id');
+        const ln = parseInt(g.getAttribute('data-line'), 10) || 0;
+        const clsObj = currentCompiled && currentCompiled.model && currentCompiled.model.classes.find((c) => c.id === cid);
+        if (!clsObj) return;
+
+        closeClsPopover();
+        const pop = Common.el('div', { class: 'eap-canvas-ctx-popover' });
+        pop.innerHTML = `
+          <div class="eap-canvas-ctx-head">
+            <span>🏛️ Κλάση «${escapeHTML(clsObj.name)}»</span>
+            <button type="button" class="tool-mini-btn" data-close>&times;</button>
+          </div>
+          <div class="eap-canvas-ctx-row">
+            <input type="text" data-attr-inp placeholder="Νέο κατηγόρημα (π.χ. όνομα)">
+            <button type="button" class="tool-mini-btn" data-add-attr>+ Πεδίο</button>
+          </div>
+          <div class="eap-canvas-ctx-row">
+            <input type="text" data-meth-inp placeholder="Νέα μέθοδος (π.χ. υπολόγισε)">
+            <button type="button" class="tool-mini-btn" data-add-meth>+ Μέθ.</button>
+          </div>
+          ${ln > 0 ? `<button type="button" class="tool-mini-btn" data-jump style="width:100%;">↪ Μετάβαση στη Γραμμή ${ln}</button>` : ''}
+        `;
+        pop.style.left = Math.min(window.innerWidth - 320, Math.max(8, e.clientX)) + 'px';
+        pop.style.top = Math.min(window.innerHeight - 200, Math.max(8, e.clientY)) + 'px';
+        document.body.appendChild(pop);
+        activeClsPopover = pop;
+
+        pop.querySelector('[data-close]').addEventListener('click', closeClsPopover);
+        const jumpB = pop.querySelector('[data-jump]');
+        if (jumpB) jumpB.addEventListener('click', () => { closeClsPopover(); jumpToLine(ln); });
+
+        pop.querySelector('[data-add-attr]').addEventListener('click', () => {
+          const aName = pop.querySelector('[data-attr-inp]').value.trim();
+          if (!aName) return;
+          if (builderDirty) loadCompiledIntoBuilder();
+          const target = builderModel.classes.find((c) => Core.canonicalKey(c.name) === Core.canonicalKey(clsObj.name));
+          if (target) {
+            target.isImplicit = false;
+            target.attributes.push({ visibility: '-', name: aName, type: '' });
+            syncBuilderToEditor();
+            showToast(`Προστέθηκε το κατηγόρημα «${aName}» στην «${clsObj.name}»!`);
+          }
+          closeClsPopover();
+        });
+
+        pop.querySelector('[data-add-meth]').addEventListener('click', () => {
+          const mName = pop.querySelector('[data-meth-inp]').value.trim().replace(/\(\)$/, '');
+          if (!mName) return;
+          if (builderDirty) loadCompiledIntoBuilder();
+          const target = builderModel.classes.find((c) => Core.canonicalKey(c.name) === Core.canonicalKey(clsObj.name));
+          if (target) {
+            target.isImplicit = false;
+            target.methods.push({ visibility: '+', name: mName, params: '', returnType: '' });
+            syncBuilderToEditor();
+            showToast(`Προστέθηκε η μέθοδος «${mName}()» στην «${clsObj.name}»!`);
+          }
+          closeClsPopover();
+        });
       });
     });
   }
@@ -360,12 +625,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     clearErrorLineMarks();
     const marked = new Set();
+    const diagsByLine = new Map();
     for (const d of validation.diagnostics) {
+      if (d.line > 0 && (d.severity === 'error' || d.severity === 'warning')) {
+        if (!diagsByLine.has(d.line)) diagsByLine.set(d.line, []);
+        diagsByLine.get(d.line).push(d);
+      }
       if (d.severity === 'error' && d.line > 0 && !marked.has(d.line)) {
         marked.add(d.line);
         const h = editor.addLineClass(Math.min(d.line - 1, editor.lineCount() - 1), 'background', 'cm-pli11-error-line');
         errorLineHandles.push(h);
       }
+    }
+    for (const [ln, list] of diagsByLine.entries()) {
+      const hasErr = list.some((x) => x.severity === 'error');
+      const marker = document.createElement('div');
+      marker.className = 'cm-pli11-gutter-marker';
+      marker.textContent = hasErr ? '❌' : '⚠️';
+      marker.title = list.map((x) => `[${x.code}] ${x.message}`).join('\n');
+      marker.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        openClsDiagPopover(ev.clientX, ev.clientY, list);
+      });
+      editor.setGutterMarker(Math.min(ln - 1, editor.lineCount() - 1), 'cm-pli11-diag', marker);
     }
 
     valBadge.classList.remove('has-errors', 'all-ok');
@@ -407,6 +689,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for (const d of validation.diagnostics) {
       const div = document.createElement('div');
       div.className = `val-diag-item ${d.severity}`;
+      const canFix = Boolean(d.fixAction && Core.applyClassQuickFix);
       div.innerHTML = `
         <div class="val-diag-head">
           <span class="val-diag-code">${escapeHTML(d.code)}</span>
@@ -414,8 +697,24 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="val-diag-msg">${escapeHTML(d.message)}</div>
         ${d.hint ? `<div class="val-diag-hint">Υπόδειξη: ${escapeHTML(d.hint)}</div>` : ''}
+        ${canFix ? `<button type="button" class="val-quickfix-btn">🔧 Αυτόματη Διόρθωση</button>` : ''}
       `;
       div.addEventListener('click', () => jumpToLine(d.line));
+      const fixBtn = div.querySelector('.val-quickfix-btn');
+      if (fixBtn) {
+        fixBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const fixedCode = Core.applyClassQuickFix(editor.getValue(), d);
+          if (fixedCode !== editor.getValue()) {
+            const scrollInfo = editor.getScrollInfo();
+            editor.setValue(fixedCode);
+            editor.scrollTo(scrollInfo.left, scrollInfo.top);
+            builderDirty = true;
+            runCompile({ fit: false });
+            showToast('Εφαρμόστηκε αυτόματη διόρθωση στο μοντέλο κλάσεων!');
+          }
+        });
+      }
       valDiagnosticsList.appendChild(div);
     }
   }
@@ -444,19 +743,53 @@ document.addEventListener('DOMContentLoaded', () => {
   // ---------------------------------------------------------------------------
   let mermaidIsUserEdited = false;
   let mermaidDebounceTimer = null;
+  let mermaidVisualEditsCount = 0;
 
   function updateMermaidStatusBadge() {
     const badge = document.getElementById('mermaid-edit-status');
     if (!badge) return;
     if (mermaidIsUserEdited) {
-      badge.textContent = 'Χειροκίνητο';
+      badge.textContent = mermaidVisualEditsCount > 0 ? `Κώδικας + Οπτικό (${mermaidVisualEditsCount})` : 'Χειροκίνητο';
       badge.style.color = 'var(--token-string, #ffee00)';
-      badge.title = 'Έχει τροποποιηθεί χειροκίνητα. Κάντε κλικ στο "Επαναφορά από Κώδικα" για επανασυγχρονισμό.';
+      badge.title = 'Ο κώδικας Mermaid έχει τροποποιηθεί χειροκίνητα.';
+    } else if (mermaidVisualEditsCount > 0) {
+      badge.textContent = `Οπτικό (${mermaidVisualEditsCount})`;
+      badge.style.color = 'var(--accent)';
+      badge.title = `${mermaidVisualEditsCount} οπτικές προσαρμογές χωρίς αλλαγή κώδικα!`;
     } else {
       badge.textContent = 'Αυτόματο';
       badge.style.color = '';
       badge.title = 'Συγχρονισμένο αυτόματα με τον κύριο ψευδοκώδικα.';
     }
+  }
+
+  const mermaidVisualEditor = window.EAPMermaidEditor
+    ? window.EAPMermaidEditor.createMermaidVisualEditor({
+        storageKey: 'pli11ClsMermaidVisualV1',
+        viewportEl: mermaidViewport,
+        getScale: () => (mermaidPanZoom && mermaidPanZoom.state && mermaidPanZoom.state.scale) || 1,
+        showToast,
+        onConfigChange: () => renderMermaidPreview({ fit: false }),
+        onStatusChange: ({ editCount, canUndo, canRedo, config }) => {
+          mermaidVisualEditsCount = editCount;
+          updateMermaidStatusBadge();
+          const uBtn = document.getElementById('mermaid-undo-btn');
+          const rBtn = document.getElementById('mermaid-redo-btn');
+          const rstBtn = document.getElementById('mermaid-reset-visual-btn');
+          const pBtn = document.getElementById('mermaid-print-btn');
+          if (uBtn) uBtn.disabled = !canUndo;
+          if (rBtn) rBtn.disabled = !canRedo;
+          if (rstBtn) rstBtn.hidden = editCount === 0;
+          if (pBtn) pBtn.classList.toggle('active', Boolean(config && config.printMode));
+        }
+      })
+    : null;
+
+  if (mermaidVisualEditor && window.EAPMermaidEditor.wireToolbar) {
+    window.EAPMermaidEditor.wireToolbar(mermaidVisualEditor, {
+      showToast,
+      onReset: () => mermaidPanZoom.fit(false)
+    });
   }
 
   async function renderMermaidPreview(opts = {}) {
@@ -493,11 +826,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const isDark = getCurrentTheme() === 'dark';
-      window.mermaid.initialize({
-        startOnLoad: false,
-        theme: isDark ? 'dark' : 'default',
-        securityLevel: 'loose'
-      });
+      window.mermaid.initialize(
+        mermaidVisualEditor
+          ? mermaidVisualEditor.getMermaidInitConfig(isDark)
+          : { startOnLoad: false, theme: isDark ? 'dark' : 'default', securityLevel: 'loose' }
+      );
       mermaidRenderCounter++;
       const id = `pli11_cls_mmd_${mermaidRenderCounter}`;
       const { svg } = await window.mermaid.render(id, code);
@@ -515,6 +848,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           svgEl.style.maxWidth = 'none';
           svgEl.style.height = 'auto';
+          if (mermaidVisualEditor) {
+            mermaidVisualEditor.attachToSVG(svgEl, 'classes');
+          }
         }
         if (opts.fit !== false || mermaidPanZoom.state.autoFitted || mermaidPanZoom.state.pendingFit) {
           requestAnimationFrame(() => mermaidPanZoom.fit(false));
@@ -611,18 +947,49 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!svgEl) return null;
     const clone = svgEl.cloneNode(true);
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
     const vb = clone.getAttribute('viewBox');
+    let vbW = 1200;
+    let vbH = 600;
     if (vb) {
       const parts = vb.split(/[\s,]+/).map(Number);
       if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
-        if (!clone.getAttribute('width') || clone.getAttribute('width').includes('%')) {
-          clone.setAttribute('width', parts[2]);
-        }
-        if (!clone.getAttribute('height') || clone.getAttribute('height').includes('%')) {
-          clone.setAttribute('height', parts[3]);
-        }
+        vbW = Math.ceil(parts[2]);
+        vbH = Math.ceil(parts[3]);
       }
     }
+    clone.setAttribute('width', String(vbW));
+    clone.setAttribute('height', String(vbH));
+    clone.style.maxWidth = '';
+
+    // Convert foreignObject to native SVG <text> to prevent browser SecurityError (tainted canvas)
+    clone.querySelectorAll('foreignObject').forEach((fo) => {
+      const text = fo.textContent.trim();
+      const fw = parseFloat(fo.getAttribute('width')) || 0;
+      const fh = parseFloat(fo.getAttribute('height')) || 0;
+      const fx = parseFloat(fo.getAttribute('x')) || 0;
+      const fy = parseFloat(fo.getAttribute('y')) || 0;
+      const child = fo.querySelector('span, div, p');
+      const textColor = (child && window.getComputedStyle(child).color) || '#0f172a';
+      const fontF = (child && window.getComputedStyle(child).fontFamily) || 'sans-serif';
+      const fontS = (child && window.getComputedStyle(child).fontSize) || '13px';
+      const fontW = (child && window.getComputedStyle(child).fontWeight) || '600';
+
+      const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      textEl.setAttribute('x', (fx + fw / 2).toFixed(1));
+      textEl.setAttribute('y', (fy + fh / 2).toFixed(1));
+      textEl.setAttribute('text-anchor', 'middle');
+      textEl.setAttribute('dominant-baseline', 'central');
+      textEl.setAttribute('fill', textColor);
+      textEl.setAttribute('stroke', 'none');
+      textEl.style.stroke = 'none';
+      textEl.setAttribute('font-size', fontS);
+      textEl.setAttribute('font-weight', fontW);
+      textEl.setAttribute('font-family', fontF);
+      textEl.textContent = text;
+      if (fo.parentNode) fo.parentNode.replaceChild(textEl, fo);
+    });
+
     return clone;
   }
 
@@ -650,6 +1017,24 @@ document.addEventListener('DOMContentLoaded', () => {
       Renderer.downloadPNG(svgEl, 'mermaid-class-diagram.png', 2)
         .then(() => showToast('Έγινε λήψη Mermaid PNG (HiDPI για MS Word)!'))
         .catch(() => showToast('Αποτυχία εξαγωγής Mermaid PNG.'));
+    });
+  }
+
+  const mermaidCopyPng = document.getElementById('mermaid-copy-png');
+  if (mermaidCopyPng) {
+    mermaidCopyPng.addEventListener('click', () => {
+      const svgEl = getPreparedMermaidSVG();
+      if (!svgEl) {
+        showToast('Δεν υπάρχει διαθέσιμο διάγραμμα Mermaid προς εξαγωγή.');
+        return;
+      }
+      Renderer.copyPNGToClipboard(svgEl, 2)
+        .then(() => showToast('Το διάγραμμα Mermaid αντιγράφηκε ως PNG! Πατήστε Ctrl+V στο Word.'))
+        .catch(() => {
+          Renderer.downloadPNG(svgEl, 'mermaid-class-diagram.png', 2)
+            .then(() => showToast('Έγινε λήψη αρχείου PNG!'))
+            .catch(() => showToast('Αποτυχία εξαγωγής Mermaid PNG.'));
+        });
     });
   }
 
@@ -690,17 +1075,39 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   clsExportSvg.addEventListener('click', () => {
-    const svg = Renderer.renderClassDiagramSVG(currentCompiled.model, getRenderOptions());
+    if (!currentCompiled) return;
+    const svg = Renderer.renderClassDiagramSVG(currentCompiled.model, getRenderOptions({ selectedClassId: null }));
     Renderer.downloadSVG(svg, 'pli11-class-diagram.svg');
     showToast('Έγινε λήψη SVG!');
   });
 
   clsExportPng.addEventListener('click', () => {
-    const svg = Renderer.renderClassDiagramSVG(currentCompiled.model, getRenderOptions());
-    Renderer.downloadPNG(svg, 'pli11-class-diagram.png', 2)
-      .then(() => showToast('Έγινε λήψη HiDPI PNG για MS Word!'))
+    if (!currentCompiled) return;
+    const svg = Renderer.renderClassDiagramSVG(
+      currentCompiled.model,
+      getRenderOptions({ printMode: true, tightCrop: true, selectedClassId: null })
+    );
+    Renderer.downloadPNG(svg, 'pli11-class-diagram.png', 3)
+      .then(() => showToast('Το Διάγραμμα Κλάσεων εξήχθη ως PNG (300+ DPI για Word)!'))
       .catch(() => showToast('Αποτυχία μετατροπής σε PNG.'));
   });
+
+  if (clsCopyPng) {
+    clsCopyPng.addEventListener('click', () => {
+      if (!currentCompiled) return;
+      const svg = Renderer.renderClassDiagramSVG(
+        currentCompiled.model,
+        getRenderOptions({ printMode: true, tightCrop: true, selectedClassId: null })
+      );
+      Renderer.copyPNGToClipboard(svg, 3)
+        .then(() => showToast('Το Διάγραμμα Κλάσεων αντιγράφηκε ως PNG! Πατήστε Ctrl+V στο Word.'))
+        .catch(() => {
+          Renderer.downloadPNG(svg, 'pli11-class-diagram.png', 3)
+            .then(() => showToast('Έγινε λήψη αρχείου PNG (έτοιμο για Word)!'))
+            .catch(() => showToast('Αποτυχία αντιγραφής/λήψης PNG.'));
+        });
+    });
+  }
 
   pseudoCopyInlineBtn.addEventListener('click', () => {
     copyTextToClipboard(officialPseudocodeView.textContent, 'Ο ΕΑΠ Ψευδοκώδικας αντιγράφηκε!');
@@ -1136,7 +1543,7 @@ document.addEventListener('DOMContentLoaded', () => {
     runCompile({ manualToast: true, switchToErrorsIfFailed: false });
   });
 
-  // Autosave draft to localStorage — restores on next visit
+  // Autosave draft & Multi-File Workspace Manager («Οι Εργασίες μου»)
   const autosave = Common.createAutosave({
     key: 'pli11ClassesDraftCode',
     getValue: () => editor.getValue(),
@@ -1144,10 +1551,32 @@ document.addEventListener('DOMContentLoaded', () => {
     onRestore: () => showToast('Επαναφέρθηκε το πρόχειρο από την προηγούμενη συνεδρία!')
   });
 
+  const clsWorkspaceMgr = Common.createWorkspaceManager
+    ? Common.createWorkspaceManager({
+        courseKey: 'pli11-classes',
+        defaultSlotTitle: 'Άσκηση 1 (Κλάσεις)',
+        getCode: () => editor.getValue(),
+        setCode: (code) => {
+          selectedClassId = null;
+          builderDirty = true;
+          editor.setValue(code);
+          runCompile({ fit: true });
+          loadCompiledIntoBuilder();
+        },
+        getExtraState: () => ({ cls: customPositions }),
+        setExtraState: (extra) => {
+          customPositions = (extra && extra.cls) || {};
+          saveClsPositions();
+          if (currentCompiled) renderDiagramView(true);
+        }
+      })
+    : null;
+
   let liveDebounceTimer = null;
   editor.on('change', () => {
     if (suppressEditorSync) return;
     autosave.onChange();
+    if (clsWorkspaceMgr) clsWorkspaceMgr.onChange();
     builderDirty = true;
     if (!liveCompileToggle.checked) return;
     clearTimeout(liveDebounceTimer);
@@ -1169,8 +1598,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
   formatButton.addEventListener('click', formatEditorCode);
 
+  if (Common.attachTouchSymbolBar) {
+    Common.attachTouchSymbolBar(editor, [';', ':', '--', '<>--', '*--', '--|>', '..>', '::', '(1)', '(0..*)', '(1..*)', '+', '-']);
+  }
+
+  const exportDocxBtn = document.getElementById('export-docx-btn');
+  if (exportDocxBtn && window.EAPDocx) {
+    exportDocxBtn.addEventListener('click', async () => {
+      if (!currentCompiled) runCompile({ fit: false });
+      showToast('Δημιουργία αρχείου Word (.docx)...');
+      try {
+        const slot = clsWorkspaceMgr ? clsWorkspaceMgr.getActiveSlot() : null;
+        const svgStr = Renderer.renderClassDiagramSVG(
+          currentCompiled.model,
+          getRenderOptions({ printMode: true, tightCrop: true, selectedClassId: null })
+        );
+        const clsPng = await window.EAPDocx.svgToPngBytes(svgStr, 3);
+        const ooPseudo = Core.generateOfficialEAPPseudocode(currentCompiled.model, {
+          defaultPrivateAttributes: pseudoDefaultPrivate.checked,
+          includeConstructor: pseudoAddCtor.checked,
+          includeRelationComments: true
+        });
+
+        const sections = [];
+        if (slot && slot.notes && slot.notes.trim()) {
+          sections.push({ type: 'heading', text: 'Εκφώνηση / Σημειώσεις' });
+          sections.push({ type: 'paragraph', text: slot.notes.trim() });
+        }
+
+        sections.push({
+          type: 'image',
+          title: '1. Διάγραμμα Κλάσεων (ΠΛΗ11)',
+          pngBytes: clsPng,
+          caption: `Διάγραμμα Κλάσεων (${currentCompiled.stats.classes} κλάσεις)`
+        });
+
+        const rels = (currentCompiled.model && currentCompiled.model.relations) || [];
+        if (rels.length > 0) {
+          const kindMap = {
+            association: 'Συσχέτιση',
+            aggregation: 'Συναρμογή (◇)',
+            composition: 'Σύνθεση (◆)',
+            inheritance: 'Κληρονομικότητα (◁)',
+            dependency: 'Εξάρτηση (..>)'
+          };
+          sections.push({
+            type: 'table',
+            title: '2. Πίνακας Σχέσεων & Πληθικοτήτων',
+            headers: ['Είδος Σχέσης', 'Κλάση Α', 'Πληθ. Α', 'Όνομα / Ρόλος', 'Πληθ. Β', 'Κλάση Β', 'Κλάση Συσχέτισης'],
+            rows: rels.map((r) => [
+              kindMap[r.kind] || r.kind,
+              r.from,
+              r.fromMult || '—',
+              r.label || '—',
+              r.toMult || '—',
+              r.to,
+              r.assocClass || '—'
+            ])
+          });
+        }
+
+        sections.push({
+          type: 'code',
+          title: '3. Αντικειμενοστρεφής Ψευδοκώδικας ΕΑΠ (ΟΣΣ2)',
+          code: ooPseudo,
+          lineNumbers: true
+        });
+
+        window.EAPDocx.downloadDocx({
+          title: slot ? `${slot.title} — Διάγραμμα Κλάσεων` : 'Παραδοτέο ΠΛΗ11 — Διάγραμμα Κλάσεων',
+          subtitle: `Ελληνικό Ανοικτό Πανεπιστήμιο (ΠΛΗ11) · ${currentCompiled.stats.classes} Κλάσεις · ${new Date().toLocaleDateString('el-GR')}`,
+          sections
+        }, 'pli11-class-diagram.docx');
+        showToast('Το αρχείο Word (pli11-class-diagram.docx) εξήχθη επιτυχώς!');
+      } catch (err) {
+        showToast('Σφάλμα εξαγωγής .docx: ' + (err.message || 'Αποτυχία'));
+      }
+    });
+  }
+
   shareButton.addEventListener('click', () => {
-    Common.shareCode(editor.getValue(), 'Ο σύνδεσμος αντιγράφηκε στο πρόχειρο!');
+    Common.shareCode(editor.getValue(), { cls: customPositions });
   });
 
   loadButton.addEventListener('click', async () => {
@@ -1196,12 +1704,20 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   clearButton.addEventListener('click', () => {
-    customPositions = {};
-    selectedClassId = null;
-    builderDirty = true;
-    editor.setValue('');
-    runCompile({ fit: true });
-    editor.focus();
+    Common.showConfirm('Καθαρισμός όλου του διαγράμματος κλάσεων στον συντάκτη;', {
+      danger: true,
+      yesText: 'Καθαρισμός',
+      onYes: () => {
+        customPositions = {};
+        selectedClassId = null;
+        builderDirty = true;
+        if (exampleSelector) exampleSelector.value = '';
+        editor.setValue('');
+        autosave.clear();
+        runCompile({ fit: true });
+        editor.focus();
+      }
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -1653,7 +2169,9 @@ document.addEventListener('DOMContentLoaded', () => {
   loadCompiledIntoBuilder();
   if (typeof Common.loadCodeFromHashAsync === 'function') {
     Common.loadCodeFromHashAsync((shared) => {
-      editor.setValue(shared);
+      const dec = Common.decodeSharePayload ? Common.decodeSharePayload(shared) : { code: shared, layout: null };
+      if (dec.layout && dec.layout.cls) customPositions = dec.layout.cls;
+      editor.setValue(dec.code);
       runCompile({ fit: true });
       loadCompiledIntoBuilder();
     });

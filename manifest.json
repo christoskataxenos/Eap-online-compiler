@@ -1,0 +1,19 @@
+{
+  "name": "EAP Online Compiler — ΠΛΗ10 & ΠΛΗ11",
+  "short_name": "EAP Compiler",
+  "description": "Διερμηνευτής Ψευδογλώσσας ΠΛΗ10 και Μεταγλωττιστής ΔΔΠ, ΔΡΔ & Διαγραμμάτων Κλάσεων ΠΛΗ11 (100% Offline).",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fdf6e3",
+  "theme_color": "#0b0c15",
+  "lang": "el",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

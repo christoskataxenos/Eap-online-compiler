@@ -490,14 +490,31 @@
       maxY = Math.max(maxY, box.y + box.h);
     }
 
-    const padX = 88;
-    const padY = 64;
-    const viewMinX = Math.min(0, Math.floor(minX - padX));
-    const viewMinY = Math.min(0, Math.floor(minY - padY));
-    const width = Math.max(600, Math.ceil(maxX + padX - viewMinX));
-    const height = Math.max(340, Math.ceil(maxY + padY - viewMinY));
+    const padX = options.tightCrop ? 36 : 88;
+    const padY = options.tightCrop ? 32 : 64;
+    const tightMinX = options.tightCrop ? Math.floor(minX - padX) : Math.min(0, Math.floor(minX - padX));
+    const tightMinY = options.tightCrop ? Math.floor(minY - padY) : Math.min(0, Math.floor(minY - padY));
+    const tightW = Math.max(options.tightCrop ? 320 : 600, Math.ceil(maxX + padX - tightMinX));
+    const tightH = Math.max(options.tightCrop ? 200 : 340, Math.ceil(maxY + padY - tightMinY));
 
-    return { boxes, minX: viewMinX, minY: viewMinY, width, height };
+    if (!options.tightCrop && (options.canvasWidth || options.canvasHeight)) {
+      const targetW = options.canvasWidth || tightW;
+      const targetH = options.canvasHeight || tightH;
+      const targetAR = targetW / targetH;
+      const tightAR = tightW / tightH;
+      let viewW = tightW;
+      let viewH = tightH;
+      if (tightAR > targetAR) {
+        viewH = Math.ceil(tightW / targetAR);
+      } else {
+        viewW = Math.ceil(tightH * targetAR);
+      }
+      const viewMinX = Math.floor(tightMinX - (viewW - tightW) / 2);
+      const viewMinY = Math.floor(tightMinY - (viewH - tightH) / 2);
+      return { boxes, minX: viewMinX, minY: viewMinY, width: viewW, height: viewH, svgW: targetW, svgH: targetH };
+    }
+
+    return { boxes, minX: tightMinX, minY: tightMinY, width: tightW, height: tightH, svgW: tightW, svgH: tightH };
   }
 
   function pairKey(idA, idB) {
@@ -696,6 +713,8 @@
     const pal = getPalette(options);
     const layout = computeClassLayout(model, options);
     const { boxes, minX, minY, width, height } = layout;
+    const svgW = layout.svgW || width;
+    const svgH = layout.svgH || height;
     const relations = (model && model.relations) || [];
 
     const idByKey = new Map();
@@ -705,7 +724,7 @@
 
     const parts = [];
     parts.push(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${width} ${height}" width="${width}" height="${height}" class="pli11-class-svg">`
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${width} ${height}" width="${svgW}" height="${svgH}" class="pli11-class-svg">`
     );
     parts.push(`<rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="${pal.bg}" />`);
 
@@ -910,7 +929,59 @@
     return parts.join('\n');
   }
 
-  // Standalone SVG & 2x HiDPI PNG download helpers (matches pli11-renderer.js)
+  // Standalone SVG & 3x HiDPI Word-Ready PNG export + Clipboard copy
+  const CRC32_TABLE = (function () {
+    const t = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[i] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) {
+      crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function injectPngPhysDpi(pngBytes, dpi = 288) {
+    if (!pngBytes || pngBytes.length < 33 || pngBytes[0] !== 0x89 || pngBytes[1] !== 0x50) {
+      return pngBytes;
+    }
+    const ppm = Math.round(dpi * 39.37007874);
+    const physChunk = new Uint8Array(21);
+    const dv = new DataView(physChunk.buffer);
+    dv.setUint32(0, 9, false);
+    physChunk[4] = 0x70; physChunk[5] = 0x48; physChunk[6] = 0x59; physChunk[7] = 0x73;
+    dv.setUint32(8, ppm, false);
+    dv.setUint32(12, ppm, false);
+    physChunk[16] = 1;
+    dv.setUint32(17, crc32(physChunk.subarray(4, 17)), false);
+
+    const ihdrLen = new DataView(pngBytes.buffer, pngBytes.byteOffset, pngBytes.byteLength).getUint32(8, false);
+    const ihdrEnd = 8 + 4 + 4 + ihdrLen + 4;
+    if (ihdrEnd > pngBytes.length) return pngBytes;
+
+    const out = new Uint8Array(pngBytes.length + 21);
+    out.set(pngBytes.subarray(0, ihdrEnd), 0);
+    out.set(physChunk, ihdrEnd);
+    out.set(pngBytes.subarray(ihdrEnd), ihdrEnd + 21);
+    return out;
+  }
+
+  function addDpiToPngBlob(blob, pixelWidth) {
+    if (!blob || typeof blob.arrayBuffer !== 'function') return Promise.resolve(blob);
+    const dpi = Math.max(220, Math.round(pixelWidth / 6.22));
+    return blob.arrayBuffer().then((buf) => {
+      const updated = injectPngPhysDpi(new Uint8Array(buf), dpi);
+      return new Blob([updated], { type: 'image/png' });
+    }).catch(() => blob);
+  }
+
   function serializeStandaloneSVG(svgStringOrEl) {
     if (typeof svgStringOrEl === 'string') return svgStringOrEl;
     if (!svgStringOrEl) return '';
@@ -927,59 +998,119 @@
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
-  function downloadPNG(svgStringOrEl, filename = 'class-diagram.png', scale = 2) {
+  function renderSVGToCanvas(svgStringOrEl, scale = 3) {
     return new Promise((resolve, reject) => {
-      const svgText = serializeStandaloneSVG(svgStringOrEl);
-      const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const img = new Image();
-      img.onload = () => {
+      try {
+        let svgText = serializeStandaloneSVG(svgStringOrEl);
+        if (!svgText) return reject(new Error('Invalid SVG input for PNG export'));
+
+        if (!svgText.includes('xmlns="http://www.w3.org/2000/svg"')) {
+          svgText = svgText.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        if (svgText.includes('xlink:href') && !svgText.includes('xmlns:xlink=')) {
+          svgText = svgText.replace('<svg', '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+        }
+
+        let w = 900;
+        let h = 560;
+        const wMatch = svgText.match(/<svg[^>]*\bwidth=["']([0-9.]+)(?:px)?["']/i);
+        const hMatch = svgText.match(/<svg[^>]*\bheight=["']([0-9.]+)(?:px)?["']/i);
+        if (wMatch && parseFloat(wMatch[1]) > 0) w = parseFloat(wMatch[1]);
+        if (hMatch && parseFloat(hMatch[1]) > 0) h = parseFloat(hMatch[1]);
+
+        const encodedData = unescape(encodeURIComponent(svgText));
+        const base64Uri = 'data:image/svg+xml;base64,' + btoa(encodedData);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const actualW = img.naturalWidth || w;
+            const actualH = img.naturalHeight || h;
+            const effectiveScale = Math.min(scale, 4800 / Math.max(1, Math.max(actualW, actualH)));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(actualW * effectiveScale);
+            canvas.height = Math.round(actualH * effectiveScale);
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.scale(effectiveScale, effectiveScale);
+            ctx.drawImage(img, 0, 0, actualW, actualH);
+            resolve(canvas);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        img.onerror = () => reject(new Error('Failed to rasterize SVG into image'));
+        img.src = base64Uri;
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  function downloadPNG(svgStringOrEl, filename = 'class-diagram.png', scale = 3) {
+    return renderSVGToCanvas(svgStringOrEl, scale).then((canvas) => {
+      return new Promise((resolve, reject) => {
         try {
-          const w = img.naturalWidth || 900;
-          const h = img.naturalHeight || 560;
-          const canvas = document.createElement('canvas');
-          canvas.width = Math.round(w * scale);
-          canvas.height = Math.round(h * scale);
-          const ctx = canvas.getContext('2d');
-          ctx.scale(scale, scale);
-          ctx.drawImage(img, 0, 0, w, h);
-          URL.revokeObjectURL(url);
-          canvas.toBlob((pngBlob) => {
-            if (!pngBlob) {
-              reject(new Error('PNG conversion failed'));
-              return;
-            }
-            const pngUrl = URL.createObjectURL(pngBlob);
+          const trigger = (downloadUrl) => {
             const a = document.createElement('a');
-            a.href = pngUrl;
+            a.style.display = 'none';
+            a.href = downloadUrl;
             a.download = filename;
             document.body.appendChild(a);
             a.click();
-            a.remove();
-            setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
+            setTimeout(() => {
+              a.remove();
+              if (downloadUrl.startsWith('blob:')) URL.revokeObjectURL(downloadUrl);
+            }, 60000);
             resolve();
-          }, 'image/png');
+          };
+          if (canvas.toBlob) {
+            canvas.toBlob((blob) => {
+              if (blob) {
+                addDpiToPngBlob(blob, canvas.width).then((hiDpiBlob) => trigger(URL.createObjectURL(hiDpiBlob)));
+              } else {
+                trigger(canvas.toDataURL('image/png'));
+              }
+            }, 'image/png');
+          } else {
+            trigger(canvas.toDataURL('image/png'));
+          }
         } catch (err) {
-          URL.revokeObjectURL(url);
           reject(err);
         }
-      };
-      img.onerror = (e) => {
-        URL.revokeObjectURL(url);
-        reject(e);
-      };
-      img.src = url;
+      });
+    });
+  }
+
+  function copyPNGToClipboard(svgStringOrEl, scale = 3) {
+    return renderSVGToCanvas(svgStringOrEl, scale).then((canvas) => {
+      return new Promise((resolve, reject) => {
+        if (!canvas.toBlob) return reject(new Error('Canvas toBlob not supported'));
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error('Failed to create PNG blob'));
+          addDpiToPngBlob(blob, canvas.width).then((hiDpiBlob) => {
+            if (navigator.clipboard && window.ClipboardItem) {
+              navigator.clipboard.write([new ClipboardItem({ 'image/png': hiDpiBlob })]).then(resolve).catch(reject);
+            } else {
+              reject(new Error('Clipboard API not available'));
+            }
+          });
+        }, 'image/png');
+      });
     });
   }
 
   return {
     computeClassLayout,
     renderClassDiagramSVG,
+    injectPngPhysDpi,
     serializeStandaloneSVG,
     downloadSVG,
-    downloadPNG
+    downloadPNG,
+    copyPNGToClipboard
   };
 }));

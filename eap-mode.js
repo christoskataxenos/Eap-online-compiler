@@ -20,18 +20,23 @@
     const KEYWORDS = new Set([
         "ΑΛΓΟΡΙΘΜΟΣ", "ΣΤΑΘΕΡΕΣ", "ΔΕΔΟΜΕΝΑ", "ΤΥΠΟΙ", "ΔΙΕΠΑΦΗ", "ΕΙΣΟΔΟΣ", "ΕΞΟΔΟΣ",
         "ΑΡΧΗ", "ΤΕΛΟΣ", "ΕΑΝ", "ΤΟΤΕ", "ΑΛΛΙΩΣ", "ΕΑΝ-ΤΕΛΟΣ",
+        "ΕΠΙΛΕΞΕ", "ΠΕΡΙΠΤΩΣΗ", "ΕΠΙΛΕΞΕ-ΤΕΛΟΣ", "ΤΕΛΟΣ-ΕΠΙΛΟΓΩΝ",
+        "ΕΓΓΡΑΦΗ", "ΤΕΛΟΣ-ΕΓΓΡΑΦΗΣ",
         "ΓΙΑ", "ΕΩΣ", "ΜΕ", "ΒΗΜΑ", "ΜΕ-ΒΗΜΑ", "ΕΠΑΝΑΛΑΒΕ", "ΓΙΑ-ΤΕΛΟΣ",
         "ΕΝΟΣΩ", "ΕΝΟΣΩ-ΤΕΛΟΣ", "ΜΕΧΡΙ", "ΥΠΟΛΟΓΙΣΕ",
         "ΔΙΑΔΙΚΑΣΙΑ", "ΔΙΑΔΙΚΑΣΙΑΣ", "ΣΥΝΑΡΤΗΣΗ", "ΣΥΝΑΡΤΗΣΗΣ",
         "ΤΕΛΟΣ-ΔΙΑΔΙΚΑΣΙΑΣ", "ΤΕΛΟΣ-ΣΥΝΑΡΤΗΣΗΣ",
         "ALGORITHM", "CONSTANTS", "DATA", "TYPES", "INTERFACE", "INPUT", "OUTPUT",
-        "BEGIN", "END", "IF", "THEN", "ELSE", "END_IF", "FOR", "TO", "STEP", "REPEAT",
+        "BEGIN", "END", "IF", "THEN", "ELSE", "END_IF", "SELECT", "CASE", "END_SELECT",
+        "RECORD", "END_RECORD", "FOR", "TO", "STEP", "REPEAT",
         "END_FOR", "WHILE", "END_WHILE", "UNTIL", "CALCULATE", "PROCEDURE", "FUNCTION",
         "END_PROCEDURE", "END_FUNCTION"
     ]);
 
     const BUILTINS = new Set([
-        "ΤΥΠΩΣΕ", "ΔΙΑΒΑΣΕ", "PRINT", "READ", "EOLN"
+        "ΤΥΠΩΣΕ", "ΔΙΑΒΑΣΕ", "PRINT", "READ", "EOLN",
+        "SQRT", "Τ_Ρ", "ABS", "Α_Τ", "TRUNC", "Α_Μ", "ROUND",
+        "SIN", "ΗΜ", "COS", "ΣΥΝ", "TAN", "ΕΦ", "LN", "EXP", "POW", "LENGTH", "ΜΗΚΟΣ"
     ]);
 
     const TYPES = new Set([
@@ -183,6 +188,15 @@
         { text: "ΤΟΤΕ\n  ", displayText: "ΤΟΤΕ" },
         { text: "ΑΛΛΙΩΣ\n  ", displayText: "ΑΛΛΙΩΣ" },
         { text: "ΕΑΝ-ΤΕΛΟΣ", displayText: "ΕΑΝ-ΤΕΛΟΣ" },
+        { text: "ΕΠΙΛΕΞΕ ", displayText: "ΕΠΙΛΕΞΕ <έκφραση> ... ΕΠΙΛΕΞΕ-ΤΕΛΟΣ" },
+        { text: "ΠΕΡΙΠΤΩΣΗ ", displayText: "ΠΕΡΙΠΤΩΣΗ <τιμή> :" },
+        { text: "ΕΠΙΛΕΞΕ-ΤΕΛΟΣ", displayText: "ΕΠΙΛΕΞΕ-ΤΕΛΟΣ" },
+        { text: "ΤΥΠΟΙ\n  ", displayText: "ΤΥΠΟΙ (Ορισμός Εγγραφών)" },
+        { text: "ΕΓΓΡΑΦΗ\n    \n  ΤΕΛΟΣ-ΕΓΓΡΑΦΗΣ;", displayText: "ΕΓΓΡΑΦΗ ... ΤΕΛΟΣ-ΕΓΓΡΑΦΗΣ" },
+        { text: "SQRT(", displayText: "SQRT(x) / Τ_Ρ(x) — Τετραγωνική ρίζα" },
+        { text: "ABS(", displayText: "ABS(x) / Α_Τ(x) — Απόλυτη τιμή" },
+        { text: "TRUNC(", displayText: "TRUNC(x) / Α_Μ(x) — Ακέραιο μέρος" },
+        { text: "ROUND(", displayText: "ROUND(x) — Στρογγυλοποίηση" },
         { text: "ΓΙΑ ", displayText: "ΓΙΑ <i := 1 ΕΩΣ N> ΕΠΑΝΑΛΑΒΕ" },
         { text: "ΕΩΣ ", displayText: "ΕΩΣ" },
         { text: "ΜΕ-ΒΗΜΑ ", displayText: "ΜΕ-ΒΗΜΑ" },

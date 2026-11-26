@@ -252,6 +252,137 @@ header {
     transform: translateY(-1px);
 }
 
+/* Shared Tools / Course Submenu Dropdown */
+.course-submenu {
+    position: relative;
+}
+
+.submenu-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--surface-2);
+    border: 1px solid color-mix(in srgb, var(--button-bg) 45%, var(--border-strong));
+    border-radius: 6px;
+    color: var(--header-text);
+    padding: 0.36rem 0.72rem;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0.01em;
+    transition: border-color 0.2s, color 0.2s, background-color 0.2s;
+}
+
+.submenu-trigger:hover,
+.course-submenu.open .submenu-trigger {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--button-bg) 14%, var(--surface-2));
+    transform: none;
+    box-shadow: none;
+}
+
+.submenu-caret {
+    font-size: 0.72rem;
+    transition: transform 0.18s;
+}
+
+.course-submenu.open .submenu-caret {
+    transform: rotate(180deg);
+}
+
+.submenu-panel {
+    position: absolute;
+    top: calc(100% + 0.45rem);
+    right: 0;
+    width: min(350px, 90vw);
+    padding: 0.45rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-elevated);
+    box-shadow: 0 20px 44px rgba(0, 0, 0, 0.24);
+    display: none;
+    flex-direction: column;
+    gap: 0.35rem;
+    z-index: 1200;
+    text-align: left;
+}
+
+.submenu-panel::before {
+    content: "";
+    position: absolute;
+    top: -0.55rem;
+    left: 0;
+    right: 0;
+    height: 0.55rem;
+}
+
+.course-submenu.open .submenu-panel {
+    display: flex;
+    animation: modalFadeIn 0.15s ease-out;
+}
+
+.submenu-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.65rem 0.78rem;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    text-decoration: none;
+    color: var(--text-secondary);
+    transition: background-color 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.submenu-item:hover,
+.submenu-item.active {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.submenu-item:hover {
+    transform: translateX(2px);
+}
+
+.submenu-item-head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.submenu-badge {
+    padding: 0.1rem 0.48rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.submenu-badge.alt {
+    background: var(--info-text);
+    color: #ffffff;
+}
+
+[data-theme="dark"] .submenu-badge.alt {
+    color: #0b0c15;
+}
+
+.submenu-title {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.submenu-desc {
+    font-size: 0.75rem;
+    line-height: 1.38;
+    color: var(--text-secondary);
+}
+
 h1 {
     margin: 0;
     font-size: 1.35rem;
@@ -391,6 +522,260 @@ main {
 .cm-error-line {
     background-color: rgba(220, 50, 47, 0.25) !important;
     border-left: 4px solid var(--term-error) !important;
+}
+
+/* Breakpoints Gutter (ΠΛΗ10 Debugger) */
+.cm-breakpoints {
+    width: 16px;
+}
+.cm-breakpoint-dot {
+    color: #ef4444;
+    font-size: 13px;
+    line-height: 1;
+    padding-left: 3px;
+    cursor: pointer;
+    user-select: none;
+    text-shadow: 0 0 6px rgba(239, 68, 68, 0.55);
+}
+.CodeMirror-linenumber {
+    cursor: pointer;
+}
+
+/* ΠΛΗ10 Pane Wrapper & Side-by-Side Split Mode */
+.pli10-pane-left {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 0.5rem;
+    min-height: 0;
+    min-width: 0;
+}
+
+@media (min-width: 861px) {
+    .container.layout-split {
+        flex-direction: row;
+        align-items: stretch;
+        gap: 0.35rem;
+    }
+    .container.layout-split .pli10-pane-left {
+        width: 50%;
+        flex: 0 0 auto;
+        height: 100%;
+    }
+    .container.layout-split .output-container {
+        flex: 1 1 0%;
+        height: 100% !important;
+        max-height: none;
+        min-width: 260px;
+    }
+    .container.layout-split > .resizer {
+        width: 10px;
+        height: 100%;
+        cursor: col-resize;
+        margin: 0;
+    }
+    .container.layout-split > .resizer::after {
+        width: 4px;
+        height: 54px;
+    }
+}
+
+/* ΠΛΗ10 Quick Snippets Bar */
+.pli10-snippets-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.28rem 0.65rem;
+    background: color-mix(in srgb, var(--panel-header-bg) 82%, var(--card-bg));
+    border-bottom: 1px solid color-mix(in srgb, var(--panel-header-border) 60%, transparent);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+    flex-shrink: 0;
+}
+.pli10-snippet-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--header-text);
+    white-space: nowrap;
+    margin-right: 0.15rem;
+}
+.pli10-snippet-chip {
+    padding: 0.18rem 0.48rem;
+    font-size: 0.71rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0.01em;
+    background: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--panel-header-border) 65%, transparent);
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.pli10-snippet-chip:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--button-bg) 16%, var(--card-bg));
+    color: var(--accent);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: none;
+}
+
+/* Batch Auto-Input Drawer (ΠΛΗ10 ΔΙΑΒΑΣΕ) */
+.batch-input-drawer {
+    padding: 0.55rem 0.85rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--panel-header-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+.batch-input-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+}
+.batch-check-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    cursor: pointer;
+    flex-wrap: wrap;
+}
+.batch-hint-text {
+    color: var(--text-muted);
+    font-size: 0.73rem;
+}
+.batch-input-btns {
+    display: flex;
+    gap: 0.35rem;
+}
+#batch-input-box {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    border-radius: 5px;
+    border: 1px solid var(--panel-header-border);
+    background: var(--panel-bg);
+    color: var(--text-color);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    resize: vertical;
+    min-height: 42px;
+    max-height: 130px;
+}
+
+/* Call Stack Strip & Reference Badges */
+.callstack-strip {
+    display: flex;
+    align-items: stretch;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+.callstack-frame {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    padding: 0.42rem 0.68rem;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    font-family: var(--font-mono);
+    font-size: 0.76rem;
+}
+.callstack-frame.active-frame {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+}
+.callstack-frame-title {
+    font-weight: 700;
+    color: var(--header-text);
+}
+.callstack-frame-vars {
+    color: var(--text-secondary);
+    font-size: 0.71rem;
+}
+.callstack-arrow {
+    align-self: center;
+    color: var(--text-muted);
+    font-weight: bold;
+}
+.mem-ref-badge {
+    font-size: 0.66rem;
+    font-family: var(--font-mono);
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    font-weight: 700;
+}
+
+/* Array Index Pointer Chips (i, j, mid) */
+.array-cell-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+.array-ptr-list {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-height: 16px;
+}
+.array-ptr-chip {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-weight: 700;
+    padding: 0 5px;
+    border-radius: 3px;
+    background: var(--accent);
+    color: #ffffff;
+    line-height: 1.35;
+}
+
+/* EAP Trace Table Filter Bar & Changed Cell Highlight */
+.trace-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--card-border);
+    font-size: 0.77rem;
+    font-weight: 600;
+}
+.trace-filter-bar input {
+    flex: 1;
+    max-width: 380px;
+    padding: 0.26rem 0.55rem;
+    border-radius: 4px;
+    border: 1px solid var(--panel-header-border);
+    background: var(--panel-bg);
+    color: var(--text-color);
+    font-family: var(--font-mono);
+    font-size: 0.77rem;
+}
+.trace-cell-changed {
+    background-color: var(--changed-highlight);
+    font-weight: 700;
+    color: var(--accent) !important;
+}
+.trace-row-active {
+    outline: 2px solid var(--debug-active-border);
+    background: var(--debug-active-bg) !important;
+}
+.action-btn.active,
+.tab-action-btn.active {
+    background-color: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1842,6 +2227,179 @@ footer {
     .tab-btn {
         white-space: nowrap;
     }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Workspace Manager («Οι Εργασίες μου») & Collapsible Notes Drawer          */
+/* -------------------------------------------------------------------------- */
+.eap-notes-drawer {
+    padding: 0.5rem 0.75rem;
+    background: color-mix(in srgb, var(--panel-header-bg) 82%, var(--panel-bg));
+    border-bottom: 1px solid var(--panel-header-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.38rem;
+}
+
+.eap-notes-drawer[hidden] {
+    display: none !important;
+}
+
+.eap-notes-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+}
+
+.eap-notes-sub {
+    color: var(--accent);
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+#eap-notes-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.42rem 0.58rem;
+    border-radius: 5px;
+    border: 1px solid var(--card-border);
+    background: var(--panel-bg);
+    color: var(--text-color);
+    font-family: var(--font-ui);
+    font-size: 0.81rem;
+    line-height: 1.45;
+    resize: vertical;
+    min-height: 62px;
+    max-height: 220px;
+}
+
+.action-btn.has-notes,
+.action-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.eap-ws-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 46vh;
+    overflow-y: auto;
+}
+
+.eap-ws-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 11px;
+    border-radius: 6px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+}
+
+.eap-ws-row.active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--card-bg));
+}
+
+.eap-ws-title-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.86rem;
+}
+
+.eap-ws-active-pill,
+.eap-ws-notes-pill {
+    font-size: 0.69rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+}
+
+.eap-ws-notes-pill {
+    background: color-mix(in srgb, var(--button-bg) 18%, transparent);
+    color: var(--text-color);
+    border: 1px solid var(--card-border);
+}
+
+.eap-ws-meta {
+    font-size: 0.73rem;
+    opacity: 0.74;
+    margin-top: 2px;
+}
+
+.eap-ws-actions {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Touch / Mobile Quick-Symbol Bar (:=  ;  [ ]  %  <> without layout switch)  */
+/* -------------------------------------------------------------------------- */
+.eap-touch-symbol-bar {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    overflow-x: auto;
+    background: color-mix(in srgb, var(--panel-header-bg) 88%, var(--panel-bg));
+    border-top: 1px solid var(--panel-header-border);
+    flex-shrink: 0;
+}
+
+.eap-touch-symbol-bar.force-visible {
+    display: flex;
+}
+
+@media (max-width: 960px), (pointer: coarse) {
+    .eap-touch-symbol-bar {
+        display: flex;
+    }
+}
+
+.eap-touch-sym-label {
+    font-size: 0.78rem;
+    opacity: 0.7;
+    padding: 0 3px;
+    user-select: none;
+}
+
+.eap-touch-sym-btn {
+    padding: 3px 9px;
+    min-width: 30px;
+    border-radius: 5px;
+    border: 1px solid var(--card-border);
+    background: var(--panel-bg);
+    color: var(--text-color);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.eap-touch-sym-btn:hover,
+.eap-touch-sym-btn:active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, var(--panel-bg));
+    color: var(--accent);
+}
+
+.pli10-snippet-chip.active,
+.snippet-chip.active {
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 } /* end @layer overrides */

@@ -944,6 +944,86 @@ PROCEDURE Put_Χ(Χ: IN) Εμφάνισε Χ; END_PROCEDURE;`;
   console.log('testOfficialEAPStructureChartLayout passed');
 }
 
+function testMermaidVisualEditorHelpers() {
+  const MmdEd = require('../mermaid-visual-editor.js');
+  assert.strictEqual(MmdEd.extractNodeKey('flowchart-N_CALC_M1-42'), 'N_CALC_M1');
+  assert.strictEqual(MmdEd.extractNodeKey('classId-C_Pelatis-7'), 'C_Pelatis');
+  assert.deepStrictEqual(MmdEd.parseTransformTranslate('translate(125.5, -40)'), { x: 125.5, y: -40 });
+
+  const d = 'M 10,20 C 30,20 50,80 70,80';
+  const ep = MmdEd.parsePathEndpoints(d);
+  assert.deepStrictEqual(ep.start, { x: 10, y: 20 });
+  assert.deepStrictEqual(ep.end, { x: 70, y: 80 });
+
+  const shifted = MmdEd.translateSvgPathD('M 10 20 L 30 40 Z', 5, -10);
+  assert.strictEqual(shifted.replace(/\s+/g, ' ').trim(), 'M 15 10 L 35 30 Z');
+
+  const ports = MmdEd.computePortPair(
+    { x: 60, y: 30, w: 80, h: 40 },
+    { x: 120, y: 180, w: 80, h: 40 }
+  );
+  assert.strictEqual(ports.p1.y, 70);
+  assert.strictEqual(ports.p2.y, 180);
+  const orthogonalPath = MmdEd.buildEdgePathD(ports.p1, ports.p2, ports.axis, 'stepAfter');
+  assert.ok(orthogonalPath.startsWith('M 100 70 L'));
+  console.log('testMermaidVisualEditorHelpers passed');
+}
+
+function testQuickFixesAndDataDictionaryAndDFDBalancing() {
+  // 1. Quick-Fix transforms for E02, E03, E04, E05, E06
+  let broken = `PROCEDURE EXEC_ROOT(X: IN)
+  LOCAL VAR A;
+  CALL GET_A(A);
+  CALL CALC_M1(A, B);
+  CALL PUT_B(B);
+END_PROCEDURE;
+
+PROCEDURE PUT_B(B: IN)
+  LOCAL VAR B;
+  ΑΡΧΙΚΟΠΟΙΗΣΕ B;
+  Εμφάνισε B στον Αποδέκτη 1;
+END_PROCEDURE;`;
+
+  // Iteratively apply quick fixes up to 8 times
+  for (let pass = 0; pass < 8; pass++) {
+    const res = Core.compilePLI11(broken);
+    const fixable = res.validation.diagnostics.find((d) => d.fixAction);
+    if (!fixable) break;
+    broken = Core.applyQuickFix(broken, fixable);
+  }
+  const fixedRes = Core.compilePLI11(broken);
+  const remainingFixable = fixedRes.validation.diagnostics.filter((d) =>
+    ['E02_PARAM_REDECLARED_LOCAL', 'E03_PARAM_INITIALIZED', 'E04_ROOT_HAS_PARAMS', 'E05_UNDECLARED_VAR', 'E06_UNINITIALIZED_LOCAL'].includes(d.code)
+  );
+  assert.strictEqual(remainingFixable.length, 0, `Expected all E02-E06 fixed, got: ${JSON.stringify(remainingFixable)}`);
+
+  // 2. Data Dictionary generation + custom overrides + DFD sourceLine attributes
+  const full = Core.compilePLI11(PLI11_EXAMPLES.GE1_2025_2026_FULL);
+  assert.ok(Array.isArray(full.dataDictionary) && full.dataDictionary.length >= 8, 'Expected populated Data Dictionary');
+  const storeEntry = full.dataDictionary.find((e) => e.category === 'Αποθήκη Δεδομένων');
+  assert.ok(storeEntry && storeEntry.eapSymbol.includes('{') && storeEntry.eapSymbol.includes('}'), 'Store should use EAP { ... } repeating notation');
+  const overridden = Core.generateDataDictionary(full.dfd, {
+    [storeEntry.key]: { definition: 'Αποθήκη_1 = { Κωδικός + Όνομα }', notes: 'Προσαρμοσμένο' }
+  });
+  const ovHit = overridden.find((e) => e.key === storeEntry.key);
+  assert.strictEqual(ovHit.eapSymbol, 'Αποθήκη_1 = { Κωδικός + Όνομα }');
+
+  const dfdSvg = Renderer.renderDFDSVG(full.dfd);
+  assert.ok(/class="dfd-node"[^>]*data-line="[1-9][0-9]*"/.test(dfdSvg), 'DFD process nodes must emit data-line for double-click jump-to-code');
+
+  // 3. DFD Black-Hole & Level 0 <-> Level 1 Unbalanced flow detection
+  const bhSpec = Core.parseDFDText('ΧΩΡΙΣ_ΚΜ\nΠΗΓΗ Χρήστης -> M1 : Αίτηση');
+  const bhDFD = Core.dfdSpecToDFD(bhSpec);
+  const bhDiags = Core.validateDFDBalancing(bhDFD, null);
+  assert.ok(bhDiags.some((d) => d.code === 'W05_DFD_BLACK_HOLE'), 'Expected W05_DFD_BLACK_HOLE');
+
+  const mismatchL0 = Core.dfdSpecToDFD(Core.parseDFDText('ΕΠΙΠΕΔΟ: 0\nΠΗΓΗ Χρήστης -> Σύστημα : Αίτηση, Μυστικό'));
+  const unbalDiags = Core.validateDFDBalancing(bhDFD, mismatchL0);
+  assert.ok(unbalDiags.some((d) => d.code === 'E12_DFD_UNBALANCED'), 'Expected E12_DFD_UNBALANCED when Level 0 has extra flow');
+
+  console.log('testQuickFixesAndDataDictionaryAndDFDBalancing passed');
+}
+
 testOfficialExamplesZeroErrors();
 testHomoglyphNormalization();
 testValidatorRules();
@@ -962,4 +1042,6 @@ testCanvasDimensionsOptions();
 testDFDFlowLabelOffsetBesideArrows();
 testSequentialProvenanceAndVerticalEAPLayout();
 testOfficialEAPStructureChartLayout();
+testMermaidVisualEditorHelpers();
+testQuickFixesAndDataDictionaryAndDFDBalancing();
 console.log('All ΠΛΗ11 tests passed!');

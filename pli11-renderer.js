@@ -2066,6 +2066,7 @@
     for (const n of renderNodes) {
       const c = coords.get(n.id);
       if (!c) continue;
+      const srcLnAttr = n.sourceLine ? ` data-line="${n.sourceLine}"` : '';
       if (c.shape === 'circle') {
         const isC = showKM && n.isCentral;
         const stroke = isC ? pal.rootStroke : pal.ctrlStroke;
@@ -2073,7 +2074,7 @@
         const lines = c.lines || [n.label];
         const fSize = lines.length > 3 ? 12 : (lines.length >= 2 ? 13 : 14);
         svgParts.push(
-          `<g class="dfd-node" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
+          `<g class="dfd-node" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}"${srcLnAttr} style="cursor: grab;">`,
           `  <circle cx="${c.cx.toFixed(1)}" cy="${c.cy.toFixed(1)}" r="${c.r}" fill="${fill}" stroke="${stroke}" stroke-width="${isC ? 2.4 : 1.9}" />`,
           renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '700', fill: pal.ink }),
           `</g>`
@@ -2086,7 +2087,7 @@
         const lines = c.lines || [n.label];
         const fSize = lines.length > 1 ? 12.5 : 13.5;
         svgParts.push(
-          `<g class="dfd-store" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
+          `<g class="dfd-store" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}"${srcLnAttr} style="cursor: grab;">`,
           `  <rect x="${x1.toFixed(1)}" y="${y1.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" fill="${pal.storeFill}" stroke="none" />`,
           `  <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${pal.storeStroke}" stroke-width="2" />`,
           `  <line x1="${x1.toFixed(1)}" y1="${y2.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${pal.storeStroke}" stroke-width="2" />`,
@@ -2100,7 +2101,7 @@
         const lines = c.lines || [n.label];
         const fSize = lines.length > 1 ? 12.5 : 13.5;
         svgParts.push(
-          `<g class="dfd-entity" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}" style="cursor: grab;">`,
+          `<g class="dfd-entity" data-node-id="${escXml(n.id)}" data-x="${c.cx.toFixed(1)}" data-y="${c.cy.toFixed(1)}"${srcLnAttr} style="cursor: grab;">`,
           `  <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${c.w.toFixed(1)}" height="${c.h.toFixed(1)}" rx="2" fill="${pal.ioFill}" stroke="${pal.ioStroke}" stroke-width="1.8"${dash} />`,
           renderMultilineText(lines, c.cx, c.cy, { fontSize: fSize, fontWeight: '600', fill: pal.ink }),
           `</g>`
